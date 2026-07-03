@@ -190,12 +190,18 @@ affects every swing) and FIGHT-082 (HIGH).
   chance boundary). Note: a tripped normal victim ends at `POS_FIGHTING`, not
   `RESTING` — ROM `damage()` (`:743-744`) re-seats a `timer<=4` victim after
   trip's `POS_RESTING`. HIGH.
-- **`FIGHT-083` — ⚠️ OPEN (MEDIUM, hunter-reported) — `dirt_kicking` missing the
+- **`FIGHT-083` — ✅ FIXED (2.14.224) — `dirt_kicking` missing the
   `if (chance % 5 == 0) chance += 1` anti-false-zero hack (`src/fight.c:2566-2568`)
   and using `if chance <= 0` where ROM's post-terrain `if (chance == 0)` (`:2604`)
-  uniquely means water/air.** `mud/skills/handlers.py:3197-3225`. Causes wrong
-  "There isn't any dirt to kick." on dry land for weak/low-dex kickers + skipped
-  wait/miss.
+  uniquely means water/air.** `mud/skills/handlers.py:dirt_kicking`. Both re-verified
+  against ROM C. Caused a wrong "There isn't any dirt to kick." on dry land for
+  weak/low-dex kickers + skipped wait/miss. **Fix (2.14.224):** inserted the
+  `c_mod(chance, 5) == 0 → chance += 1` hack after the level modifier / before the
+  terrain switch (c_mod: chance can be negative from dex/level mods; the `== 0` test
+  is sign-invariant), and changed the post-terrain gate from `chance <= 0` to
+  `chance == 0` so a negative dry-land chance proceeds to the guaranteed-miss
+  WAIT_STATE as in ROM. Test: `tests/integration/test_fight083_dirt_kick_false_zero.py`
+  (3 — false-zero at skill 20 INSIDE, negative-chance dry land, water still "no dirt").
 - **`FIGHT-084` — ⚠️ OPEN (MEDIUM, hunter-reported) — `check_parry` visibility
   operands inverted.** `mud/combat/engine.py:1594` uses `not victim.can_see(attacker)`;
   ROM `src/fight.c:1311` is `!can_see(ch, victim)` (attacker→victim). `can_see`

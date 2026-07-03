@@ -50,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **FIGHT-083: `dirt_kicking` false-zero hack + `chance == 0` terrain gate.**
+  `src/fight.c:2566-2608`. Restored ROM's "sloppy hack to prevent false zeroes"
+  (`chance % 5 == 0 → += 1`, before the terrain switch) and changed the
+  post-terrain gate from `chance <= 0` to `chance == 0`, so a weak/low-dex
+  kicker on dry land no longer wrongly sees "There isn't any dirt to kick." and
+  correctly eats the guaranteed-miss WAIT_STATE; only water/air (which hard-set
+  chance to 0) report no dirt.
 - **MAGIC-045: `heat_metal` collapsed ROM's cursed-item branches (HIGH).**
   `src/magic.c:3123-3277`. The port hardcoded `can_drop_obj` to `True`, so a
   worn cursed (NODROP) weapon/armor or a cursed inventory item was dropped and

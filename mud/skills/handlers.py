@@ -33,7 +33,7 @@ from mud.magic.effects import (
     poison_effect,
     shock_effect,
 )
-from mud.math.c_compat import c_div
+from mud.math.c_compat import c_div, c_mod
 from mud.mobprog import mp_act_trigger_room
 from mud.models.character import Character, SpellEffect, character_registry
 from mud.models.constants import (
@@ -3198,6 +3198,14 @@ def dirt_kicking(caster: Character, target: Character | None = None) -> str:
     victim_level = max(int(getattr(victim, "level", 0) or 0), 0)
     chance += (caster_level - victim_level) * 2
 
+    # FIGHT-083: ROM src/fight.c:2566-2568 — "sloppy hack to prevent false zeroes."
+    # Bumps a chance that lands exactly on a multiple of 5 (crucially 0) BEFORE the
+    # terrain switch, so that a post-terrain `chance == 0` uniquely means water/air
+    # (the only terrains that hard-set chance to 0). chance can be negative here, so
+    # use c_mod (C `%`, sign-of-dividend); the `== 0` test is sign-invariant anyway.
+    if c_mod(chance, 5) == 0:
+        chance += 1
+
     room = getattr(caster, "room", None)
     sector = Sector.INSIDE
     if room is not None:
@@ -3220,7 +3228,11 @@ def dirt_kicking(caster: Character, target: Character | None = None) -> str:
     elif sector in (Sector.WATER_SWIM, Sector.WATER_NOSWIM, Sector.AIR):
         chance = 0
 
-    if chance <= 0:
+    # FIGHT-083: ROM src/fight.c:2604 — `if (chance == 0)`, NOT `<= 0`. Thanks to the
+    # false-zero hack above, only water/air (which hard-set chance to 0) reach here at
+    # exactly 0; a negative dry-land chance (weak/low-dex kicker) still proceeds to the
+    # attack (guaranteed miss + WAIT_STATE + check_improve), as in ROM.
+    if chance == 0:
         _send_to_char(caster, "There isn't any dirt to kick.")
         return ""
 
