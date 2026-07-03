@@ -333,7 +333,10 @@ def test_rescue_switches_tank_and_wait_state(monkeypatch: pytest.MonkeyPatch) ->
     skill = skill_registry.get("rescue")
     assert skill is not None
 
-    rescuer = Character(name="Rescuer", level=40, is_npc=False, skills={"rescue": 75})
+    # ch_class=3 (warrior): HANDLER-008 do_rescue now uses get_skill, which gates on
+    # the class-skill level (rescue.levels=(53,53,53,1)); a mage-class char at 40 < 53
+    # would get 0. Warrior learns rescue at level 1.
+    rescuer = Character(name="Rescuer", level=40, is_npc=False, ch_class=3, skills={"rescue": 75})
     ally = Character(name="Ally", is_npc=False)
     foe = Character(name="Ogre", is_npc=True)
     onlooker = Character(name="Onlooker", is_npc=False)

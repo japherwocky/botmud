@@ -284,7 +284,10 @@ def do_rescue(char: Character, args: str) -> str:
     char.cooldowns = cooldowns
 
     roll = rng_mm.number_percent()
-    learned = _character_skill_percent(char, "rescue")
+    # HANDLER-008: ROM do_rescue rolls get_skill(ch, gsn_rescue) (src/fight.c:3082) —
+    # PC class-gated learned, NPC 40+level (was 0 via the dict → NPC rescue never
+    # worked), daze/drunk-adjusted.
+    learned = get_skill(char, "rescue")
     success = roll <= learned
 
     if not success:
