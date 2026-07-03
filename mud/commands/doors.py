@@ -655,9 +655,13 @@ def do_pick(char: Character, args: str) -> str:
     exit_info = getattr(pexit, "exit_info", 0)
     key_vnum = getattr(pexit, "key", 0)
 
-    # Immortal check (ROM C lines 958, 963, 973)
-    trust = getattr(char, "trust", 0)
-    is_immortal = trust >= 51  # LEVEL_HERO threshold
+    # Immortal check (ROM C lines 958, 963, 973): !IS_IMMORTAL(ch), where
+    # IS_IMMORTAL = get_trust(ch) >= LEVEL_IMMORTAL (=52, src/merc.h:149,2091)
+    # and get_trust falls back to ch->level when ch->trust is unset. The prior
+    # `trust >= 51` was wrong twice: 51 is LEVEL_HERO (a mortal), and reading raw
+    # `char.trust` skipped the level fallback (a level-52 immortal with trust 0
+    # was wrongly refused). Character.is_immortal() encodes both correctly.
+    is_immortal = char.is_immortal()
 
     if not (exit_info & EX_CLOSED) and not is_immortal:
         return "It's not closed."

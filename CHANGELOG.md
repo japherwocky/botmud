@@ -50,6 +50,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **PICK-003: `do_pick` door immortal-bypass used the wrong threshold and
+  skipped the `get_trust` level fallback.** The door branch had
+  `is_immortal = trust >= 51` reading raw `char.trust`. ROM gates on
+  `!IS_IMMORTAL(ch)` where `IS_IMMORTAL = get_trust(ch) >= LEVEL_IMMORTAL` (=52)
+  and `get_trust` falls back to level when trust is unset
+  (`src/act_move.c:958,963,973`, `src/merc.h:149,2091`). So (a) a trust-51
+  mortal hero wrongly bypassed pickproof/open-door gates, and (b) a level-52
+  immortal with trust 0 was wrongly refused ("You failed.") on a pickproof door.
+  Fixed to `char.is_immortal()`. Contradicts a stale "immortal bypass FIXED"
+  audit claim. Same wrong-constant class as GET-015.
 - **GET-015: `get all <pit>` greed gate treated a level-51 mortal hero as
   immortal.** The pit donation gate hardcoded `char_trust >= 51`, but ROM gates
   on `!IS_IMMORTAL(ch)` where `IS_IMMORTAL = get_trust(ch) >= LEVEL_IMMORTAL`
