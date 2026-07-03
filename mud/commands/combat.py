@@ -1231,8 +1231,16 @@ def do_trip(char: Character, args: str) -> str:
     if victim_pos < Position.FIGHTING:
         return "They are already down."
 
+    # FIGHT-082: ROM src/fight.c:2700/2742/2750 — do_trip WAIT_STATE uses the
+    # skill's RAW beats (skill_table[gsn_trip].beats == 24), not PULSE_VIOLENCE,
+    # with no HASTE/SLOW adjustment (read skill.beats directly, per CAST-010; the
+    # _compute_skill_lag haste/slow scaling is FIGHT-085's separate concern and
+    # must stay out of ROM WAIT_STATE sites).
+    trip_beats = int(getattr(skill_registry.get("trip"), "beats", 0) or 0)
+
     if victim is char:
-        skill_registry._apply_wait_state(char, get_pulse_violence() * 2)
+        # ROM src/fight.c:2700 — WAIT_STATE(ch, 2 * skill_table[gsn_trip].beats).
+        skill_registry._apply_wait_state(char, 2 * trip_beats)
         return "You fall flat on your face!"
 
     # FIGHT-071: ROM src/fight.c:2705-2709 — do_trip's charm gate, checked LAST
@@ -1258,6 +1266,13 @@ def do_trip(char: Character, args: str) -> str:
     victim_dex = victim.get_curr_stat(Stat.DEX) or 0
     chance += char_dex - victim_dex * 3 // 2
 
+    # Speed modifier — ROM src/fight.c:2722-2726: attacker OFF_FAST/AFF_HASTE
+    # adds +10, victim OFF_FAST/AFF_HASTE subtracts 20.
+    if (_npc_off_flags(char) & OffFlag.FAST) or char.has_affect(AffectFlag.HASTE):
+        chance += 10
+    if (_npc_off_flags(victim) & OffFlag.FAST) or victim.has_affect(AffectFlag.HASTE):
+        chance -= 20
+
     # Level modifier
     char_level = skill_handlers._coerce_int(getattr(char, "level", 1))
     victim_level = skill_handlers._coerce_int(getattr(victim, "level", 1))
@@ -1265,18 +1280,21 @@ def do_trip(char: Character, args: str) -> str:
 
     # Roll
     if rng_mm.number_percent() < chance:
-        # Success
+        # Success — ROM src/fight.c:2741-2745.
+        # DAZE_STATE(victim, 2 * PULSE_VIOLENCE) — the victim is DAZED, not WAIT'd.
+        victim.daze = max(int(getattr(victim, "daze", 0) or 0), 2 * get_pulse_violence())
+        # WAIT_STATE(ch, skill_table[gsn_trip].beats) — raw beats, not PULSE_VIOLENCE.
+        skill_registry._apply_wait_state(char, trip_beats)
         victim.position = Position.RESTING
-        skill_registry._apply_wait_state(char, get_pulse_violence())
-        skill_registry._apply_wait_state(victim, get_pulse_violence() * 2)
 
-        # Damage
-        damage_amt = rng_mm.number_range(2, 2 + 2 * victim_size + skill_level // 20)
+        # Damage — ROM :2744 number_range(2, 2 + 2 * victim->size); no skill-level term.
+        damage_amt = rng_mm.number_range(2, 2 + 2 * victim_size)
         apply_damage(char, victim, damage_amt, DamageType.BASH)
 
         message = f"You trip {getattr(victim, 'name', 'them')} and they go down!"
     else:
-        skill_registry._apply_wait_state(char, get_pulse_violence())
+        # ROM :2750 — WAIT_STATE(ch, skill_table[gsn_trip].beats * 2 / 3).
+        skill_registry._apply_wait_state(char, trip_beats * 2 // 3)
         message = "You try to trip them but miss."
 
     check_killer(char, victim)  # mirroring ROM src/fight.c:2753 — unconditional

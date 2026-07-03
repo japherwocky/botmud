@@ -171,13 +171,25 @@ affects every swing) and FIGHT-082 (HIGH).
   `c_div(victim_ac, 10)`). Test: `tests/integration/test_fight081_ac_scale_order.py`
   (3 — -100 AC scale, -200 AC rescale band, invis -4 gated on can_see not the affect).
   As predicted, no existing combat test needed re-baselining (3387 pass). HIGH.
-- **`FIGHT-082` — ⚠️ OPEN (HIGH, hunter-reported) — `do_trip` cluster.**
-  `mud/commands/combat.py:1234-1283` vs `src/fight.c:2711-2753`. (a) damage upper
-  bound has a spurious `skill_level // 20` term (ROM `number_range(2, 2 + 2*victim->size)`,
-  `:2744`); (b) missing OFF_FAST/AFF_HASTE speed modifier (`chance += 10` self /
-  `-= 20` victim, `:2722-2726`); (c) wrong wait/daze values — success attacker
-  should be `beats`(24) not `PULSE_VIOLENCE`(12), failure `beats*2/3`(16), self-trip
-  `2*beats`(48), and the victim should get **DAZE** not WAIT (`:2741`).
+- **`FIGHT-082` — ✅ FIXED (2.14.222) — `do_trip` cluster.**
+  `mud/commands/combat.py:1234-1283` vs `src/fight.c:2711-2753`. All four
+  hunter-reported sub-claims re-verified against ROM C and confirmed: (a) damage
+  upper bound had a spurious `skill_level // 20` term (ROM `number_range(2, 2 +
+  2*victim->size)`, `:2744`); (b) missing OFF_FAST/AFF_HASTE speed modifier
+  (`chance += 10` self / `-= 20` victim, `:2722-2726`); (c) wrong wait/daze values
+  — success attacker was `PULSE_VIOLENCE`(12) not `beats`(24), failure was
+  `PULSE_VIOLENCE` not `beats*2/3`(16), self-trip was `2*PULSE_VIOLENCE`(24) not
+  `2*beats`(48), and the victim got **WAIT** where ROM `DAZE_STATE`s it
+  (`2*PULSE_VIOLENCE`, `:2741`). **Fix (2.14.222):** read `trip_beats` from
+  `skill_registry.get("trip").beats` (raw, no haste/slow — CAST-010 precedent);
+  added the ROM speed-modifier block; success now `DAZE`s the victim and WAITs the
+  attacker for raw `beats`, failure WAITs `beats*2//3`, self-trip WAITs `2*beats`;
+  dropped the `skill_level // 20` damage term. Test:
+  `tests/integration/test_fight082_do_trip_cluster.py` (5 — raw beats + DAZE,
+  failure 2/3-beats, self-trip 2×beats, damage bound has no skill term, haste +10
+  chance boundary). Note: a tripped normal victim ends at `POS_FIGHTING`, not
+  `RESTING` — ROM `damage()` (`:743-744`) re-seats a `timer<=4` victim after
+  trip's `POS_RESTING`. HIGH.
 - **`FIGHT-083` — ⚠️ OPEN (MEDIUM, hunter-reported) — `dirt_kicking` missing the
   `if (chance % 5 == 0) chance += 1` anti-false-zero hack (`src/fight.c:2566-2568`)
   and using `if chance <= 0` where ROM's post-terrain `if (chance == 0)` (`:2604`)
@@ -201,6 +213,20 @@ affects every swing) and FIGHT-082 (HIGH).
   hand-to-hand to 1.** `mud/skills/handlers.py:3305` `max(hand_to_hand, 1)`; ROM
   `src/fight.c:3188` uses raw `hth`, so an unarmed NPC with `hth == 0` gets chance 0
   in ROM, nonzero in Python. Narrow edge case.
+- **`FIGHT-088` — ⚠️ OPEN (MEDIUM) — `do_trip` uses plain return strings and
+  omits the failure `damage(0)` call.** Surfaced 2026-07-03 while closing
+  FIGHT-082 (full `do_trip` read). (a) ROM success emits three `act()` lines —
+  `"$n trips you and you go down!"` TO_VICT, `"You trip $N and $N goes down!"`
+  TO_CHAR, `"$n trips $N, sending $M to the ground."` TO_NOTVICT (`src/fight.c:2735-2738`);
+  Python `mud/commands/combat.py` returns a single baked
+  `f"You trip {victim.name} and they go down!"` string with no room broadcast
+  and no `$N`/`$M` PERS rendering (act()-render class, sibling of FIGHT-073). (b)
+  ROM failure calls `damage(ch, victim, 0, gsn_trip, DAM_BASH, TRUE)` (`:2749`)
+  before the wait — delivering the standard miss combat message and starting the
+  fight — whereas Python's failure branch only sets the wait and returns
+  `"You try to trip them but miss."` (no `damage(0)` call, so no miss dam_message,
+  no fight-start on a cold trip). Both are pre-existing and were **not** part of
+  FIGHT-082's four wait/daze/chance items.
 
 ### Follow-ups (FIGHT-022 / FIGHT-023 / FIGHT-025 / FIGHT-026 — filed, not yet closed)
 

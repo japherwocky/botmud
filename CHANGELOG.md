@@ -50,6 +50,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **FIGHT-082: `do_trip` cluster — four ROM divergences (HIGH).** `src/fight.c:2711-2753`.
+  (a) dropped the spurious `skill_level // 20` term from the bash-damage bound
+  (ROM `number_range(2, 2 + 2*victim->size)`); (b) added the missing
+  OFF_FAST/AFF_HASTE speed modifier (`+10` self / `-20` victim); (c) fixed the
+  wait/daze values — success now WAITs the attacker for the skill's raw `beats`
+  (24) and `DAZE`s the victim (`2*PULSE_VIOLENCE`) instead of WAITing it, failure
+  WAITs `beats*2/3` (16), and self-trip WAITs `2*beats` (48) — all previously a
+  flat `PULSE_VIOLENCE`.
 - **FIGHT-081: melee AC modifiers applied at the wrong scale/order in
   `attack_round` (HIGH — every swing).** ROM `one_hit` (`src/fight.c:480-503`)
   divides `GET_AC` by 10 **first**, then applies the `< -15` rescale and the
