@@ -26,7 +26,8 @@ import pytest
 
 from mud.models.constants import OffFlag, WeaponType, WearLocation
 from mud.skills import handlers as skill_handlers
-from mud.skills.handlers import _hand_to_hand_skill, disarm
+from mud.skills.handlers import disarm
+from mud.skills.skill_lookup import get_skill
 from mud.utils import rng_mm
 from mud.world import create_test_character, initialize_world
 
@@ -65,32 +66,35 @@ def test_unarmed_npc_disarm_uses_rom_hand_to_hand_skill(monkeypatch: pytest.Monk
     victim.is_npc = True
     caster.level = 10
     victim.level = 10
-    caster.skills = {"disarm": 100}  # ROM disarm-skill gate; isolate the hand-to-hand term
-    caster.off_flags = int(OffFlag.DISARM)  # unarmed NPC allowed to disarm
+    caster.skills = {"disarm": 100}  # disarm-skill gate (still dict-sourced; see handlers.py)
+    # HANDLER-008: the hand-to-hand skill now comes from get_skill (NPC 40+2*10 = 60),
+    # so an unarmed NPC computes a real chance instead of the old floor-of-1.
+    caster.off_flags = int(OffFlag.DISARM)
     # wait > 0 so the disarm-success path drops the weapon to the room rather than the
     # NPC-recovery branch (which is MobInstance-only; a flag-flipped Character lacks
     # add_to_inventory). Irrelevant to the chance under test.
     victim.wait = 5
     _wield(victim)
 
-    # roll 0: chance = disarm(100) * hth / 150 + modifiers(=-16).
-    #   floor path (hth=1):   c_div(100,150)=0  → chance clamps to 0  → 0>=0 → FAIL
-    #   ROM path  (hth=40+2*10=60): c_div(6000,150)=40 → chance 24    → 0<24 → SUCCEED
+    # roll 0: chance = disarm(50) unarmed → c_div(50*60,150)=20; + modifiers(=-16) = 4;
+    # 0 < 4 → SUCCEED. (The pre-HANDLER-008 skills-dict lookup gave disarm=0 → the
+    # "You don't know how to disarm" gate, or hand-to-hand=0 → floor-of-1 → chance 0.)
     monkeypatch.setattr(rng_mm, "number_percent", lambda: 0)
     monkeypatch.setattr(skill_handlers.rng_mm, "number_percent", lambda: 0)
 
-    assert disarm(caster, victim) is True, "unarmed NPC disarm should use raw hand-to-hand skill"
+    assert disarm(caster, victim) is True, "unarmed NPC disarm should use ROM get_skill values"
 
 
-def test_hand_to_hand_skill_mirrors_rom_get_skill() -> None:
-    # ROM get_skill (src/handler.c:394): PC → learned percent; NPC → 40 + 2*level
-    # (hand-to-hand has no ACT gate, unlike backstab's ACT_THIEF).
-    pc = create_test_character("Monk", _ROOM)
-    pc.is_npc = False
-    pc.skills["hand to hand"] = 55
-    assert _hand_to_hand_skill(pc) == 55
-
+def test_disarm_hand_to_hand_uses_unified_get_skill() -> None:
+    # HANDLER-008: disarm's unarmed hand-to-hand skill now comes from get_skill.
+    # NPC → 40+2*level (no ACT gate); PC → learned percent.
     npc = create_test_character("Brawler", _ROOM)
     npc.is_npc = True
     npc.level = 12
-    assert _hand_to_hand_skill(npc) == 40 + 2 * 12
+    assert get_skill(npc, "hand to hand") == 40 + 2 * 12
+
+    pc = create_test_character("Monk", _ROOM)
+    pc.is_npc = False
+    pc.level = 60  # above class gate
+    pc.skills["hand to hand"] = 55
+    assert get_skill(pc, "hand to hand") == 55

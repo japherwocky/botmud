@@ -75,6 +75,7 @@ from mud.net.protocol import broadcast_room
 from mud.registry import room_registry
 from mud.skills.metadata import ROM_SKILL_METADATA, ROM_SKILL_NAMES_BY_INDEX
 from mud.skills.registry import check_improve
+from mud.skills.skill_lookup import get_skill
 from mud.spawning.obj_spawner import spawn_object
 from mud.utils import rng_mm
 from mud.utils.act import act_format, act_to_room, capitalize_act_line
@@ -192,21 +193,6 @@ def _skill_percent(character: Character, name: str) -> int:
     except (TypeError, ValueError):  # pragma: no cover - defensive guard
         percent = 0
     return max(0, min(100, percent))
-
-
-def _hand_to_hand_skill(character: Character) -> int:
-    """ROM get_skill(ch, gsn_hand_to_hand) for do_disarm's unarmed chance.
-
-    Mirrors src/handler.c:394 — NPCs get ``40 + 2*level`` (no ACT gate, unlike
-    backstab); PCs use their learned percent. The systemic daze/drunk get_skill
-    modifiers (src/handler.c:434-442) remain unported (HANDLER-008); this is a
-    partial, hand-to-hand-only mirror, the same spirit as
-    the (now-removed) backstab partial mirror — both migrating onto HANDLER-008's
-    unified ``mud.skills.skill_lookup.get_skill``.
-    """
-    if getattr(character, "is_npc", False):
-        return 40 + 2 * int(getattr(character, "level", 0) or 0)
-    return _skill_percent(character, "hand to hand")
 
 
 def _skill_beats(name: str) -> int:
@@ -3313,13 +3299,22 @@ def disarm(caster: Character, target: Character | None = None) -> bool:
         _send_to_char(caster, "Your opponent is not wielding a weapon.")
         return False
 
+    # HANDLER-008 (deferred): ROM do_disarm gates on and scales by
+    # get_skill(ch, gsn_disarm) (src/fight.c:3155). Migrating this lookup to
+    # get_skill enforces ROM's PC class-level gate (an NPC with OFF_DISARM would
+    # also finally disarm), but it is a real behavior change that requires the
+    # existing PC disarm parity tests to set a real ch_class — left as a focused
+    # follow-up. For now the disarm-skill percent still comes from the dict.
     skill = _skill_percent(caster, "disarm")
     if skill <= 0:
         _send_to_char(caster, "You don't know how to disarm opponents.")
         return False
 
     caster_weapon = get_wielded_weapon(caster)
-    hand_to_hand = _hand_to_hand_skill(caster)  # ROM get_skill(ch, gsn_hand_to_hand)
+    # HANDLER-008: the unarmed hand-to-hand skill now comes from unified get_skill
+    # (retiring the _hand_to_hand_skill partial mirror) — ROM get_skill(ch,
+    # gsn_hand_to_hand), NPC 40+2*level, and daze/drunk-adjusted.
+    hand_to_hand = get_skill(caster, "hand to hand")
     caster_off = int(getattr(caster, "off_flags", 0) or 0)
     caster_is_npc = bool(getattr(caster, "is_npc", False))
 

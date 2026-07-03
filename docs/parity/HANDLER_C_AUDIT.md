@@ -351,16 +351,18 @@ had encoded the same index-1-is-DEX error).
 | Python | There is **no unified `get_skill` port**. Skill percents are fetched ad-hoc — `mud/combat/engine.py:_lookup_skill_percent`/`_get_skill_percent`/`_backstab_skill`, `mud/commands/combat.py:_character_skill_percent`, etc. — none of which apply the daze (`skill /= 2` for spells, `2*skill/3` for skills) or drunk (`9*skill/10`) reductions. |
 | Status | 🔄 IN PROGRESS (2.14.232) — the faithful unified `get_skill` is now implemented at `mud/skills/skill_lookup.py:get_skill` (PC class-level gate + learned; full NPC formula dispatch; daze `skill/2`/`2*skill/3`; drunk `9*skill/10`; `URANGE(0,skill,100)`), self-contained + unit-tested (`tests/test_get_skill.py`, 16). **Call-site migrations pending** — the five workaround sites below still need routing through it before this row is ✅. Surfaced 2026-07-03 while closing FIGHT-086. |
 
-**Known affected sites (partial mirrors shipped where a single gap needed one):**
-`mud/combat/engine.py:_backstab_skill` (FIGHT-086) and
-`mud/skills/handlers.py:_hand_to_hand_skill` (FIGHT-087) are backstab-/hand-to-hand-only
-partial mirrors that supply the NPC formula but skip the daze/drunk step;
-`mud/commands/combat.py:do_kick` inlines the NPC `10+3*level` (FIGHT-091, same
-partial-mirror shape). Still unfixed: `mud/skills/handlers.py:disarm`'s own
-`skill = _skill_percent(caster, "disarm")` (an NPC with OFF_DISARM should get
-`20+3*level`, `src/handler.c:405`), and every other ad-hoc percent lookup across
-combat/skills. **Four sites now carry the same NPC-formula workaround — the unified
-`get_skill` port is overdue; it would retire all of them and add daze/drunk uniformly.**
+**Site migration status (onto `mud/skills/skill_lookup.py:get_skill`):**
+- ✅ `mud/commands/combat.py:do_kick` — migrated (2.14.233), NPC-formula workaround retired, daze/drunk now apply.
+- ✅ `mud/combat/engine.py:attack_round` backstab THAC0 — migrated (2.14.234), `_backstab_skill` removed.
+- ✅ `mud/skills/handlers.py:disarm` hand-to-hand — migrated (2.14.235), `_hand_to_hand_skill` removed.
+- ⚠️ **`mud/skills/handlers.py:disarm` disarm-**skill** lookup** — still dict-sourced.
+  Migrating enforces ROM's PC class-level gate (`disarm.levels = (53,53,12,11)`),
+  which requires the ~10 `TestDisarmRomParity` PC tests to set a real warrior
+  `ch_class` (they name the char "warrior" but leave `ch_class=0`/mage). A focused
+  follow-up: fix those tests to be ROM-faithful, then migrate.
+- ⚠️ `mud/commands/combat.py:do_rescue` — `get_skill(gsn_rescue)` roll still dict-sourced (NPC rescue).
+- ⚠️ Every other ad-hoc percent lookup across combat/skills (`_lookup_skill_percent`,
+  `_character_skill_percent`, etc.) — migrate opportunistically.
 
 The scope is systemic: the correct fix is a single `get_skill(ch, sn)` helper
 mirroring `src/handler.c:346-448` in full (PC learned / NPC formula defaults +
