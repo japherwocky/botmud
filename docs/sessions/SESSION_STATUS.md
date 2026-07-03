@@ -20,8 +20,12 @@
   - **`FIGHT-091`** (2.14.231) — NPC kick chance uses ROM `get_skill` `10+3*level`
     (`src/fight.c:3125`); NPC kicks could never land before.
   - Filed OPEN (out-of-scope, surfaced while reading ROM): **`FIGHT-090`** (MEDIUM —
-    `do_trip`/`skill_handlers.trip` duplicate impls), **`HANDLER-008`** (MODERATE —
-    unified `get_skill` port; the NPC-formula workaround now spans **5 sites**).
+    `do_trip`/`skill_handlers.trip` duplicate impls).
+  - **`HANDLER-008`** (🔄 IN PROGRESS, 2.14.232–235) — the unified `get_skill` port:
+    core landed at `mud/skills/skill_lookup.py:get_skill` (self-contained,
+    `tests/test_get_skill.py` × 16); **3 of 5 sites migrated** (do_kick, backstab,
+    disarm hand-to-hand — partial mirrors retired, daze/drunk now apply); the
+    disarm-skill gate + do_rescue roll deferred (class-gate migration follow-up).
 - **Pointer to latest summary**:
   [SESSION_SUMMARY_2026-07-03_FIGHT_COLD_PATH_TAIL_GETSKILL.md](SESSION_SUMMARY_2026-07-03_FIGHT_COLD_PATH_TAIL_GETSKILL.md)
 
@@ -29,26 +33,28 @@
 
 | Metric | Value |
 |--------|-------|
-| Version | 2.14.231 |
-| Tests | 6061 passed, 4 skipped, 0 failed (+40 pre-existing aiohttp env collection errors) |
+| Version | 2.14.235 |
+| Tests | 6079 passed, 4 skipped, 0 failed (+40 pre-existing aiohttp env collection errors) |
 | Cross-file invariants | INV-054 latest (unchanged) |
-| Cold-path queue | FIGHT-085/086/087/088/089/091 closed; FIGHT-090 + HANDLER-008 + MAGIC-046 OPEN |
-| Active focus | Cold-path divergence hunt — FIGHT tail closed; get_skill consolidation queued |
+| Cold-path queue | FIGHT-085/086/087/088/089/091 closed; HANDLER-008 core + 3/5 sites done; FIGHT-090 + MAGIC-046 + HANDLER-008 tail OPEN |
+| Active focus | HANDLER-008 get_skill consolidation (3/5 sites migrated); class-gate migration follow-up next |
 
 ## Next Intended Task
 
-**Port ROM `get_skill` (HANDLER-008) — the #1 priority.** The get_skill
-NPC-formula workaround now appears at five combat sites (`_backstab_skill`,
-`_hand_to_hand_skill`, `do_kick` inline, the `disarm`-skill lookup, and
-`do_rescue`'s roll), and the daze/drunk skill modifiers are unported everywhere.
-Build a faithful unified `get_skill(ch, sn)` mirroring `src/handler.c:346-448`
-(PC learned + class-level gate; NPC formula dispatch; daze `skill/2`/`2*skill/3`;
-drunk `9*skill/10`; `URANGE(0,skill,100)`) — add it self-contained + unit-tested
-first (zero call-site changes), then migrate the five sites and retire the
-partial mirrors. `Skill` exposes `type`/`levels`; `Character` exposes
-`daze`/`condition[COND_DRUNK]`. Then **MAGIC-046** (ROM-ordered `carrying`
-accessor for `heat_metal`) and **FIGHT-090** (unify the two `do_trip` impls),
-then resume cold-path / cross-INV divergence hunting.
+**Finish HANDLER-008 — the class-gate migration follow-up.** The unified
+`get_skill` core is landed and 3 of 5 sites migrated. The remaining two
+(`disarm`-skill gate, `do_rescue` roll) both read the skills dict; migrating them
+onto `get_skill` enforces ROM's PC class-level gate — correct, but it makes the
+~10 `TestDisarmRomParity` PC tests (and any rescue PC tests) fail because they
+create a char named "warrior" but leave `ch_class=0` (mage), below the
+`disarm.levels=(53,53,12,11)` / `rescue.levels=(53,53,53,1)` mage requirement.
+The follow-up: set a real warrior `ch_class` on those ROM-parity test chars (a
+faithful correction — they assert non-ROM ungated behavior), then migrate both
+lookups and retire the last dict reads. After that, migrate the remaining ad-hoc
+`_lookup_skill_percent`/`_character_skill_percent` sites opportunistically to
+close HANDLER-008. Then **MAGIC-046** (ROM-ordered `carrying` accessor for
+`heat_metal`) and **FIGHT-090** (unify the two `do_trip` impls), then resume
+cold-path / cross-INV divergence hunting.
 
 **Tooling note:** the GitNexus MCP server is disconnected; the on-disk index was
 reindexed twice this session (fresh as of the FIGHT-091 commit). Restart the MCP

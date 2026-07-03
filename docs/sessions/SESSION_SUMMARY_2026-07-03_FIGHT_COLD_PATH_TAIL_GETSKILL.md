@@ -65,6 +65,32 @@ ROM C first per the AGENTS.md re-verify rule; full suite regression-clean.
 - **Fix**: NPC branch now `max(0, min(100, 10 + 3*level))`; PC branch unchanged. Fourth site of the HANDLER-008 get_skill NPC-formula class.
 - **Tests**: `tests/integration/test_fight091_npc_kick_skill.py` (1 — NPC kick lands at a roll where the 0-chance path always missed). Green.
 
+### `HANDLER-008` — 🔄 IN PROGRESS (2.14.232–235) — unified `get_skill` port
+
+The systemic root cause was tackled directly rather than papering over more sites.
+
+- **Core (2.14.232)** — `mud/skills/skill_lookup.py:get_skill`, a faithful port of
+  ROM `get_skill` (`src/handler.c:346-448`): PC class-level gate + learned; the full
+  NPC formula dispatch (spell `40+2*level`, weapon `40+5*level/2`, kick `10+3*level`,
+  backstab+ACT_THIEF, dodge/parry/trip/bash/disarm/berserk by off/act flags, …); the
+  daze (`skill/2` spell, `2*skill/3` skill) and drunk (`9*skill/10`, PC) reductions;
+  `URANGE(0,skill,100)`. `c_div` on the daze/drunk divisions (the "third attack"
+  branch `4*level-40` is negative below level 10). Self-contained + unit-tested
+  (`tests/test_get_skill.py`, 16). Zero call-site changes → zero regression risk.
+- **Site migrations** — routed three of the five workaround sites onto `get_skill`,
+  retiring their partial mirrors and newly applying ROM's daze/drunk at each:
+  - `do_kick` (2.14.233) — retired the inline NPC `10+3*level`.
+  - backstab THAC0 in `attack_round` (2.14.234) — removed `engine._backstab_skill`.
+  - `disarm` hand-to-hand (2.14.235) — removed `handlers._hand_to_hand_skill`.
+- **Deferred (documented in the HANDLER-008 audit row):** the `disarm`-**skill** gate
+  and `do_rescue`'s roll both still read the dict. Migrating them enforces ROM's PC
+  class-level gate, which requires the ~10 `TestDisarmRomParity` (and the rescue) PC
+  tests to set a real warrior `ch_class` (they name the char "warrior" but leave
+  `ch_class=0`/mage). A focused "class-gate migration" follow-up.
+- **Tests**: `tests/test_get_skill.py` (16) + daze-integration at the kick site +
+  get_skill-based assertions replacing the retired-helper unit tests. Full suite
+  **6079 passed, 0 failed**.
+
 ## New findings filed (durable, not fixed this session)
 
 - **`FIGHT-090`** (MEDIUM, `FIGHT_C_AUDIT.md`) — `do_trip` (command) and `skill_handlers.trip` (skill-registry `"function": "trip"`) are divergent duplicate implementations of ROM `do_trip`; both live, each with its own gate ordering/message wording. Unify to one implementation.
