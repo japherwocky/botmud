@@ -77,19 +77,29 @@ The systemic root cause was tackled directly rather than papering over more site
   `URANGE(0,skill,100)`. `c_div` on the daze/drunk divisions (the "third attack"
   branch `4*level-40` is negative below level 10). Self-contained + unit-tested
   (`tests/test_get_skill.py`, 16). Zero call-site changes → zero regression risk.
-- **Site migrations** — routed three of the five workaround sites onto `get_skill`,
-  retiring their partial mirrors and newly applying ROM's daze/drunk at each:
+- **Site migrations — all five offensive-skill sites** routed onto `get_skill`,
+  retiring every partial mirror and newly applying ROM's daze/drunk (and the PC
+  class-level gate) at each:
   - `do_kick` (2.14.233) — retired the inline NPC `10+3*level`.
   - backstab THAC0 in `attack_round` (2.14.234) — removed `engine._backstab_skill`.
   - `disarm` hand-to-hand (2.14.235) — removed `handlers._hand_to_hand_skill`.
-- **Deferred (documented in the HANDLER-008 audit row):** the `disarm`-**skill** gate
-  and `do_rescue`'s roll both still read the dict. Migrating them enforces ROM's PC
-  class-level gate, which requires the ~10 `TestDisarmRomParity` (and the rescue) PC
-  tests to set a real warrior `ch_class` (they name the char "warrior" but leave
-  `ch_class=0`/mage). A focused "class-gate migration" follow-up.
+  - `disarm`-**skill** gate (2.14.236) — NPC disarm now works (OFF_DISARM → 20+3*level;
+    was 0 → always rejected).
+  - `do_rescue` roll (2.14.237) — NPC rescue now works (40+level; was 0 → never succeeded).
+- **Class-gate test fixes (2.14.238)** — the disarm-skill/rescue migrations enforce
+  ROM's PC class-level gate; **the per-area runs passed but the full suite caught 8
+  cross-file failures** (disarm/rescue tests in 5 files creating default *mage*-class
+  casters that get_skill correctly gates to 0). Fixed ROM-faithfully by setting
+  `ch_class=3` (warrior) + adequate level on those casters — they were asserting
+  ungated behavior a mage-class char can't have. A worked example of the advisor's
+  "run the full suite, not just per-area" rule.
+- **Remaining before HANDLER-008 is ✅:** the *defensive* checks
+  `check_dodge`/`check_parry`/`check_shield_block` still read the dict for their
+  NPC-defender skill (ROM: OFF_DODGE dodger `level*2`, etc.) — so NPC mobs never
+  dodge/parry/shield-block. Documented in the audit row; same class-gate blast radius.
 - **Tests**: `tests/test_get_skill.py` (16) + daze-integration at the kick site +
-  get_skill-based assertions replacing the retired-helper unit tests. Full suite
-  **6079 passed, 0 failed**.
+  get_skill-based assertions replacing retired-helper unit tests + 8 cross-file
+  class-gate fixes. Full suite **6079 passed, 0 failed**.
 
 ## New findings filed (durable, not fixed this session)
 

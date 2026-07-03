@@ -21,11 +21,13 @@
     (`src/fight.c:3125`); NPC kicks could never land before.
   - Filed OPEN (out-of-scope, surfaced while reading ROM): **`FIGHT-090`** (MEDIUM —
     `do_trip`/`skill_handlers.trip` duplicate impls).
-  - **`HANDLER-008`** (🔄 IN PROGRESS, 2.14.232–235) — the unified `get_skill` port:
-    core landed at `mud/skills/skill_lookup.py:get_skill` (self-contained,
-    `tests/test_get_skill.py` × 16); **3 of 5 sites migrated** (do_kick, backstab,
-    disarm hand-to-hand — partial mirrors retired, daze/drunk now apply); the
-    disarm-skill gate + do_rescue roll deferred (class-gate migration follow-up).
+  - **`HANDLER-008`** (🔄 IN PROGRESS, 2.14.232–238) — the unified `get_skill` port:
+    core at `mud/skills/skill_lookup.py:get_skill` (self-contained,
+    `tests/test_get_skill.py` × 16); **all 5 offensive-skill sites migrated**
+    (do_kick, backstab, disarm hand-to-hand, disarm-skill gate, do_rescue — every
+    partial mirror retired, NPC formulas + daze/drunk + PC class-gate now apply);
+    8 cross-file disarm/rescue tests fixed to set warrior `ch_class`. Remaining:
+    the defensive `check_dodge`/`check_parry`/`check_shield_block` NPC lookups.
 - **Pointer to latest summary**:
   [SESSION_SUMMARY_2026-07-03_FIGHT_COLD_PATH_TAIL_GETSKILL.md](SESSION_SUMMARY_2026-07-03_FIGHT_COLD_PATH_TAIL_GETSKILL.md)
 
@@ -33,26 +35,26 @@
 
 | Metric | Value |
 |--------|-------|
-| Version | 2.14.235 |
+| Version | 2.14.238 |
 | Tests | 6079 passed, 4 skipped, 0 failed (+40 pre-existing aiohttp env collection errors) |
 | Cross-file invariants | INV-054 latest (unchanged) |
-| Cold-path queue | FIGHT-085/086/087/088/089/091 closed; HANDLER-008 core + 3/5 sites done; FIGHT-090 + MAGIC-046 + HANDLER-008 tail OPEN |
-| Active focus | HANDLER-008 get_skill consolidation (3/5 sites migrated); class-gate migration follow-up next |
+| Cold-path queue | FIGHT-085/086/087/088/089/091 closed; HANDLER-008 core + all 5 offensive sites done; FIGHT-090 + MAGIC-046 + HANDLER-008 defensive tail OPEN |
+| Active focus | HANDLER-008 get_skill consolidation (5/5 offensive sites); defensive check migration is the last piece |
 
 ## Next Intended Task
 
-**Finish HANDLER-008 — the class-gate migration follow-up.** The unified
-`get_skill` core is landed and 3 of 5 sites migrated. The remaining two
-(`disarm`-skill gate, `do_rescue` roll) both read the skills dict; migrating them
-onto `get_skill` enforces ROM's PC class-level gate — correct, but it makes the
-~10 `TestDisarmRomParity` PC tests (and any rescue PC tests) fail because they
-create a char named "warrior" but leave `ch_class=0` (mage), below the
-`disarm.levels=(53,53,12,11)` / `rescue.levels=(53,53,53,1)` mage requirement.
-The follow-up: set a real warrior `ch_class` on those ROM-parity test chars (a
-faithful correction — they assert non-ROM ungated behavior), then migrate both
-lookups and retire the last dict reads. After that, migrate the remaining ad-hoc
-`_lookup_skill_percent`/`_character_skill_percent` sites opportunistically to
-close HANDLER-008. Then **MAGIC-046** (ROM-ordered `carrying` accessor for
+**Finish HANDLER-008 — migrate the defensive checks.** The unified `get_skill`
+core is landed and all 5 offensive-skill sites are migrated. The last piece is the
+defensive trio in `mud/combat/engine.py`: `check_dodge`/`check_parry`/
+`check_shield_block` still read `_get_skill_percent(defender, …)` (0 for NPC
+defenders), so NPC mobs never dodge/parry/shield-block — ROM `get_skill` gives an
+OFF_DODGE dodger `level*2`, OFF_PARRY parry `level*2`, shield_block `10+2*level`.
+Migrate each to `get_skill(victim, …)`. **Watch the same class-gate blast radius**:
+per the session just closed, the per-area runs will pass but the full suite will
+catch PC-defender tests that create default mage-class chars — run the FULL suite
+and expect to set a real `ch_class` on the affected defense tests (and mind the
+`_get_skill_percent` `fallback_attr` pattern, e.g. `parry_skill`, which get_skill
+does not read). Then **MAGIC-046** (ROM-ordered `carrying` accessor for
 `heat_metal`) and **FIGHT-090** (unify the two `do_trip` impls), then resume
 cold-path / cross-INV divergence hunting.
 
