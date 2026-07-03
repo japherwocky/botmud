@@ -267,20 +267,40 @@ affects every swing) and FIGHT-082 (HIGH).
   handlers.py) is another get_skill NPC-formula gap on the same function — part of
   **HANDLER-008**'s surface, not fixed here (an NPC with OFF_DISARM should get
   `20+3*level`).
-- **`FIGHT-088` — ⚠️ OPEN (MEDIUM) — `do_trip` uses plain return strings and
-  omits the failure `damage(0)` call.** Surfaced 2026-07-03 while closing
+- **`FIGHT-088` — ✅ FIXED (2.14.230) — `do_trip` used plain return strings and
+  omitted the failure `damage(0)` call.** Surfaced 2026-07-03 while closing
   FIGHT-082 (full `do_trip` read). (a) ROM success emits three `act()` lines —
   `"$n trips you and you go down!"` TO_VICT, `"You trip $N and $N goes down!"`
   TO_CHAR, `"$n trips $N, sending $M to the ground."` TO_NOTVICT (`src/fight.c:2735-2738`);
-  Python `mud/commands/combat.py` returns a single baked
+  Python `mud/commands/combat.py` returned a single baked
   `f"You trip {victim.name} and they go down!"` string with no room broadcast
   and no `$N`/`$M` PERS rendering (act()-render class, sibling of FIGHT-073). (b)
   ROM failure calls `damage(ch, victim, 0, gsn_trip, DAM_BASH, TRUE)` (`:2749`)
   before the wait — delivering the standard miss combat message and starting the
-  fight — whereas Python's failure branch only sets the wait and returns
+  fight — whereas Python's failure branch only set the wait and returned
   `"You try to trip them but miss."` (no `damage(0)` call, so no miss dam_message,
-  no fight-start on a cold trip). Both are pre-existing and were **not** part of
-  FIGHT-082's four wait/daze/chance items.
+  no fight-start on a cold trip). **Fix (2.14.230):** success now pushes TO_VICT via
+  `send_to_char_buffered`, broadcasts TO_NOTVICT via `act_to_room` (`$M` → victim's
+  objective pronoun), and returns the TO_CHAR `act_format` line; the success damage
+  now passes `dt="trip"`. Failure now calls `apply_damage(char, victim, 0,
+  DamageType.BASH, dt="trip")` before the `beats*2//3` wait and returns its
+  (unpushed, single-delivery) TO_CHAR miss line. Test:
+  `tests/integration/test_fight088_do_trip_act_render.py` (2 — cold miss starts the
+  fight via `victim.fighting is char`; success broadcasts the `$M`-gendered
+  TO_NOTVICT to a bystander). Filed **FIGHT-090** (divergent duplicate trip impls).
+
+- **`FIGHT-090` — ⚠️ OPEN (MEDIUM) — `do_trip` and `skill_handlers.trip` are
+  divergent duplicate implementations of ROM `do_trip`.** Surfaced 2026-07-03 while
+  closing FIGHT-088. The `"trip"` command routes to `mud/commands/combat.py:do_trip`;
+  the `"trip"` *skill* (`data/skills.json` `"function": "trip"`) routes to
+  `mud/skills/handlers.py:trip` (~`:7999`) via the registry — both are live, each
+  with its own gate ordering, chance math, and message wording. `skill_handlers.trip`
+  has the failure `damage(0)` (`:8114`) but still bakes the success act lines
+  (`:8086-8091`, `"sending them to the ground"`, no `$M`); `do_trip` (now FIGHT-088)
+  has the correct act render. They should be unified to one implementation (the
+  command delegating to the handler, or vice versa) so a future ROM-parity fix
+  can't land on one path and miss the other. Not fixed here — this is a refactor,
+  not a gap-closer.
 
 ### Follow-ups (FIGHT-022 / FIGHT-023 / FIGHT-025 / FIGHT-026 — filed, not yet closed)
 

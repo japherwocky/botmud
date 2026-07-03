@@ -1280,7 +1280,18 @@ def do_trip(char: Character, args: str) -> str:
 
     # Roll
     if rng_mm.number_percent() < chance:
-        # Success — ROM src/fight.c:2741-2745.
+        # Success — ROM src/fight.c:2735-2745.
+        # FIGHT-088: ROM emits three act() lines before the damage() call. TO_VICT is
+        # pushed to the victim, TO_NOTVICT broadcasts to the room ($M = victim's
+        # objective pronoun), TO_CHAR is this command's return value. Replaces a
+        # single baked f-string with no $N/$M render and no room broadcast.
+        from mud.utils.messaging import send_to_char_buffered as _send
+
+        _send(victim, act_format("{5$n trips you and you go down!{x", recipient=victim, actor=char, arg2=victim))
+        room = getattr(char, "room", None)
+        if room is not None:
+            act_to_room(room, "{5$n trips $N, sending $M to the ground.{x", char, arg2=victim, exclude=victim)
+
         # DAZE_STATE(victim, 2 * PULSE_VIOLENCE) — the victim is DAZED, not WAIT'd.
         victim.daze = max(int(getattr(victim, "daze", 0) or 0), 2 * get_pulse_violence())
         # WAIT_STATE(ch, skill_table[gsn_trip].beats) — raw beats, not PULSE_VIOLENCE.
@@ -1288,14 +1299,19 @@ def do_trip(char: Character, args: str) -> str:
         victim.position = Position.RESTING
 
         # Damage — ROM :2744 number_range(2, 2 + 2 * victim->size); no skill-level term.
+        # dt=gsn_trip so the dam_message renders the trip verb (ROM passes gsn_trip).
         damage_amt = rng_mm.number_range(2, 2 + 2 * victim_size)
-        apply_damage(char, victim, damage_amt, DamageType.BASH)
+        apply_damage(char, victim, damage_amt, DamageType.BASH, dt="trip")
 
-        message = f"You trip {getattr(victim, 'name', 'them')} and they go down!"
+        message = act_format("{5You trip $N and $N goes down!{x", recipient=char, actor=char, arg2=victim)
     else:
-        # ROM :2750 — WAIT_STATE(ch, skill_table[gsn_trip].beats * 2 / 3).
+        # FIGHT-088: ROM :2749 — the failure branch calls damage(ch, victim, 0,
+        # gsn_trip, DAM_BASH, TRUE) BEFORE the wait, delivering the miss dam_message
+        # and starting the fight (set_fighting). apply_damage returns the attacker's
+        # TO_CHAR line unpushed (single-delivery), so returning it is correct.
+        message = apply_damage(char, victim, 0, DamageType.BASH, dt="trip")
+        # ROM :2750 — WAIT_STATE(ch, skill_table[gsn_trip].beats * 2 / 3), after damage.
         skill_registry._apply_wait_state(char, trip_beats * 2 // 3)
-        message = "You try to trip them but miss."
 
     check_killer(char, victim)  # mirroring ROM src/fight.c:2753 — unconditional
     return message

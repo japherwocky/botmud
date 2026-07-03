@@ -50,6 +50,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **FIGHT-088: `do_trip` now emits ROM's three act() lines and the failure
+  `damage(0)`.** The trip command returned a single baked
+  `"You trip X and they go down!"` with no room broadcast or `$N`/`$M` pronoun
+  render, and on a miss only set the wait — never starting the fight. Success now
+  pushes the TO_VICT line, broadcasts the `$M`-gendered TO_NOTVICT to the room, and
+  returns the TO_CHAR line; a miss now calls `damage(ch, victim, 0, gsn_trip, …)`
+  before the wait (miss combat message + fight-start), matching
+  `src/fight.c:2735-2751`. Filed FIGHT-090 (divergent duplicate trip
+  implementations to unify).
+
 - **FIGHT-087: unarmed disarm used a hand-to-hand floor of 1 and a non-ROM gate.**
   An unarmed NPC disarmer computed `chance * 1 / 150` (via `max(hand_to_hand, 1)`)
   instead of ROM's `chance * (40+2*level) / 150` — a near-guaranteed failure. Added
