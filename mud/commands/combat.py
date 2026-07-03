@@ -25,6 +25,7 @@ from mud.models.constants import (
 )
 from mud.skills import skill_registry
 from mud.skills.say_spell import broadcast_spell_words
+from mud.skills.skill_lookup import get_skill
 from mud.utils import rng_mm
 from mud.utils.act import act_format, act_to_room
 from mud.world.vision import can_see_character
@@ -216,17 +217,10 @@ def do_kick(char: Character, args: str) -> str:
         cooldowns["kick"] = skill.cooldown
         char.cooldowns = cooldowns
     roll = rng_mm.number_percent()
-    if getattr(char, "is_npc", False):
-        # FIGHT-091: ROM get_skill(ch, gsn_kick) for an NPC = 10 + 3*level
-        # (src/handler.c:410), clamped to 100. The port read the skills dict (0 for
-        # mobs), so NPC kicks never landed. HANDLER-008 get_skill NPC-formula class.
-        chance = max(0, min(100, 10 + 3 * int(getattr(char, "level", 0) or 0)))
-    else:
-        try:
-            learned = getattr(char, "skills", {}).get("kick", 0)
-            chance = max(0, min(100, int(learned)))
-        except (TypeError, ValueError):
-            chance = 0
+    # FIGHT-091 / HANDLER-008: ROM do_kick rolls get_skill(ch, gsn_kick)
+    # (src/fight.c:3125) — NPC 10+3*level, PC class-gated learned, both
+    # daze/drunk-adjusted. Migrated from the inline NPC-formula workaround.
+    chance = get_skill(char, "kick")
     success = chance > roll
 
     message = skill_handlers.kick(char, opponent, success=success, roll=roll)
