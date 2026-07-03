@@ -140,6 +140,65 @@ ROM applies the same safety contract by routing attack variants through `damage(
 | `FIGHT-066` | MINOR | ✅ FIXED (2.14.90) | `src/fight.c:1316-1370` `check_parry`/`check_dodge`/`check_shield_block` each emit TWO act() lines — TO_VICT "You parry/dodge/block $n's attack." + TO_CHAR "$N parries/dodges/blocks your attack." | `mud/combat/engine.py:attack_round` (~705-709) returns `f"{victim.name} parries your attack."` / `f"{victim.name} dodges your attack."` / `f"{victim.name} blocks your attack with a shield."` | **`attack_round`'s defense-return string bakes `victim.name` where ROM uses `$N` = PERS(victim) capitalized.** The `check_parry`/`check_dodge`/`check_shield_block` functions ALREADY deliver both ROM lines correctly to the player via `_push_message` with `pers()` + `capitalize_act_line` (engine.py:1641/1643, 1677/1679, 1597/1599 — FIGHT-031/032). So the baked `attack_round` return at ~705-709 is a SECONDARY string that disagrees with the correctly-pushed line ("goblin …" vs "A green goblin …"). **Severity confirmed LATENT (2026-06-13 trace):** every `multi_hit` caller discards the returned `results` list (`game_loop.py:1659`, `mob_cmds.py:1057/1076`, `spec_funs.py:908`, `assist.py:72/85/159`, `aggressive.py:119`, `murder.py:100`), and the player-facing defense tests (`test_combat_defenses_prob.py`, `test_combat.py:446`) read the **pushed** line from `char.messages` (via `deliver_kill`/`process_command`), NOT the return — so this baked string is **never delivered to a player and not asserted by any test**. It is NOT a double-delivery (the correct pushed line is single-delivered by check_parry/dodge/shield_block). Risk is purely latent: a future refactor that starts delivering `attack_round`'s return would reintroduce the baked name. Surfaced by extending the act()-lens from spell handlers (MAGIC-025..044, exhausted) to `mud/combat/`. **Fix (2.14.90):** the three returns now use `capitalize_act_line(f"{pers(victim, attacker)} parries/dodges/blocks …")`, matching the already-pushed lines. As predicted, no existing test needed re-baselining — `test_combat_defenses_prob.py` reads the pushed line and the PC-name return tests render identically for a visible PC. Test: `tests/integration/test_fight066_defense_return_pers.py` (NPC victim → "A green goblin parries your attack." not "goblin …"). | ✅ FIXED (2.14.90) |
 | `FIGHT-067` | MEDIUM | `src/fight.c:2405-2419` `do_bash` entry gates — `if (is_safe(ch,victim)) return;` (2405); `if (IS_NPC(victim) && victim->fighting != NULL && !is_same_group(ch, victim->fighting)) "Kill stealing is not permitted." return;` (2408-2413); `if (IS_AFFECTED(ch,AFF_CHARM) && ch->master==victim) act("But $N is your friend!", ...) return;` (2415-2419) | `mud/commands/combat.py:do_bash` (~`:440-443`) | **`do_bash` missing the entire ROM entry-level offensive-target gate block.** ROM gates the bash on `is_safe`, kill-steal, and charm-friend at command entry — *before* computing chance, applying WAIT_STATE, dazing the victim, or knocking them to RESTING. Python `do_bash` had none of these; it relied solely on `apply_damage` re-checking `is_safe` (FIGHT-002), which is **downstream and silent** — it suppresses only the HP damage. **Confirmed observable:** in a ROOM_SAFE room, forcing the success roll, Python still applied 24-pulse WAIT_STATE to the attacker, set victim `daze`, knocked the victim to RESTING, and broadcast "sends you sprawling" — a real griefing divergence (a player could lag + floor another character in a safe room, town square, etc.). **Fix (2.14.100):** inserted the ROM gate block after the position check / before the wait check in `do_bash`: `is_safe(char, victim)` → `return ""` (silent, consistent with FIGHT-002's downstream re-check); kill-steal → "Kill stealing is not permitted."; charm-friend → `act_format("But $N is your friend!", recipient=char, actor=char, arg2=victim)` (`$N` PERS, FIGHT-064 precedent). Test: `tests/integration/test_fight067_bash_safe_room_entry_gate.py` (ROOM_SAFE + forced success → no attacker lag, no victim daze, no knockdown). Verified red (`assert 24 == 0`) before fix, green after. | ✅ FIXED (2.14.100) |
 
+### Cold-path divergence hunt — OPEN (filed 2026-07-03, not yet closed)
+
+Surfaced by a parallel cold-path combat/update divergence hunt (same session
+that closed GET-015 / PICK-003 / GL-045). **`FIGHT-081` is independently
+verified against ROM C by the filer; `FIGHT-082..087` are hunter-reported with
+exact cites and MUST be re-verified against ROM C before closing** (per AGENTS.md
+"re-verify any status claim against ROM C source"). Prioritize FIGHT-081 (HIGH,
+affects every swing) and FIGHT-082 (HIGH).
+
+- **`FIGHT-081` — ⚠️ OPEN (HIGH, VERIFIED) — AC modifiers applied at wrong
+  scale/order in `attack_round`.** `mud/combat/engine.py:552-596` vs ROM `one_hit`
+  `src/fight.c:483-503`. ROM divides AC by 10 **first** (`victim_ac = GET_AC(victim,
+  AC_x) / 10`), then applies the `< -15` clamp and the `-4/+4/+6` (invis /
+  pos<FIGHTING / pos<RESTING) modifiers **on the /10 scale**. Python applies the
+  modifiers and the clamp to the **raw** AC and divides by 10 last (`vac =
+  c_div(victim_ac, 10)`, line 596). Two effects: (a) the -4/+4/+6 position/invis
+  modifiers become ~0.4/0.4/0.6 AC after the trailing /10 (≈10× too weak); (b) the
+  `< -15` clamp fires for any raw AC < -15 (almost every armored character) instead
+  of ROM's raw < -150, drastically changing effective AC. Worked example (raw
+  AC_BASH = -100): ROM effective victim_ac = -10; Python = -3 → victim ~7 AC points
+  easier to hit. Pervasive (shared PC+NPC melee, every swing); didn't surface in
+  `combat_melee_rounds` because that mob's AC sits in the non-divergent band.
+  Sub-divergence: Python gates the -4 on `AffectFlag.INVISIBLE` (line 554); ROM
+  uses `!can_see(ch, victim)` (`fight.c:496`) — broader (blind/dark/hide, withheld
+  from a detect-invis attacker). **Fix direction:** `/10` first, then clamp, then
+  modifiers, drop the trailing `c_div(victim_ac,10)`; consider `!attacker.can_see(victim)`
+  for the -4. HIGH blast radius — scope with a differential combat scenario whose
+  victim AC is in the divergent range, expect combat-test re-baselining.
+- **`FIGHT-082` — ⚠️ OPEN (HIGH, hunter-reported) — `do_trip` cluster.**
+  `mud/commands/combat.py:1234-1283` vs `src/fight.c:2711-2753`. (a) damage upper
+  bound has a spurious `skill_level // 20` term (ROM `number_range(2, 2 + 2*victim->size)`,
+  `:2744`); (b) missing OFF_FAST/AFF_HASTE speed modifier (`chance += 10` self /
+  `-= 20` victim, `:2722-2726`); (c) wrong wait/daze values — success attacker
+  should be `beats`(24) not `PULSE_VIOLENCE`(12), failure `beats*2/3`(16), self-trip
+  `2*beats`(48), and the victim should get **DAZE** not WAIT (`:2741`).
+- **`FIGHT-083` — ⚠️ OPEN (MEDIUM, hunter-reported) — `dirt_kicking` missing the
+  `if (chance % 5 == 0) chance += 1` anti-false-zero hack (`src/fight.c:2566-2568`)
+  and using `if chance <= 0` where ROM's post-terrain `if (chance == 0)` (`:2604`)
+  uniquely means water/air.** `mud/skills/handlers.py:3197-3225`. Causes wrong
+  "There isn't any dirt to kick." on dry land for weak/low-dex kickers + skipped
+  wait/miss.
+- **`FIGHT-084` — ⚠️ OPEN (MEDIUM, hunter-reported) — `check_parry` visibility
+  operands inverted.** `mud/combat/engine.py:1594` uses `not victim.can_see(attacker)`;
+  ROM `src/fight.c:1311` is `!can_see(ch, victim)` (attacker→victim). `can_see`
+  is not symmetric. (`check_dodge` at :1630 correctly matches ROM :1363.)
+- **`FIGHT-085` — ⚠️ OPEN (MEDIUM, hunter-reported) — skill wait-states are
+  haste/slow-adjusted; ROM `WAIT_STATE` uses raw beats.** `mud/skills/registry.py:301-309`
+  (`_compute_skill_lag`) halves lag under AFF_HASTE / doubles under AFF_SLOW;
+  ROM applies raw `skill_table[sn].beats`. Affects do_bash/do_kick/do_backstab/do_rescue.
+- **`FIGHT-086` — ⚠️ OPEN (MEDIUM, hunter-reported) — backstab THAC0 bonus
+  missing.** ROM `one_hit` `src/fight.c:474-475`: `if (dt == gsn_backstab) thac0 -=
+  10 * (100 - get_skill(ch, gsn_backstab));` (near-auto-hit below skill 100).
+  Python `compute_thac0` has no backstab branch (only the damage multiplier is
+  ported). Moot at skill 100.
+- **`FIGHT-087` — ⚠️ OPEN (LOW, hunter-reported) — `disarm` floors unarmed
+  hand-to-hand to 1.** `mud/skills/handlers.py:3305` `max(hand_to_hand, 1)`; ROM
+  `src/fight.c:3188` uses raw `hth`, so an unarmed NPC with `hth == 0` gets chance 0
+  in ROM, nonzero in Python. Narrow edge case.
+
 ### Follow-ups (FIGHT-022 / FIGHT-023 / FIGHT-025 / FIGHT-026 — filed, not yet closed)
 
 - **`FIGHT-068` — `do_bash` checked `victim == ch` before `position < POS_FIGHTING` (order swap vs ROM), ✅ FIXED (2.14.105).** Surfaced 2026-06-14 while closing FIGHT-067 (full `do_bash` read, `src/fight.c:2392-2403`). ROM checks `position < POS_FIGHTING` ("You'll have to let $M get back up first.", `:2392-2397`) **before** `victim == ch` ("You try to bash your brains out, but fail.", `:2399-2403`). Python `mud/commands/combat.py:do_bash` checked `victim is char` **before** the position check. Observable only in the edge case of bashing *yourself* while you are sitting/sleeping (`position < FIGHTING`): ROM emits the position line, Python emitted "You try to bash your brains out, but fail." **Fix (2.14.105):** swapped the two early-return blocks so the position check precedes the self-target check. Test: `tests/integration/test_fight068_bash_position_before_self.py` (self-bash while POS_SITTING → position gate wins). Verified red before fix, green after. Residual: the position message is the literal `"You'll have to let them get back up first."`, where ROM renders `act("...$M...")` (victim objective pronoun) — filed as **FIGHT-075** below (act()-render class, sibling of FIGHT-073).
