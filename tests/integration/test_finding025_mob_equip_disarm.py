@@ -63,6 +63,7 @@ def test_disarm_mob_equip_weapon_auto_gets_back_to_inventory(
     attacker = movable_char_factory("warrior", 3001)
     attacker.skills["disarm"] = 100
     attacker.level = 20
+    attacker.ch_class = 3  # Warrior — HANDLER-008 get_skill disarm class gate
     attacker.perm_stat = [0, 0, 0, 25, 0]
     attacker.mod_stat = [0, 0, 0, 0, 0]
     attacker.equip_object(_weapon(object_factory, 2602, "attacker sword"), int(WearLocation.WIELD))
@@ -102,6 +103,7 @@ def test_disarm_mob_nodrop_weapon_stays_on_victim_inventory(
     attacker = movable_char_factory("warrior", 3001)
     attacker.skills["disarm"] = 100
     attacker.level = 20
+    attacker.ch_class = 3  # Warrior — HANDLER-008 get_skill disarm class gate
     attacker.perm_stat = [0, 0, 0, 25, 0]
     attacker.mod_stat = [0, 0, 0, 0, 0]
     attacker.equip_object(_weapon(object_factory, 2612, "attacker sword"), int(WearLocation.WIELD))

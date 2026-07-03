@@ -125,6 +125,7 @@ def test_disarm_strips_weapon_and_trains_skill(monkeypatch: pytest.MonkeyPatch) 
     room = Room(vnum=2000, sector_type=int(Sector.CITY))
 
     duelist = _make_combatant("Duelist", level=30)
+    duelist.ch_class = 3  # Warrior — HANDLER-008 get_skill gates disarm on class level (warrior=11)
     duelist.perm_stat = [18, 18, 18, 18, 18]
     duelist.mod_stat = [0] * len(duelist.perm_stat)
     duelist.skills.update({"disarm": 85, "hand to hand": 70, "sword": 80})

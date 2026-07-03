@@ -77,6 +77,7 @@ def test_noremove_disarm_credits_improve_true(monkeypatch: pytest.MonkeyPatch) -
 
     room = _room()
     caster = _pc("Duelist", room)
+    caster.ch_class = 3  # Warrior — HANDLER-008 get_skill gates disarm on class level
     caster.skills.update({"disarm": 85, "hand to hand": 70, "sword": 80})
     victim = _pc("Mercenary", room, level=28, stats=14)
     victim.sex = Sex.MALE

@@ -83,6 +83,7 @@ def test_rescue_single_delivers_all_three_legs_to_connected_pcs(monkeypatch) -> 
         ally.position = int(Position.FIGHTING)
         foe.fighting = ally
         rescuer.skills["rescue"] = 100
+        rescuer.ch_class = 3  # Warrior — HANDLER-008 get_skill rescue class gate
         rescuer.wait = 0
 
         # Mirror mud/net/connection.py's per-command delivery for the actor:

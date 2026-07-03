@@ -41,6 +41,8 @@ def test_rescue_against_pc_foe_flags_rescuer_killer(monkeypatch: pytest.MonkeyPa
     rescuer.desc = object()
     foe.desc = object()
     rescuer.clan = 1  # is_clan(ch) gate in check_killer (engine.py:1284)
+    rescuer.ch_class = 3  # Warrior — HANDLER-008 get_skill rescue class gate (warrior=1)
+    rescuer.level = 20
     rescuer.skills["rescue"] = 100
     rescuer.wait = 0
 
@@ -81,6 +83,8 @@ def test_rescue_against_npc_foe_does_not_flag_rescuer(monkeypatch: pytest.Monkey
     mob.is_npc = True
 
     rescuer.clan = 1
+    rescuer.ch_class = 3  # Warrior — HANDLER-008 get_skill rescue class gate (warrior=1)
+    rescuer.level = 20
     rescuer.skills["rescue"] = 100
     rescuer.wait = 0
 

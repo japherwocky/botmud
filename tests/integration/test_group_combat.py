@@ -678,6 +678,7 @@ class TestGroupCombatEdgeCases:
         leader.damroll = 15
         leader.perm_stat = [18, 13, 13, 13, 16]
         leader.skills = {"rescue": 100}
+        leader.ch_class = 3  # Warrior — HANDLER-008 get_skill rescue class gate
 
         follower.hitroll = 10
         follower.damroll = 8

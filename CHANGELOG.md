@@ -58,6 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **HANDLER-008 test fixes: warrior `ch_class` on disarm/rescue PC casters.** The disarm-skill and do_rescue get_skill migrations enforce ROM's PC class-level gate; cross-file disarm/rescue tests that created default mage-class casters now set `ch_class=3` (+ adequate level) — ROM-faithful, since a mage can't disarm/rescue below level 53. Restores the full suite to green.
+
 - **HANDLER-008 migration: do_rescue uses `get_skill`.** The rescue success roll now comes from unified `get_skill(char, "rescue")` — class-gated for PCs and 40+level for NPCs (was 0 via the dict → NPC rescue never succeeded). Fifth get_skill site migration; all offensive-skill NPC-formula workarounds are now retired.
 
 - **HANDLER-008 migration: disarm-skill gate uses `get_skill`.** `do_disarm`'s skill gate/chance now come from unified `get_skill(caster, "disarm")` — enforcing ROM's PC class-level requirement and finally letting an NPC with OFF_DISARM disarm (20+3*level; was 0 via the dict → always rejected). Fourth of five get_skill site migrations.
