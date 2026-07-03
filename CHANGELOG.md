@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `death_autoloot_autosplit` scenario + golden, pinning ROM `do_get all corpse`
   behavior when `PLR_AUTOLOOT` collects mixed NPC corpse contents for a grouped
   PC with `PLR_AUTOSPLIT`.
+- **Differential harness non-death `get all corpse` autosplit coverage** —
+  committed the `get_corpse_money_autosplit` scenario + golden, exercising the
+  shared `do_get` → `get_obj` autosplit path (`src/act_obj.c:162-184`) via a
+  **manual** `get all corpse` (autoloot/autogold OFF) rather than the death
+  auto-branch. A grouped level-5 PC with `PLR_AUTOSPLIT` picks up 17 silver /
+  2 gold from a slain janitor's corpse; ROM emits the "You get ..." line plus
+  both `do_split` share lines (9 silver / 1 gold), and Python converges — locking
+  the FIGHT-080 fix on the non-death entry point.
 
 ### Fixed
 
