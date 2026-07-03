@@ -221,10 +221,19 @@ affects every swing) and FIGHT-082 (HIGH).
   fires** — a defender who can't see the attacker dodges at full chance instead of
   half. Surfaced 2026-07-03 while closing FIGHT-084 (same dead-lambda class).
   One-line fix: `not can_see_character(victim, attacker)`.
-- **`FIGHT-085` — ⚠️ OPEN (MEDIUM, hunter-reported) — skill wait-states are
-  haste/slow-adjusted; ROM `WAIT_STATE` uses raw beats.** `mud/skills/registry.py:301-309`
-  (`_compute_skill_lag`) halves lag under AFF_HASTE / doubles under AFF_SLOW;
-  ROM applies raw `skill_table[sn].beats`. Affects do_bash/do_kick/do_backstab/do_rescue.
+- **`FIGHT-085` — ✅ FIXED (2.14.226) — skill wait-states were
+  haste/slow-adjusted; ROM `WAIT_STATE` uses raw beats.** `mud/skills/registry.py`
+  (`_compute_skill_lag`) halved lag under AFF_HASTE / doubled under AFF_SLOW;
+  ROM's `WAIT_STATE` macro (`src/merc.h:2116`) is a bare `UMAX` applying raw
+  `skill_table[sn].beats` — haste/slow only change the number of attacks
+  (`multi_hit`), never a skill's lag. Re-verified against ROM. **Fix (2.14.226):**
+  deleted the HASTE/SLOW scaling branches; `_compute_skill_lag` now returns
+  `max(1, base_lag)`. Removed the now-dead `c_div` / `AffectFlag` imports. Test:
+  `tests/integration/test_fight085_skill_wait_raw_beats.py` (3 — baseline/haste/slow
+  all == raw beats); the pre-existing `test_skills.py::test_skill_wait_adjusts_for_haste_and_slow`
+  asserted the wrong scaling and was rewritten as
+  `test_skill_wait_is_raw_beats_regardless_of_haste_slow`. Affected
+  do_bash/do_kick/do_backstab/do_rescue and every registry `use()` skill.
 - **`FIGHT-086` — ⚠️ OPEN (MEDIUM, hunter-reported) — backstab THAC0 bonus
   missing.** ROM `one_hit` `src/fight.c:474-475`: `if (dt == gsn_backstab) thac0 -=
   10 * (100 - get_skill(ch, gsn_backstab));` (near-auto-hit below skill 100).

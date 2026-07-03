@@ -298,7 +298,11 @@ def test_skill_tick_only_reduces_cooldowns() -> None:
     assert character.cooldowns == {"shield": 1}
 
 
-def test_skill_wait_adjusts_for_haste_and_slow(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_skill_wait_is_raw_beats_regardless_of_haste_slow(monkeypatch: pytest.MonkeyPatch) -> None:
+    # FIGHT-085: ROM's WAIT_STATE (src/merc.h:2116) applies raw
+    # skill_table[sn].beats; haste/slow never scale a skill's wait-state (they
+    # only change multi_hit attack count). Both a hasted and a slowed caster get
+    # the same raw beats a normal caster would.
     reg = load_registry()
     skill = reg.get("acid blast")
     monkeypatch.setattr(rng_mm, "number_percent", lambda: 1)
@@ -311,9 +315,7 @@ def test_skill_wait_adjusts_for_haste_and_slow(monkeypatch: pytest.MonkeyPatch) 
     )
     haste_target = Character()
     reg.use(haste_caster, "acid blast", haste_target)
-    haste_pulses = max(1, c_div(skill.lag, 2))
-    expected_haste = max(1, haste_pulses)
-    assert haste_caster.wait == expected_haste
+    assert haste_caster.wait == skill.beats
 
     slow_caster = Character(
         mana=20,
@@ -323,9 +325,7 @@ def test_skill_wait_adjusts_for_haste_and_slow(monkeypatch: pytest.MonkeyPatch) 
     )
     slow_target = Character()
     reg.use(slow_caster, "acid blast", slow_target)
-    slow_pulses = skill.lag * 2
-    expected_slow = max(1, slow_pulses)
-    assert slow_caster.wait == expected_slow
+    assert slow_caster.wait == skill.beats
 
 
 def test_rescue_switches_tank_and_wait_state(monkeypatch: pytest.MonkeyPatch) -> None:

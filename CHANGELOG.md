@@ -50,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **FIGHT-085: skill wait-states were haste/slow-scaled; ROM uses raw beats.**
+  `SkillRegistry._compute_skill_lag` halved a skill's lag under `AFF_HASTE` and
+  doubled it under `AFF_SLOW`. ROM's `WAIT_STATE` macro (`src/merc.h:2116`) is a
+  bare `UMAX` that applies the raw `skill_table[sn].beats`; haste/slow only
+  change the number of attacks (`multi_hit`), never lag. Removed the scaling so
+  bash/kick/backstab/rescue and every registry-`use()` skill match ROM.
+
 - **FIGHT-084: `check_parry` visibility halving used the wrong direction and was
   inert.** ROM `src/fight.c:1311` halves parry on `!can_see(attacker, victim)`;
   the port used `victim.can_see(attacker)` (wrong direction) with a

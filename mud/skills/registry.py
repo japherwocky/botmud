@@ -8,9 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from mud.advancement import gain_exp
-from mud.math.c_compat import c_div
 from mud.models import Skill, SkillJson
-from mud.models.constants import AffectFlag
 from mud.models.json_io import dataclass_from_dict
 from mud.skills.metadata import _POS_BY_NAME, ROM_SKILL_METADATA, ROM_SKILL_MIN_POSITION
 from mud.utils import rng_mm
@@ -300,14 +298,10 @@ class SkillRegistry:
         if base_lag <= 0:
             return 0
 
-        flags = int(getattr(caster, "affected_by", 0) or 0)
-        lag_pulses = base_lag
-        if flags & AffectFlag.HASTE:
-            lag_pulses = max(1, c_div(lag_pulses, 2))
-        if flags & AffectFlag.SLOW:
-            lag_pulses = lag_pulses * 2
-
-        return max(1, int(lag_pulses))
+        # ROM applies the raw skill_table[sn].beats via WAIT_STATE (src/merc.h:2116,
+        # a bare UMAX). Haste/slow never scale a skill's wait-state in ROM — they
+        # only change the number of attacks (multi_hit), not lag. FIGHT-085.
+        return max(1, base_lag)
 
     def _apply_wait_state(self, caster, lag: int) -> None:
         """Apply WAIT_STATE semantics mirroring ROM's UMAX logic."""
