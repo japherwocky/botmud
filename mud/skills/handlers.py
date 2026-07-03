@@ -5197,71 +5197,68 @@ def heat_metal(
             obj_type = getattr(obj.prototype, "item_type", None)
         wear_loc = int(getattr(obj, "wear_loc", -1))
         is_worn = wear_loc != -1
+        obj_name = getattr(obj, "short_descr", "something")
+
+        # MAGIC-045: ROM can_drop_obj (src/handler.c) — droppable unless ITEM_NODROP,
+        # with an immortal-PC bypass. The pre-fix port hardcoded this True, collapsing
+        # ROM's cursed-item (else) branches — dropping NODROP items that should stay,
+        # with the wrong message/damage/RNG.
+        can_drop = (not (obj_extra & int(ExtraFlag.NODROP))) or (
+            not getattr(target, "is_npc", False) and int(getattr(target, "level", 0) or 0) >= LEVEL_IMMORTAL
+        )
+        # ROM remove_obj(victim, wear_loc, TRUE) returns FALSE on ITEM_NOREMOVE
+        # (emitting "You can't remove $p."); a worn NOREMOVE item then sears instead.
+        can_remove = not (obj_extra & int(ExtraFlag.NOREMOVE))
+
+        def _drop_to_room(o=obj) -> None:
+            for slot, equipped in list(target.equipment.items()):
+                if equipped is o:
+                    del target.equipment[slot]
+                    break
+            if o in target.inventory:
+                target.inventory.remove(o)
+            if room:
+                room.add_object(o)
 
         # ROM L3143-3261: handle ARMOR and WEAPON types
         if obj_type == ItemType.ARMOR:
             if is_worn:
-                # ROM L3146-3175: try to remove worn armor
+                # ROM L3146-3175 — can_drop_obj(victim,obj) && (weight/10 <
+                # number_range(1, 2*get_curr_stat(victim,STAT_DEX))) && remove_obj(...).
+                # C && short-circuits: the DEX roll is drawn ONLY when can_drop is true,
+                # and remove_obj is only reached when the roll passes.
                 obj_weight = int(getattr(obj, "weight", 0) or 0)
-                dex = int(getattr(target, "dex", 10) or 10)
-                can_remove = c_div(obj_weight, 10) < rng_mm.number_range(1, 2 * dex)
-
-                # Simplified: assume can_drop_obj returns True (no cursed items check)
-                if can_remove:
-                    # Successfully removed
-                    obj_name = getattr(obj, "short_descr", "something")
+                dex = int(target.get_curr_stat(Stat.DEX) or 13)
+                removed = False
+                if can_drop and c_div(obj_weight, 10) < rng_mm.number_range(1, 2 * dex):
+                    if can_remove:
+                        removed = True
+                    else:
+                        _send_to_char(target, f"You can't remove {obj_name}.")
+                if removed:
+                    # ROM L3156-3165 — remove and drop.
                     if room:
-                        # MAGIC-007 / INV-027: ROM act("$n yelps and throws $p to
-                        # the ground!", victim, obj, NULL, TO_ROOM) (src/magic.c:3156).
-                        act_to_room(
-                            room,
-                            "$n yelps and throws $p to the ground!",
-                            target,
-                            arg1=obj,
-                            exclude=target,
-                        )
+                        act_to_room(room, "$n yelps and throws $p to the ground!", target, arg1=obj, exclude=target)
                     _send_to_char(target, f"You remove and drop {obj_name} before it burns you.")
                     dam += c_div(rng_mm.number_range(1, obj_level), 3)
-
-                    # Move from equipped to room
-                    for slot, equipped in list(equipment.items()):
-                        if equipped is obj:
-                            del target.equipment[slot]
-                            break
-                    if room:
-                        room.add_object(obj)
+                    _drop_to_room()
                     fail = False
                 else:
-                    # ROM L3167-3174: stuck on body
-                    obj_name = getattr(obj, "short_descr", "something")
+                    # ROM L3167-3174 — stuck on the body.
                     _send_to_char(target, f"Your skin is seared by {obj_name}!")
                     dam += rng_mm.number_range(1, obj_level)
                     fail = False
             else:
-                # ROM L3177-3201: not worn, try to drop from inventory
-                obj_name = getattr(obj, "short_descr", "something")
-                # Simplified: assume can_drop (no cursed check)
-                if True:  # can_drop_obj
+                # ROM L3177-3201 — not worn.
+                if can_drop:
                     if room:
-                        # MAGIC-007 / INV-027: ROM act("$n yelps and throws $p to
-                        # the ground!", victim, obj, NULL, TO_ROOM) (src/magic.c:3182).
-                        act_to_room(
-                            room,
-                            "$n yelps and throws $p to the ground!",
-                            target,
-                            arg1=obj,
-                            exclude=target,
-                        )
+                        act_to_room(room, "$n yelps and throws $p to the ground!", target, arg1=obj, exclude=target)
                     _send_to_char(target, f"You and drop {obj_name} before it burns you.")
                     dam += c_div(rng_mm.number_range(1, obj_level), 6)
-
-                    if obj in target.inventory:
-                        target.inventory.remove(obj)
-                    if room:
-                        room.add_object(obj)
+                    _drop_to_room()
                     fail = False
                 else:
-                    # Cannot drop
+                    # ROM L3193-3199 — cursed (NODROP): cannot drop, sears.
                     _send_to_char(target, f"Your skin is seared by {obj_name}!")
                     dam += c_div(rng_mm.number_range(1, obj_level), 2)
                     fail = False
@@ -5278,14 +5275,16 @@ def heat_metal(
                 if obj_weapon_flags & WeaponFlag.FLAMING:
                     continue
 
-                # Try to drop wielded weapon
-                obj_name = getattr(obj, "short_descr", "something")
-                # Simplified: assume can_drop
-                if True:  # can_drop_obj and remove_obj
+                # ROM L3209-3211 — can_drop_obj(victim,obj) && remove_obj(...); no DEX roll.
+                removed = False
+                if can_drop:
+                    if can_remove:
+                        removed = True
+                    else:
+                        _send_to_char(target, f"You can't remove {obj_name}.")
+                if removed:
+                    # ROM L3213-3222 — burned, throws it down.
                     if room:
-                        # MAGIC-007 / INV-027: ROM act("$n is burned by $p, and
-                        # throws it to the ground.", victim, obj, NULL, TO_ROOM)
-                        # (src/magic.c:3214).
                         act_to_room(
                             room,
                             "$n is burned by $p, and throws it to the ground.",
@@ -5295,44 +5294,24 @@ def heat_metal(
                         )
                     _send_to_char(target, "You throw your red-hot weapon to the ground!")
                     dam += 1
-
-                    # Unequip weapon
-                    for slot, equipped in list(equipment.items()):
-                        if equipped is obj:
-                            del target.equipment[slot]
-                            break
-                    if room:
-                        room.add_object(obj)
+                    _drop_to_room()
                     fail = False
                 else:
-                    # ROM L3224-3232: stuck with weapon
+                    # ROM L3224-3232 — cursed worn weapon: sears flesh, stays worn.
                     _send_to_char(target, "Your weapon sears your flesh!")
                     dam += rng_mm.number_range(1, obj_level)
                     fail = False
             else:
                 # ROM L3234-3259: weapon in inventory
-                obj_name = getattr(obj, "short_descr", "something")
-                if True:  # can_drop_obj
+                if can_drop:
                     if room:
-                        # MAGIC-007 / INV-027: ROM act("$n throws a burning hot $p
-                        # to the ground!", victim, obj, NULL, TO_ROOM) (src/magic.c:3240).
-                        act_to_room(
-                            room,
-                            "$n throws a burning hot $p to the ground!",
-                            target,
-                            arg1=obj,
-                            exclude=target,
-                        )
+                        act_to_room(room, "$n throws a burning hot $p to the ground!", target, arg1=obj, exclude=target)
                     _send_to_char(target, f"You and drop {obj_name} before it burns you.")
                     dam += c_div(rng_mm.number_range(1, obj_level), 6)
-
-                    if obj in target.inventory:
-                        target.inventory.remove(obj)
-                    if room:
-                        room.add_object(obj)
+                    _drop_to_room()
                     fail = False
                 else:
-                    # Cannot drop
+                    # ROM L3251-3257 — cursed (NODROP): cannot drop, sears.
                     _send_to_char(target, f"Your skin is seared by {obj_name}!")
                     dam += c_div(rng_mm.number_range(1, obj_level), 2)
                     fail = False

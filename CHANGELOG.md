@@ -50,6 +50,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **MAGIC-045: `heat_metal` collapsed ROM's cursed-item branches (HIGH).**
+  `src/magic.c:3123-3277`. The port hardcoded `can_drop_obj` to `True`, so a
+  worn cursed (NODROP) weapon/armor or a cursed inventory item was dropped and
+  took the wrong damage instead of ROM's "sears your flesh / skin is seared"
+  else-branch (item stays). Restored the real `can_drop_obj` (NODROP +
+  immortal bypass), modelled `remove_obj`'s NOREMOVE failure, preserved ROM's
+  `&&` short-circuit so the worn-armor DEX `number_range` is only drawn when the
+  item is droppable (RNG parity), and switched that bound to
+  `get_curr_stat(DEX)`. Iteration-order sub-finding refiled as MAGIC-046.
 - **FIGHT-082: `do_trip` cluster — four ROM divergences (HIGH).** `src/fight.c:2711-2753`.
   (a) dropped the spurious `skill_level // 20` term from the bash-damage bound
   (ROM `number_range(2, 2 + 2*victim->size)`); (b) added the missing

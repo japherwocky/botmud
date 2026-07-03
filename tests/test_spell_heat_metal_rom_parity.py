@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import mud.skills.handlers as handlers
 from mud.models.character import Character
-from mud.models.constants import ExtraFlag, ImmFlag, ItemType, Position
+from mud.models.constants import ExtraFlag, ImmFlag, ItemType, Position, WearLocation
 from mud.models.object import Object, ObjIndex
 from mud.models.room import Room
 from mud.skills.handlers import heat_metal
@@ -257,3 +258,94 @@ def test_heat_metal_no_room():
     # Should not crash
     dam = heat_metal(caster, victim)
     assert dam >= 0
+
+
+# --- MAGIC-045: cursed-item (ITEM_NODROP) branches must not be collapsed ---
+
+
+def test_heat_metal_worn_nodrop_weapon_sears_and_stays(monkeypatch):
+    """ROM src/magic.c:3209-3232 — a worn cursed (NODROP) weapon cannot be dropped:
+    can_drop_obj is False, so ROM takes the else branch ("Your weapon sears your
+    flesh!", dam += number_range(1,level)) and the weapon STAYS WORN. The pre-fix
+    port hardcoded can_drop_obj True and threw the cursed weapon to the ground."""
+    monkeypatch.setattr(handlers, "saves_spell", lambda *a, **k: False)  # victim never saves
+    room = make_room()
+    room.contents = []
+    caster = make_character(level=30, room=room)
+    victim = make_character(level=10, imm_flags=0, room=room)
+    victim.messages = []
+
+    weapon = make_object(
+        item_type=ItemType.WEAPON,
+        level=0,
+        extra_flags=int(ExtraFlag.NODROP),
+        wear_loc=int(WearLocation.WIELD),
+        short_descr="a cursed blade",
+        value=[0, 0, 0, 0],
+    )
+    victim.equipment = {int(WearLocation.WIELD): weapon}
+
+    rng_mm.seed_mm(0xCAFE)
+    heat_metal(caster, victim)
+
+    assert weapon in victim.equipment.values()  # cursed weapon stays worn
+    assert weapon not in room.contents
+    assert any("sears your flesh" in m for m in victim.messages)
+    assert not any("throw your red-hot weapon" in m for m in victim.messages)
+
+
+def test_heat_metal_worn_nodrop_armor_sears_and_stays(monkeypatch):
+    """ROM src/magic.c:3148-3174 — a worn cursed (NODROP) armor cannot be dropped;
+    the DEX weight-roll is short-circuited (can_drop_obj is the first && operand),
+    so ROM sears ("Your skin is seared by $p!") and the armor STAYS WORN."""
+    monkeypatch.setattr(handlers, "saves_spell", lambda *a, **k: False)
+    room = make_room()
+    room.contents = []
+    caster = make_character(level=30, room=room)
+    victim = make_character(level=10, imm_flags=0, dex=18, room=room)
+    victim.messages = []
+
+    armor = make_object(
+        item_type=ItemType.ARMOR,
+        level=0,
+        extra_flags=int(ExtraFlag.NODROP),
+        wear_loc=int(WearLocation.BODY),
+        short_descr="cursed plate",
+        weight=0,  # weight/10 == 0 < any DEX roll: pre-fix would always drop it
+    )
+    victim.equipment = {int(WearLocation.BODY): armor}
+
+    rng_mm.seed_mm(0xCAFE)
+    heat_metal(caster, victim)
+
+    assert armor in victim.equipment.values()  # cursed armor stays worn
+    assert armor not in room.contents
+    assert any("skin is seared" in m for m in victim.messages)
+
+
+def test_heat_metal_inventory_nodrop_item_sears_and_stays(monkeypatch):
+    """ROM src/magic.c:3192-3200 — a cursed (NODROP) inventory item cannot be
+    dropped: ROM takes the else branch (seared, dam += number_range(1,level)/2)
+    and the item STAYS in inventory. The pre-fix port always dropped it (/6)."""
+    monkeypatch.setattr(handlers, "saves_spell", lambda *a, **k: False)
+    room = make_room()
+    room.contents = []
+    caster = make_character(level=30, room=room)
+    victim = make_character(level=10, imm_flags=0, room=room)
+    victim.messages = []
+
+    armor = make_object(
+        item_type=ItemType.ARMOR,
+        level=0,
+        extra_flags=int(ExtraFlag.NODROP),
+        wear_loc=-1,
+        short_descr="a cursed amulet",
+    )
+    victim.inventory = [armor]
+
+    rng_mm.seed_mm(0xCAFE)
+    heat_metal(caster, victim)
+
+    assert armor in victim.inventory  # cursed item stays carried
+    assert armor not in room.contents
+    assert any("skin is seared" in m for m in victim.messages)
