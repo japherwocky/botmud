@@ -187,6 +187,23 @@ def _lookup_skill_percent(attacker: Character, skill_name: str) -> int:
     return 0
 
 
+def _backstab_skill(attacker: Character) -> int:
+    """ROM get_skill(ch, gsn_backstab) for the backstab THAC0 bonus.
+
+    Mirrors src/handler.c:346 get_skill for the backstab sn: PCs use their
+    learned percent; NPC thieves (ACT_THIEF) get 20 + 2*level; other NPCs 0.
+    The systemic daze/drunk get_skill modifiers (src/handler.c:434-442) are not
+    yet ported — they affect every skill lookup, not just backstab, and are
+    tracked as HANDLER-008.
+    """
+    if getattr(attacker, "is_npc", False):
+        act_flags = int(getattr(attacker, "act", 0) or 0)
+        if act_flags & ActFlag.THIEF:
+            return 20 + 2 * int(getattr(attacker, "level", 0) or 0)
+        return 0
+    return _get_skill_percent(attacker, "backstab")
+
+
 def _get_skill_percent(attacker: Character, skill_name: str, fallback_attr: str | None = None) -> int:
     """Return the learned percentage for a skill with optional attribute fallback."""
 
@@ -613,6 +630,12 @@ def attack_round(attacker: Character, victim: Character, dt: str | int | None = 
         )
     else:
         th = compute_thac0(attacker.level, attacker.ch_class, hitroll=get_hitroll(attacker), skill=skill_total)
+    # FIGHT-086: ROM one_hit (src/fight.c:474-475) — backstab near-auto-hit below
+    # skill 100: thac0 -= 10 * (100 - get_skill(ch, gsn_backstab)). Operands are
+    # non-negative for a PC (skill clamped 0..100); an NPC thief's 20+2*level can
+    # exceed 100, matching ROM's unclamped subtraction. No c_div — no division.
+    if _normalize_dt(dt) == "backstab":
+        th -= 10 * (100 - _backstab_skill(attacker))
     # FIGHT-081: victim_ac is already on the /10 scale (see _compute_victim_ac); no
     # further division — ROM src/fight.c:510 uses victim_ac directly.
     # ROM src/fight.c:510 — miss on nat 0, or (not 19 and diceroll < thac0 - victim_ac).

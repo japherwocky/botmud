@@ -50,6 +50,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **FIGHT-086: backstab THAC0 bonus was missing.** ROM `one_hit`
+  (`src/fight.c:474-475`) subtracts `10 * (100 - get_skill(ch, gsn_backstab))`
+  from THAC0 for a backstab — a near-guaranteed hit below skill 100. The port
+  had the backstab *damage* multiplier but not the THAC0 branch, so sub-100
+  backstabs missed far more often than ROM. Added the branch in `attack_round`
+  plus a `_backstab_skill` helper mirroring ROM `get_skill` (PC learned / NPC
+  thief `20+2*level`). Surfaced HANDLER-008 (systemic daze/drunk get_skill
+  modifiers still unported).
+
 - **FIGHT-085: skill wait-states were haste/slow-scaled; ROM uses raw beats.**
   `SkillRegistry._compute_skill_lag` halved a skill's lag under `AFF_HASTE` and
   doubled it under `AFF_SLOW`. ROM's `WAIT_STATE` macro (`src/merc.h:2116`) is a

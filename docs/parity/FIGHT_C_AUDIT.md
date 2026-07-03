@@ -234,11 +234,19 @@ affects every swing) and FIGHT-082 (HIGH).
   asserted the wrong scaling and was rewritten as
   `test_skill_wait_is_raw_beats_regardless_of_haste_slow`. Affected
   do_bash/do_kick/do_backstab/do_rescue and every registry `use()` skill.
-- **`FIGHT-086` — ⚠️ OPEN (MEDIUM, hunter-reported) — backstab THAC0 bonus
-  missing.** ROM `one_hit` `src/fight.c:474-475`: `if (dt == gsn_backstab) thac0 -=
+- **`FIGHT-086` — ✅ FIXED (2.14.227) — backstab THAC0 bonus
+  restored.** ROM `one_hit` `src/fight.c:474-475`: `if (dt == gsn_backstab) thac0 -=
   10 * (100 - get_skill(ch, gsn_backstab));` (near-auto-hit below skill 100).
-  Python `compute_thac0` has no backstab branch (only the damage multiplier is
-  ported). Moot at skill 100.
+  Python `compute_thac0` is a pure helper with no `dt`, so the branch belongs in
+  `attack_round` right after THAC0 is interpolated/skill-adjusted. **Fix (2.14.227):**
+  added `if _normalize_dt(dt) == "backstab": th -= 10 * (100 - _backstab_skill(attacker))`
+  in `mud/combat/engine.py:attack_round`, plus a `_backstab_skill` helper mirroring
+  ROM `get_skill` (`src/handler.c:346`) for the backstab sn — PC learned percent,
+  NPC ACT_THIEF `20 + 2*level`, other NPC `0`. Plain `*`/`-` (no division → no
+  c_div). Test: `tests/integration/test_fight086_backstab_thac0.py` (2 — backstab
+  hits where a normal attack misses at the same diceroll; `_backstab_skill` matches
+  ROM get_skill for PC/NPC-thief/NPC-plain). The systemic daze/drunk get_skill
+  modifiers (`src/handler.c:434-442`) are still unported — filed as **HANDLER-008**.
 - **`FIGHT-087` — ⚠️ OPEN (LOW, hunter-reported) — `disarm` floors unarmed
   hand-to-hand to 1.** `mud/skills/handlers.py:3305` `max(hand_to_hand, 1)`; ROM
   `src/fight.c:3188` uses raw `hth`, so an unarmed NPC with `hth == 0` gets chance 0

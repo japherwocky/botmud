@@ -342,6 +342,23 @@ the AGENTS.md re-verify rule. Tests:
 the DEX-based cap) + the corrected `test_stat_based_carry_caps_monotonic` (which
 had encoded the same index-1-is-DEX error).
 
+#### HANDLER-008 — `get_skill` daze/drunk modifiers unported (no unified get_skill)
+
+| Field | Value |
+|-------|-------|
+| Severity | MODERATE (every skill/spell lookup is over-valued while dazed or drunk — affects hit chance, skill success rolls, backstab THAC0, etc.) |
+| ROM C | `src/handler.c:434-442` — after computing the base skill, `get_skill` applies: `if (ch->daze > 0) { if spell → skill /= 2; else skill = 2*skill/3; }` and `if (!IS_NPC(ch) && condition[COND_DRUNK] > 10) skill = 9*skill/10;`, then clamps `URANGE(0, skill, 100)`. |
+| Python | There is **no unified `get_skill` port**. Skill percents are fetched ad-hoc — `mud/combat/engine.py:_lookup_skill_percent`/`_get_skill_percent`/`_backstab_skill`, `mud/commands/combat.py:_character_skill_percent`, etc. — none of which apply the daze (`skill /= 2` for spells, `2*skill/3` for skills) or drunk (`9*skill/10`) reductions. |
+| Status | ⚠️ OPEN — surfaced 2026-07-03 while closing FIGHT-086 (backstab THAC0 branch, which needed `get_skill(ch, gsn_backstab)`). |
+
+The scope is systemic: the correct fix is a single `get_skill(ch, sn)` helper
+mirroring `src/handler.c:346-448` in full (PC learned / NPC formula defaults +
+the daze/drunk modifiers + the URANGE clamp), then routing the ad-hoc percent
+lookups through it. `_backstab_skill` (added for FIGHT-086) is a partial,
+backstab-only mirror that deliberately omits the daze/drunk step so as not to
+expand FIGHT-086's scope. Because the modifiers use `/` on provably non-negative
+operands (skill ≥ 0), the port can use `//` (bit-identical to C truncation here).
+
 #### HANDLER-DEAD-001 — dead `is_friend()` duplicate with wrong assist-bit values (removed)
 
 | Field | Value |
