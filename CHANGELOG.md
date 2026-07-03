@@ -58,6 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **HANDLER-008 migration: disarm-skill gate uses `get_skill`.** `do_disarm`'s skill gate/chance now come from unified `get_skill(caster, "disarm")` — enforcing ROM's PC class-level requirement and finally letting an NPC with OFF_DISARM disarm (20+3*level; was 0 via the dict → always rejected). Fourth of five get_skill site migrations.
+
 - **HANDLER-008 migration: disarm hand-to-hand uses `get_skill`.** The unarmed disarm chance sources its hand-to-hand skill from unified `get_skill` (retiring `_hand_to_hand_skill`); daze/drunk now apply. The disarm-*skill* gate migration (which enforces ROM's PC class-level requirement) is a documented follow-up.
 
 - **HANDLER-008 migration: backstab THAC0 uses `get_skill`.** `attack_round`'s backstab branch sources its skill from unified `get_skill` (retiring `engine._backstab_skill`); daze/drunk now factor into the backstab near-auto-hit.

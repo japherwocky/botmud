@@ -355,12 +355,14 @@ had encoded the same index-1-is-DEX error).
 - ✅ `mud/commands/combat.py:do_kick` — migrated (2.14.233), NPC-formula workaround retired, daze/drunk now apply.
 - ✅ `mud/combat/engine.py:attack_round` backstab THAC0 — migrated (2.14.234), `_backstab_skill` removed.
 - ✅ `mud/skills/handlers.py:disarm` hand-to-hand — migrated (2.14.235), `_hand_to_hand_skill` removed.
-- ⚠️ **`mud/skills/handlers.py:disarm` disarm-**skill** lookup** — still dict-sourced.
-  Migrating enforces ROM's PC class-level gate (`disarm.levels = (53,53,12,11)`),
-  which requires the ~10 `TestDisarmRomParity` PC tests to set a real warrior
-  `ch_class` (they name the char "warrior" but leave `ch_class=0`/mage). A focused
-  follow-up: fix those tests to be ROM-faithful, then migrate.
-- ⚠️ `mud/commands/combat.py:do_rescue` — `get_skill(gsn_rescue)` roll still dict-sourced (NPC rescue).
+- ✅ `mud/skills/handlers.py:disarm` disarm-**skill** gate — migrated (2.14.236). Now
+  `get_skill(caster, "disarm")` — enforces ROM's PC class-level gate and NPC disarm
+  finally works (OFF_DISARM → 20+3*level). The 14 `TestDisarmRomParity` warrior chars
+  now set `ch_class=3` + a level ≥ 11 (ROM-faithful: they were asserting ungated
+  behavior a mage-class char couldn't have).
+- ⚠️ `mud/commands/combat.py:do_rescue` — `_character_skill_percent("rescue")` roll
+  still dict-sourced (NPC rescue always fails). Same class-gate blast radius
+  (`rescue.levels=(53,53,53,1)`); migrate with the rescue PC tests set to warrior.
 - ⚠️ Every other ad-hoc percent lookup across combat/skills (`_lookup_skill_percent`,
   `_character_skill_percent`, etc.) — migrate opportunistically.
 

@@ -1204,6 +1204,7 @@ class TestDisarmRomParity:
     def test_disarm_requires_skill(self, movable_char_factory):
         """ROM L3153-3157: get_skill(gsn_disarm)==0 blocks with "don't know" message."""
         char = movable_char_factory("warrior", 3001)
+        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
         char.skills["disarm"] = 0
 
         result = do_disarm(char, "")
@@ -1213,6 +1214,7 @@ class TestDisarmRomParity:
     def test_disarm_requires_fighting_target(self, movable_char_factory):
         """ROM L3167-3171: disarm requires `ch->fighting` (no opponent => blocked)."""
         char = movable_char_factory("warrior", 3001)
+        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
         char.skills["disarm"] = 75
         char.fighting = None
 
@@ -1225,6 +1227,7 @@ class TestDisarmRomParity:
         from mud.skills import handlers as skill_handlers
 
         char = movable_char_factory("warrior", 3001)
+        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
         char.skills["disarm"] = 75
         char.level = 20
         char.wait = 0
@@ -1249,6 +1252,8 @@ class TestDisarmRomParity:
         from mud.skills import handlers as skill_handlers
 
         char = movable_char_factory("warrior", 3001)
+        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
+        char.level = 20  # >= disarm.levels[warrior]=11 so get_skill(disarm) > 0
         char.skills["disarm"] = 75
         char.skills["hand to hand"] = 0
         char.off_flags = 0
@@ -1277,6 +1282,7 @@ class TestDisarmRomParity:
         from mud.skills import handlers as skill_handlers
 
         char = movable_char_factory("warrior", 3001)
+        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
         char.skills["disarm"] = 75
         char.skills["hand to hand"] = 100
         char.wielded_weapon = None
@@ -1318,6 +1324,7 @@ class TestDisarmRomParity:
         from mud.skills import handlers as skill_handlers
 
         char = movable_char_factory("warrior", 3001)
+        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
         char.skills["disarm"] = 80
         char.skills["hand to hand"] = 0
         char.level = 20
@@ -1399,6 +1406,7 @@ class TestDisarmRomParity:
         from mud.skills import handlers as skill_handlers
 
         char = movable_char_factory("warrior", 3001)
+        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
         char.skills["disarm"] = 60
         char.level = 20
         char.perm_stat = [0, 0, 0, 0, 0]
@@ -1482,6 +1490,7 @@ class TestDisarmRomParity:
         from mud.skills import handlers as skill_handlers
 
         char = movable_char_factory("warrior", 3001)
+        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
         char.skills["disarm"] = 100
         char.level = 20
         char.perm_stat = [0, 0, 0, 10, 0]  # DEX=10
@@ -1551,6 +1560,7 @@ class TestDisarmRomParity:
         from mud.skills import handlers as skill_handlers
 
         char = movable_char_factory("warrior", 3001)
+        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
         char.skills["disarm"] = 50
         char.level = 25
         char.perm_stat = [0, 0, 0, 0, 0]
@@ -1620,6 +1630,7 @@ class TestDisarmRomParity:
         from mud.skills import handlers as skill_handlers
 
         char = movable_char_factory("warrior", 3001)
+        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
         char.skills["disarm"] = 50
         char.skills["hand to hand"] = 0
         char.wait = 0
@@ -1674,6 +1685,7 @@ class TestDisarmRomParity:
         from mud.skills import handlers as skill_handlers
 
         char = movable_char_factory("warrior", 3001)
+        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
         char.skills["disarm"] = 100
         char.level = 20
         char.perm_stat = [0, 0, 0, 25, 0]
@@ -1749,6 +1761,7 @@ class TestDisarmRomParity:
         from mud.skills import handlers as skill_handlers
 
         char = movable_char_factory("warrior", 3001)
+        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
         char.skills["disarm"] = 100
         char.level = 20
         char.perm_stat = [0, 0, 0, 25, 0]
@@ -1805,6 +1818,7 @@ class TestDisarmRomParity:
         from mud.skills import handlers as skill_handlers
 
         char = movable_char_factory("warrior", 3001)
+        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
         char.skills["disarm"] = 100
         char.level = 20
         char.perm_stat = [0, 0, 0, 25, 0]
@@ -1857,6 +1871,7 @@ class TestDisarmRomParity:
         from mud.skills import handlers as skill_handlers
 
         char = movable_char_factory("warrior", 3001)
+        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
         char.skills["disarm"] = 100
         char.level = 20
         char.perm_stat = [0, 0, 0, 25, 0]

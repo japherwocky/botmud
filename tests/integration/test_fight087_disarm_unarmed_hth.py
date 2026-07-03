@@ -66,9 +66,9 @@ def test_unarmed_npc_disarm_uses_rom_hand_to_hand_skill(monkeypatch: pytest.Monk
     victim.is_npc = True
     caster.level = 10
     victim.level = 10
-    caster.skills = {"disarm": 100}  # disarm-skill gate (still dict-sourced; see handlers.py)
-    # HANDLER-008: the hand-to-hand skill now comes from get_skill (NPC 40+2*10 = 60),
-    # so an unarmed NPC computes a real chance instead of the old floor-of-1.
+    # No skills dict: HANDLER-008 get_skill supplies BOTH the disarm-skill gate
+    # (OFF_DISARM NPC → 20+3*10 = 50; was 0 via the dict → "you don't know how")
+    # and the hand-to-hand skill (NPC → 40+2*10 = 60), so an unarmed NPC can disarm.
     caster.off_flags = int(OffFlag.DISARM)
     # wait > 0 so the disarm-success path drops the weapon to the room rather than the
     # NPC-recovery branch (which is MobInstance-only; a flag-flipped Character lacks

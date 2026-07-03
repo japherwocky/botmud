@@ -3299,13 +3299,11 @@ def disarm(caster: Character, target: Character | None = None) -> bool:
         _send_to_char(caster, "Your opponent is not wielding a weapon.")
         return False
 
-    # HANDLER-008 (deferred): ROM do_disarm gates on and scales by
-    # get_skill(ch, gsn_disarm) (src/fight.c:3155). Migrating this lookup to
-    # get_skill enforces ROM's PC class-level gate (an NPC with OFF_DISARM would
-    # also finally disarm), but it is a real behavior change that requires the
-    # existing PC disarm parity tests to set a real ch_class — left as a focused
-    # follow-up. For now the disarm-skill percent still comes from the dict.
-    skill = _skill_percent(caster, "disarm")
+    # HANDLER-008: ROM do_disarm gates on and scales by get_skill(ch, gsn_disarm)
+    # (src/fight.c:3155) — enforces the PC class-level gate, and an NPC with
+    # OFF_DISARM/WARRIOR/THIEF now gets 20+3*level (was 0 via the dict → always
+    # rejected here, so NPC disarm never worked).
+    skill = get_skill(caster, "disarm")
     if skill <= 0:
         _send_to_char(caster, "You don't know how to disarm opponents.")
         return False
