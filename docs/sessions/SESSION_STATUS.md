@@ -1,53 +1,49 @@
-# Session Status — 2026-07-03 — Cold-path divergence hunt (GET-015, PICK-003, GL-045)
+# Session Status — 2026-07-03 — FIGHT/MAGIC HIGH+MEDIUM closure (081/082/045/083/084)
 
 ## Current State
 
 - **Active focus**: Cross-file invariants / divergence-class roster; cold-path
-  divergence hunting (per-file audit tracker exhausted).
-- **Last completed** (five-unit autonomous batch):
-  - **Unit 1** — non-death `get all corpse` autosplit differential scenario
-    (`get_corpse_money_autosplit`), locking the shared `do_get` → `_get_obj`
-    autosplit path (`src/act_obj.c:162-184`) via a manual (non-death) entry.
-    Converges. (v2.14.216)
-  - **Unit 2** — `weather_tick` MM draw-order regression lock
-    (`tests/test_weather_tick_draw_order.py`), pinning ROM `weather_update`'s
-    unspecified-eval-order `dice()` expression (`src/update.c:578`) against a
-    silent draw-swap. (v2.14.217)
-  - **`GET-015`** — `get all <pit>` greed gate hardcoded `trust >= 51`; a
-    level-51 mortal hero could empty a donation pit. Fixed to `>= LEVEL_IMMORTAL`
-    (52); ROM `!IS_IMMORTAL` (`src/act_obj.c:320`). (v2.14.218)
-  - **`PICK-003`** — `do_pick` door immortal check hardcoded `trust >= 51` on raw
-    `char.trust` (wrong threshold + missing `get_trust` level fallback). Fixed to
-    `char.is_immortal()`; ROM `!IS_IMMORTAL` (`src/act_move.c:958,963,973`).
-    Contradicted a stale "immortal bypass FIXED" audit claim. (v2.14.219)
-  - **`GL-045`** — `obj_update` object-affect fade skipped its `number_range(0,4)`
-    draw at level 0 (swapped `&&` operands); ROM draws unconditionally
-    (`src/update.c:933`). Object-side twin of GL-026. Fixed. (v2.14.220)
-  - Filed OPEN (out-of-scope hunt findings): `FIGHT-081` (HIGH, verified — AC
-    scale/order), `FIGHT-082..087` + `MAGIC-045` (hunter-reported, verify first).
+  divergence hunting (per-file audit tracker exhausted). Closing the cold-path
+  finding queue filed in the prior batch.
+- **Last completed** (five gap-closer units, all re-verified against ROM C first):
+  - **`FIGHT-081`** (HIGH, v2.14.221) — melee AC modifiers now apply on the /10
+    scale in ROM order (`_compute_victim_ac`, `src/fight.c:480-503`); `-4` gated on
+    `can_see_character` not the INVISIBLE affect.
+  - **`FIGHT-082`** (HIGH, v2.14.222) — `do_trip` damage bound / speed modifier /
+    raw-beats WAIT + victim DAZE (`src/fight.c:2711-2753`). Filed FIGHT-088.
+  - **`MAGIC-045`** (HIGH, v2.14.223) — `heat_metal` cursed-item (NODROP) branches
+    restored (`src/magic.c:3123-3277`). Filed MAGIC-046 (iteration order).
+  - **`FIGHT-083`** (MEDIUM, v2.14.224) — `dirt_kicking` false-zero hack +
+    `chance == 0` terrain gate (`src/fight.c:2566-2608`).
+  - **`FIGHT-084`** (MEDIUM, v2.14.225) — `check_parry` visibility direction +
+    functional (`src/fight.c:1311`). Filed FIGHT-089 (check_dodge twin).
+  - Filed OPEN (out-of-scope, surfaced while reading ROM): `FIGHT-088` (MEDIUM),
+    `FIGHT-089` (LOW), `MAGIC-046` (MEDIUM).
 - **Pointer to latest summary**:
-  [SESSION_SUMMARY_2026-07-03_COLD_PATH_HUNT_GET015_PICK003_GL045.md](SESSION_SUMMARY_2026-07-03_COLD_PATH_HUNT_GET015_PICK003_GL045.md)
+  [SESSION_SUMMARY_2026-07-03_FIGHT_MAGIC_HIGH_MEDIUM_CLOSURE.md](SESSION_SUMMARY_2026-07-03_FIGHT_MAGIC_HIGH_MEDIUM_CLOSURE.md)
 
 ## Project Status (snapshot)
 
 | Metric | Value |
 |--------|-------|
-| Version | 2.14.220 |
-| Tests | 6032 passed, 4 skipped (+40 pre-existing aiohttp env collection errors) |
-| Cross-file invariants | INV-054 latest (unchanged); GL-045 added to UPDATE_C_AUDIT |
-| Differential scenarios | 56 committed (`get_corpse_money_autosplit` added) |
-| Active focus | Cold-path divergence hunt; FIGHT-081 AC scale next |
+| Version | 2.14.225 |
+| Tests | 6049 passed, 4 skipped, 0 failed (+40 pre-existing aiohttp env collection errors) |
+| Cross-file invariants | INV-054 latest (unchanged) |
+| Cold-path queue | FIGHT-081/082/083/084 + MAGIC-045 closed; FIGHT-085/086/087/088/089 + MAGIC-046 OPEN |
+| Active focus | Cold-path divergence hunt — all HIGHs closed; MEDIUM/LOW tail remains |
 
 ## Next Intended Task
 
-**Top priority: `FIGHT-081` (HIGH, already verified against ROM C).** Fix the AC
-modifier scale/order in `mud/combat/engine.py:attack_round` — ROM `one_hit`
-(`src/fight.c:483-503`) divides AC by 10 **first**, then applies the `<-15` clamp
-and the −4/+4/+6 modifiers on the /10 scale; Python applies them to raw AC and
-divides last, making armor/position modifiers ~10× too weak and over-triggering
-the clamp for every armored character. HIGH blast radius (shared PC+NPC melee) —
-scope with a differential combat scenario whose victim AC is in the divergent
-band and expect combat-test re-baselining. Then re-verify and close
-`FIGHT-082..087` and `MAGIC-045` (exact ROM cites in the audit docs). Separately,
-the `Router.__init__()` aiohttp collection errors (6042→6032 passing) are an
-environmental dependency issue, not a parity regression.
+**Continue the FIGHT cold-path tail (all MEDIUM/LOW).** Highest value:
+`FIGHT-085` (skill wait-states haste/slow-adjusted; ROM `WAIT_STATE` uses raw
+beats — `mud/skills/registry.py:_compute_skill_lag`, affects
+do_bash/do_kick/do_backstab/do_rescue; FIGHT-082's raw-beats read is the pattern),
+then `FIGHT-086` (backstab THAC0 bonus in `compute_thac0`, `src/fight.c:474-475`),
+`FIGHT-088` (do_trip act()-render + failure `damage(0)`), `FIGHT-089` (one-line
+check_dodge visibility fix), `FIGHT-087` (disarm hth floor). `MAGIC-046`
+(heat_metal iteration order) is cross-cutting — needs a unified ROM-ordered
+`carrying` accessor on `Character`, so scope it separately.
+
+**Tooling note:** the GitNexus MCP server disconnected mid-session; the index is
+stale (last indexed `241c454`). Run `npx gitnexus analyze --skip-agents-md` and
+restart the MCP server before relying on `gitnexus_impact` / `gitnexus_detect_changes`.
