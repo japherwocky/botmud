@@ -28,6 +28,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `death_autoloot_autosplit` scenario + golden, pinning ROM `do_get all corpse`
   behavior when `PLR_AUTOLOOT` collects mixed NPC corpse contents for a grouped
   PC with `PLR_AUTOSPLIT`.
+- **`weather_tick` RNG draw-order regression lock** — `tests/test_weather_tick_draw_order.py`
+  pins the Mitchell-Moore draw sequence of ROM `weather_update`
+  (`src/update.c:578`): the pressure line `change += diff*dice(1,4) + dice(2,6)
+  - dice(2,6)` is a single C expression whose three `dice()` calls have
+  *unspecified* evaluation order in C, but the diff-harness build platform
+  evaluates it strictly left-to-right — which is the order the Python port
+  draws in. The test locks the draw count, order, operand sizes, and the +/−
+  assignment (so a refactor cannot silently swap the two `dice(2,6)` draws and
+  desync every subsequent MM draw shared with combat/spells), plus the
+  per-sky-state `number_bits(2)` draw count. No behavior change — this path was
+  previously unguarded by any dedicated test.
 - **Differential harness non-death `get all corpse` autosplit coverage** —
   committed the `get_corpse_money_autosplit` scenario + golden, exercising the
   shared `do_get` → `get_obj` autosplit path (`src/act_obj.c:162-184`) via a
