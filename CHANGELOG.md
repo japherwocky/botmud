@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **HANDLER-008: faithful unified `get_skill` port (core).** Added
+  `mud/skills/skill_lookup.py:get_skill` mirroring ROM `src/handler.c:346-448` —
+  the PC class-level gate + learned percent, the full NPC formula dispatch
+  (spell/weapon/kick/backstab/dodge/parry/trip/bash/disarm/… by flags), the daze
+  (`skill/2` spell, `2*skill/3` skill) and drunk (`9*skill/10`) reductions, and the
+  `URANGE(0,skill,100)` clamp. Self-contained + unit-tested; call-site migrations
+  (retiring the per-skill NPC-formula partial mirrors) follow.
+
 - **Differential harness death autosac coverage** — added `__plr_autosac=0|1`
   to the C/Python replay drivers and committed the `death_auto_sac` scenario +
   golden. The new replay confirms death `PLR_AUTOSAC` converges with ROM

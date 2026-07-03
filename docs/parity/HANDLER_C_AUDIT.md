@@ -349,7 +349,7 @@ had encoded the same index-1-is-DEX error).
 | Severity | MODERATE (every skill/spell lookup is over-valued while dazed or drunk — affects hit chance, skill success rolls, backstab THAC0, etc.) |
 | ROM C | `src/handler.c:434-442` — after computing the base skill, `get_skill` applies: `if (ch->daze > 0) { if spell → skill /= 2; else skill = 2*skill/3; }` and `if (!IS_NPC(ch) && condition[COND_DRUNK] > 10) skill = 9*skill/10;`, then clamps `URANGE(0, skill, 100)`. |
 | Python | There is **no unified `get_skill` port**. Skill percents are fetched ad-hoc — `mud/combat/engine.py:_lookup_skill_percent`/`_get_skill_percent`/`_backstab_skill`, `mud/commands/combat.py:_character_skill_percent`, etc. — none of which apply the daze (`skill /= 2` for spells, `2*skill/3` for skills) or drunk (`9*skill/10`) reductions. |
-| Status | ⚠️ OPEN — surfaced 2026-07-03 while closing FIGHT-086 (backstab THAC0 branch, which needed `get_skill(ch, gsn_backstab)`). |
+| Status | 🔄 IN PROGRESS (2.14.232) — the faithful unified `get_skill` is now implemented at `mud/skills/skill_lookup.py:get_skill` (PC class-level gate + learned; full NPC formula dispatch; daze `skill/2`/`2*skill/3`; drunk `9*skill/10`; `URANGE(0,skill,100)`), self-contained + unit-tested (`tests/test_get_skill.py`, 16). **Call-site migrations pending** — the five workaround sites below still need routing through it before this row is ✅. Surfaced 2026-07-03 while closing FIGHT-086. |
 
 **Known affected sites (partial mirrors shipped where a single gap needed one):**
 `mud/combat/engine.py:_backstab_skill` (FIGHT-086) and
