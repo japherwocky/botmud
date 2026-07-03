@@ -194,6 +194,20 @@ def _skill_percent(character: Character, name: str) -> int:
     return max(0, min(100, percent))
 
 
+def _hand_to_hand_skill(character: Character) -> int:
+    """ROM get_skill(ch, gsn_hand_to_hand) for do_disarm's unarmed chance.
+
+    Mirrors src/handler.c:394 — NPCs get ``40 + 2*level`` (no ACT gate, unlike
+    backstab); PCs use their learned percent. The systemic daze/drunk get_skill
+    modifiers (src/handler.c:434-442) remain unported (HANDLER-008); this is a
+    partial, hand-to-hand-only mirror, the same spirit as
+    ``mud.combat.engine._backstab_skill``.
+    """
+    if getattr(character, "is_npc", False):
+        return 40 + 2 * int(getattr(character, "level", 0) or 0)
+    return _skill_percent(character, "hand to hand")
+
+
 def _skill_beats(name: str) -> int:
     """Lookup ROM beat/lag values for a skill with a safe default."""
 
@@ -3304,17 +3318,24 @@ def disarm(caster: Character, target: Character | None = None) -> bool:
         return False
 
     caster_weapon = get_wielded_weapon(caster)
-    hand_to_hand = _skill_percent(caster, "hand to hand")
+    hand_to_hand = _hand_to_hand_skill(caster)  # ROM get_skill(ch, gsn_hand_to_hand)
     caster_off = int(getattr(caster, "off_flags", 0) or 0)
+    caster_is_npc = bool(getattr(caster, "is_npc", False))
 
     if caster_weapon is None:
-        if hand_to_hand <= 0 and not (caster_off & int(OffFlag.DISARM)):
+        # ROM do_disarm src/fight.c:3160-3164 — unarmed reject when the hand-to-hand
+        # skill is 0, OR the attacker is an NPC lacking OFF_DISARM. FIGHT-087: the port
+        # had `hth<=0 AND !OFF_DISARM`, which let an unarmed hth==0 char through when
+        # OFF_DISARM was set; ROM's `hth==0` disjunct is unconditional.
+        if hand_to_hand == 0 or (caster_is_npc and not (caster_off & int(OffFlag.DISARM))):
             _send_to_char(caster, "You must wield a weapon to disarm.")
             return False
 
     chance = skill
     if caster_weapon is None:
-        chance = c_div(chance * max(hand_to_hand, 1), 150)
+        # ROM src/fight.c:3188 — chance * hth / 150, raw hth (no floor). The gate above
+        # guarantees hth != 0 here, so no `max(...,1)` is needed. FIGHT-087.
+        chance = c_div(chance * hand_to_hand, 150)
     else:
         caster_weapon_sn = get_weapon_sn(caster, caster_weapon)
         chance = c_div(chance * get_weapon_skill(caster, caster_weapon_sn), 100)

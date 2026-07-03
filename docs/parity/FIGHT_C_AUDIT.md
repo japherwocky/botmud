@@ -250,10 +250,23 @@ affects every swing) and FIGHT-082 (HIGH).
   hits where a normal attack misses at the same diceroll; `_backstab_skill` matches
   ROM get_skill for PC/NPC-thief/NPC-plain). The systemic daze/drunk get_skill
   modifiers (`src/handler.c:434-442`) are still unported — filed as **HANDLER-008**.
-- **`FIGHT-087` — ⚠️ OPEN (LOW, hunter-reported) — `disarm` floors unarmed
-  hand-to-hand to 1.** `mud/skills/handlers.py:3305` `max(hand_to_hand, 1)`; ROM
-  `src/fight.c:3188` uses raw `hth`, so an unarmed NPC with `hth == 0` gets chance 0
-  in ROM, nonzero in Python. Narrow edge case.
+- **`FIGHT-087` — ✅ FIXED (2.14.229) — `disarm` floored unarmed hand-to-hand to
+  1 and used a non-ROM gate.** `mud/skills/handlers.py:disarm` fetched hand-to-hand
+  via `_skill_percent` (skills-dict only → 0 for NPCs) and papered over it with
+  `max(hand_to_hand, 1)`, so an unarmed NPC disarmer computed `chance * 1 / 150`
+  instead of ROM's `chance * (40+2*level) / 150` (`src/fight.c:3188`) — a
+  near-guaranteed failure. The unarmed gate also used `hth<=0 AND !OFF_DISARM`
+  where ROM (`src/fight.c:3160-3164`) is `hth==0 OR (IS_NPC AND !OFF_DISARM)`.
+  **Fix (2.14.229):** added `_hand_to_hand_skill` (PC learned / NPC `40+2*level`,
+  a partial get_skill mirror like `engine._backstab_skill`), dropped the floor
+  (raw `hth`; the gate guarantees `hth != 0` on the unarmed path), and aligned the
+  gate boolean to ROM. Test: `tests/integration/test_fight087_disarm_unarmed_hth.py`
+  (2 — unarmed NPC disarm succeeds at a roll where the floor path fails;
+  `_hand_to_hand_skill` matches ROM get_skill for PC/NPC). Note: the sibling
+  disarm-**skill** NPC lookup (`skill = _skill_percent(caster, "disarm")`,
+  handlers.py) is another get_skill NPC-formula gap on the same function — part of
+  **HANDLER-008**'s surface, not fixed here (an NPC with OFF_DISARM should get
+  `20+3*level`).
 - **`FIGHT-088` — ⚠️ OPEN (MEDIUM) — `do_trip` uses plain return strings and
   omits the failure `damage(0)` call.** Surfaced 2026-07-03 while closing
   FIGHT-082 (full `do_trip` read). (a) ROM success emits three `act()` lines —

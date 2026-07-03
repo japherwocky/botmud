@@ -50,6 +50,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **FIGHT-087: unarmed disarm used a hand-to-hand floor of 1 and a non-ROM gate.**
+  An unarmed NPC disarmer computed `chance * 1 / 150` (via `max(hand_to_hand, 1)`)
+  instead of ROM's `chance * (40+2*level) / 150` — a near-guaranteed failure. Added
+  a `_hand_to_hand_skill` helper (PC learned / NPC `40+2*level`, per ROM
+  `get_skill`), dropped the floor, and aligned the unarmed gate to ROM's
+  `hth==0 OR (IS_NPC AND !OFF_DISARM)`. The disarm-skill NPC lookup on the same
+  function remains part of HANDLER-008.
+
 - **FIGHT-089: `check_dodge` visibility halving was inert.** The dodge check
   halved chance when the defender couldn't see the attacker, but the port used a
   `getattr(victim, "can_see", lambda x: True)` fallback that never fired (runtime

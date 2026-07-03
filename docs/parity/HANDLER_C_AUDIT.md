@@ -351,6 +351,14 @@ had encoded the same index-1-is-DEX error).
 | Python | There is **no unified `get_skill` port**. Skill percents are fetched ad-hoc — `mud/combat/engine.py:_lookup_skill_percent`/`_get_skill_percent`/`_backstab_skill`, `mud/commands/combat.py:_character_skill_percent`, etc. — none of which apply the daze (`skill /= 2` for spells, `2*skill/3` for skills) or drunk (`9*skill/10`) reductions. |
 | Status | ⚠️ OPEN — surfaced 2026-07-03 while closing FIGHT-086 (backstab THAC0 branch, which needed `get_skill(ch, gsn_backstab)`). |
 
+**Known affected sites (partial mirrors shipped where a single gap needed one):**
+`mud/combat/engine.py:_backstab_skill` (FIGHT-086) and
+`mud/skills/handlers.py:_hand_to_hand_skill` (FIGHT-087) are backstab-/hand-to-hand-only
+partial mirrors that supply the NPC formula but skip the daze/drunk step. Still
+unfixed: `mud/skills/handlers.py:disarm`'s own `skill = _skill_percent(caster,
+"disarm")` (an NPC with OFF_DISARM should get `20+3*level`, `src/handler.c:405`),
+and every other ad-hoc percent lookup across combat/skills.
+
 The scope is systemic: the correct fix is a single `get_skill(ch, sn)` helper
 mirroring `src/handler.c:346-448` in full (PC learned / NPC formula defaults +
 the daze/drunk modifiers + the URANGE clamp), then routing the ad-hoc percent
