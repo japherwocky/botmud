@@ -149,25 +149,28 @@ exact cites and MUST be re-verified against ROM C before closing** (per AGENTS.m
 "re-verify any status claim against ROM C source"). Prioritize FIGHT-081 (HIGH,
 affects every swing) and FIGHT-082 (HIGH).
 
-- **`FIGHT-081` — ⚠️ OPEN (HIGH, VERIFIED) — AC modifiers applied at wrong
+- **`FIGHT-081` — ✅ FIXED (2.14.221) — AC modifiers applied at wrong
   scale/order in `attack_round`.** `mud/combat/engine.py:552-596` vs ROM `one_hit`
-  `src/fight.c:483-503`. ROM divides AC by 10 **first** (`victim_ac = GET_AC(victim,
-  AC_x) / 10`), then applies the `< -15` clamp and the `-4/+4/+6` (invis /
-  pos<FIGHTING / pos<RESTING) modifiers **on the /10 scale**. Python applies the
-  modifiers and the clamp to the **raw** AC and divides by 10 last (`vac =
-  c_div(victim_ac, 10)`, line 596). Two effects: (a) the -4/+4/+6 position/invis
-  modifiers become ~0.4/0.4/0.6 AC after the trailing /10 (≈10× too weak); (b) the
-  `< -15` clamp fires for any raw AC < -15 (almost every armored character) instead
-  of ROM's raw < -150, drastically changing effective AC. Worked example (raw
-  AC_BASH = -100): ROM effective victim_ac = -10; Python = -3 → victim ~7 AC points
+  `src/fight.c:480-503`. ROM divides AC by 10 **first** (`victim_ac = GET_AC(victim,
+  AC_x) / 10`), then applies the `< -15` rescale and the `-4/+4/+6` (invis /
+  pos<FIGHTING / pos<RESTING) modifiers **on the /10 scale**. Python applied the
+  modifiers and the rescale to the **raw** AC and divided by 10 last (`vac =
+  c_div(victim_ac, 10)`, old line 596). Two effects: (a) the -4/+4/+6 position/invis
+  modifiers became ~0.4/0.4/0.6 AC after the trailing /10 (≈10× too weak); (b) the
+  `< -15` rescale fired for any raw AC < -15 (almost every armored character) instead
+  of ROM's post-/10 < -15, drastically changing effective AC. Worked example (raw
+  AC_BASH = -100): ROM effective victim_ac = -10; old Python = -3 → victim ~7 AC points
   easier to hit. Pervasive (shared PC+NPC melee, every swing); didn't surface in
   `combat_melee_rounds` because that mob's AC sits in the non-divergent band.
-  Sub-divergence: Python gates the -4 on `AffectFlag.INVISIBLE` (line 554); ROM
+  Sub-divergence (also fixed): Python gated the -4 on `AffectFlag.INVISIBLE`; ROM
   uses `!can_see(ch, victim)` (`fight.c:496`) — broader (blind/dark/hide, withheld
-  from a detect-invis attacker). **Fix direction:** `/10` first, then clamp, then
-  modifiers, drop the trailing `c_div(victim_ac,10)`; consider `!attacker.can_see(victim)`
-  for the -4. HIGH blast radius — scope with a differential combat scenario whose
-  victim AC is in the divergent range, expect combat-test re-baselining.
+  from a detect-invis attacker). **Fix (2.14.221):** extracted `_compute_victim_ac`
+  mirroring ROM `src/fight.c:480-503` — `c_div(get_ac, 10)` first, then the `< -15`
+  rescale, then `not can_see_character(attacker, victim)` -4 / position +4/+6, all
+  on the /10 scale; the hit test now uses `victim_ac` directly (dropped the trailing
+  `c_div(victim_ac, 10)`). Test: `tests/integration/test_fight081_ac_scale_order.py`
+  (3 — -100 AC scale, -200 AC rescale band, invis -4 gated on can_see not the affect).
+  As predicted, no existing combat test needed re-baselining (3387 pass). HIGH.
 - **`FIGHT-082` — ⚠️ OPEN (HIGH, hunter-reported) — `do_trip` cluster.**
   `mud/commands/combat.py:1234-1283` vs `src/fight.c:2711-2753`. (a) damage upper
   bound has a spurious `skill_level // 20` term (ROM `number_range(2, 2 + 2*victim->size)`,

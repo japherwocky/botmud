@@ -43,7 +43,7 @@ from mud.skills import check_improve
 from mud.utils import rng_mm
 from mud.utils.act import capitalize_act_line
 from mud.wiznet import WiznetFlag, wiznet
-from mud.world.vision import can_see_object, pers
+from mud.world.vision import can_see_character, can_see_object, pers
 
 HAND_TO_HAND_SKILL = "hand to hand"
 
@@ -519,6 +519,35 @@ def _mob_offensive_skill(attacker: Character, roll: int, off_flags: int, act_fla
     # commented out).
 
 
+def _compute_victim_ac(attacker: Character, victim: Character, ac_idx: int, victim_pos: int) -> int:
+    """ROM ``one_hit`` effective victim AC (src/fight.c:480-503).
+
+    ROM divides GET_AC by 10 **first**, then applies the ``< -15`` rescale and
+    the visibility/position modifiers **on the /10 scale** — not on the raw
+    (×10) armor value. FIGHT-081: the pre-fix Python applied the modifiers and
+    the rescale to the raw AC and divided by 10 last, making the -4/+4/+6
+    modifiers ~10× too weak and mis-firing the rescale for nearly every armored
+    character. The visibility -4 gates on ``!can_see(ch, victim)`` (broader than
+    the victim's INVISIBLE affect: also blind/dark/hide, and withheld from a
+    detect-invis attacker), mirroring ROM src/fight.c:496.
+    """
+
+    # mirroring ROM src/fight.c:480-491 — GET_AC(victim, ac) / 10 (c_div: AC is signed).
+    victim_ac = c_div(get_ac(victim, ac_idx), 10)
+    # mirroring ROM src/fight.c:493-494 — rescale of very-negative AC, on the /10 scale.
+    if victim_ac < -15:
+        victim_ac = c_div(victim_ac + 15, 5) - 15
+    # mirroring ROM src/fight.c:496-497 — !can_see(ch, victim), not the INVISIBLE affect.
+    if not can_see_character(attacker, victim):
+        victim_ac -= 4
+    # mirroring ROM src/fight.c:499-503 — position penalties on the /10 scale.
+    if victim_pos < Position.FIGHTING:
+        victim_ac += 4
+    if victim_pos < Position.RESTING:
+        victim_ac += 6
+    return victim_ac
+
+
 def attack_round(attacker: Character, victim: Character, dt: str | int | None = None) -> str:
     """Resolve a single attack round.
 
@@ -548,19 +577,10 @@ def attack_round(attacker: Character, victim: Character, dt: str | int | None = 
     dam_type_lookup = attack_damage_type(attack_index)
     dam_type = int(dam_type_lookup) if dam_type_lookup is not None else int(DamageType.BASH)
     ac_idx = ac_index_for_dam_type(dam_type)
-    # ROM src/merc.h:2104-2106 GET_AC adds dex_app[DEX].defensive when IS_AWAKE.
-    victim_ac = get_ac(victim, ac_idx)
-    # Visibility and position modifiers (ROM-inspired)
-    if getattr(victim, "has_affect", None) and victim.has_affect(AffectFlag.INVISIBLE):
-        victim_ac -= 4
-    if _victim_pos_before < Position.FIGHTING:
-        victim_ac += 4
-    if _victim_pos_before < Position.RESTING:
-        victim_ac += 6
-
-    # ROM AC clamping for very negative values
-    if victim_ac < -15:
-        victim_ac = c_div(victim_ac + 15, 5) - 15
+    # FIGHT-081: ROM one_hit (src/fight.c:480-503) divides GET_AC by 10 first,
+    # then rescales/modifies on the /10 scale. victim_ac is already the value
+    # used directly in the hit test — no further division.
+    victim_ac = _compute_victim_ac(attacker, victim, ac_idx, _victim_pos_before)
 
     # FIGHT-019: ROM one_hit has a single attack-roll model — the THAC0 /
     # number_bits(5) roll (src/fight.c:508-516). The legacy percent model
@@ -593,9 +613,10 @@ def attack_round(attacker: Character, victim: Character, dt: str | int | None = 
         )
     else:
         th = compute_thac0(attacker.level, attacker.ch_class, hitroll=get_hitroll(attacker), skill=skill_total)
-    vac = c_div(victim_ac, 10)
+    # FIGHT-081: victim_ac is already on the /10 scale (see _compute_victim_ac); no
+    # further division — ROM src/fight.c:510 uses victim_ac directly.
     # ROM src/fight.c:510 — miss on nat 0, or (not 19 and diceroll < thac0 - victim_ac).
-    if diceroll == 0 or (diceroll != 19 and diceroll < (th - vac)):
+    if diceroll == 0 or (diceroll != 19 and diceroll < (th - victim_ac)):
         # Miss — ROM C calls damage(ch, victim, 0, dt, dam_type, TRUE).
         return apply_damage(attacker, victim, 0, int(dam_type), dt=attack_dt)
 

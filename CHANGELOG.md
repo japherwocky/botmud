@@ -50,6 +50,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **FIGHT-081: melee AC modifiers applied at the wrong scale/order in
+  `attack_round` (HIGH — every swing).** ROM `one_hit` (`src/fight.c:480-503`)
+  divides `GET_AC` by 10 **first**, then applies the `< -15` rescale and the
+  `-4/+4/+6` visibility/position modifiers on the /10 scale; the port applied
+  them to the raw (×10) AC and divided last, making the modifiers ~10× too weak
+  and mis-firing the rescale for nearly every armored character. Extracted
+  `_compute_victim_ac` mirroring ROM order, and gated the -4 on
+  `not can_see_character(attacker, victim)` (blind/dark/hide/detect-invis aware)
+  instead of the victim's INVISIBLE affect. No existing combat test needed
+  re-baselining.
 - **GL-045: `obj_update` object-affect fade skipped its RNG draw at level 0
   (RNG desync).** `_tick_object_affects` had the fade-roll operands swapped
   (`level > 0 and number_range(0,4) == 0`), so a level-0 object affect with
