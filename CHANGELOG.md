@@ -50,6 +50,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **FIGHT-091: an NPC's kick never landed (chance was 0).** `do_kick` read the
+  kick percent from the skills dict — empty for mobs — so an aggressive OFF_KICK
+  mob could never land a kick. The NPC branch now uses ROM `get_skill`'s
+  `10 + 3*level` (`src/handler.c:410`). Fourth site of the get_skill NPC-formula
+  class (HANDLER-008), which the unified port will consolidate.
+
 - **FIGHT-088: `do_trip` now emits ROM's three act() lines and the failure
   `damage(0)`.** The trip command returned a single baked
   `"You trip X and they go down!"` with no room broadcast or `$N`/`$M` pronoun

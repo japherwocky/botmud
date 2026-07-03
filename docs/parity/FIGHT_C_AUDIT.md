@@ -302,6 +302,18 @@ affects every swing) and FIGHT-082 (HIGH).
   can't land on one path and miss the other. Not fixed here — this is a refactor,
   not a gap-closer.
 
+- **`FIGHT-091` — ✅ FIXED (2.14.231) — an NPC's kick chance was 0 (skills dict),
+  so NPC kicks never landed.** ROM `do_kick` (`src/fight.c:3125`) rolls
+  `get_skill(ch, gsn_kick) > number_percent()`; for an NPC `get_skill` returns
+  `10 + 3*level` (`src/handler.c:410`). Python `do_kick` read the kick percent from
+  the skills dict — empty for mobs — so `chance == 0` and an aggressive OFF_KICK mob
+  could never land a kick. **Fix (2.14.231):** NPC branch now computes
+  `max(0, min(100, 10 + 3*level))`; PC branch unchanged (learned percent). Test:
+  `tests/integration/test_fight091_npc_kick_skill.py` (NPC kick lands at a roll where
+  the 0-chance path always missed). The do_kick site of the **HANDLER-008** get_skill
+  NPC-formula class (4th after backstab/hand-to-hand/disarm-skill); the daze/drunk
+  modifiers remain deferred to the unified get_skill port.
+
 ### Follow-ups (FIGHT-022 / FIGHT-023 / FIGHT-025 / FIGHT-026 — filed, not yet closed)
 
 - **`FIGHT-068` — `do_bash` checked `victim == ch` before `position < POS_FIGHTING` (order swap vs ROM), ✅ FIXED (2.14.105).** Surfaced 2026-06-14 while closing FIGHT-067 (full `do_bash` read, `src/fight.c:2392-2403`). ROM checks `position < POS_FIGHTING` ("You'll have to let $M get back up first.", `:2392-2397`) **before** `victim == ch` ("You try to bash your brains out, but fail.", `:2399-2403`). Python `mud/commands/combat.py:do_bash` checked `victim is char` **before** the position check. Observable only in the edge case of bashing *yourself* while you are sitting/sleeping (`position < FIGHTING`): ROM emits the position line, Python emitted "You try to bash your brains out, but fail." **Fix (2.14.105):** swapped the two early-return blocks so the position check precedes the self-target check. Test: `tests/integration/test_fight068_bash_position_before_self.py` (self-bash while POS_SITTING → position gate wins). Verified red before fix, green after. Residual: the position message is the literal `"You'll have to let them get back up first."`, where ROM renders `act("...$M...")` (victim objective pronoun) — filed as **FIGHT-075** below (act()-render class, sibling of FIGHT-073).

@@ -216,11 +216,17 @@ def do_kick(char: Character, args: str) -> str:
         cooldowns["kick"] = skill.cooldown
         char.cooldowns = cooldowns
     roll = rng_mm.number_percent()
-    try:
-        learned = getattr(char, "skills", {}).get("kick", 0)
-        chance = max(0, min(100, int(learned)))
-    except (TypeError, ValueError):
-        chance = 0
+    if getattr(char, "is_npc", False):
+        # FIGHT-091: ROM get_skill(ch, gsn_kick) for an NPC = 10 + 3*level
+        # (src/handler.c:410), clamped to 100. The port read the skills dict (0 for
+        # mobs), so NPC kicks never landed. HANDLER-008 get_skill NPC-formula class.
+        chance = max(0, min(100, 10 + 3 * int(getattr(char, "level", 0) or 0)))
+    else:
+        try:
+            learned = getattr(char, "skills", {}).get("kick", 0)
+            chance = max(0, min(100, int(learned)))
+        except (TypeError, ValueError):
+            chance = 0
     success = chance > roll
 
     message = skill_handlers.kick(char, opponent, success=success, roll=roll)

@@ -354,10 +354,13 @@ had encoded the same index-1-is-DEX error).
 **Known affected sites (partial mirrors shipped where a single gap needed one):**
 `mud/combat/engine.py:_backstab_skill` (FIGHT-086) and
 `mud/skills/handlers.py:_hand_to_hand_skill` (FIGHT-087) are backstab-/hand-to-hand-only
-partial mirrors that supply the NPC formula but skip the daze/drunk step. Still
-unfixed: `mud/skills/handlers.py:disarm`'s own `skill = _skill_percent(caster,
-"disarm")` (an NPC with OFF_DISARM should get `20+3*level`, `src/handler.c:405`),
-and every other ad-hoc percent lookup across combat/skills.
+partial mirrors that supply the NPC formula but skip the daze/drunk step;
+`mud/commands/combat.py:do_kick` inlines the NPC `10+3*level` (FIGHT-091, same
+partial-mirror shape). Still unfixed: `mud/skills/handlers.py:disarm`'s own
+`skill = _skill_percent(caster, "disarm")` (an NPC with OFF_DISARM should get
+`20+3*level`, `src/handler.c:405`), and every other ad-hoc percent lookup across
+combat/skills. **Four sites now carry the same NPC-formula workaround — the unified
+`get_skill` port is overdue; it would retire all of them and add daze/drunk uniformly.**
 
 The scope is systemic: the correct fix is a single `get_skill(ch, sn)` helper
 mirroring `src/handler.c:346-448` in full (PC learned / NPC formula defaults +
