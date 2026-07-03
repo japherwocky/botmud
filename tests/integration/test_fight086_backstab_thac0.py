@@ -17,7 +17,6 @@ from __future__ import annotations
 import pytest
 
 from mud.combat import engine as combat_engine
-from mud.combat.engine import _backstab_skill
 from mud.models.constants import ActFlag
 from mud.world import create_test_character, initialize_world
 
@@ -52,22 +51,27 @@ def test_backstab_thac0_bonus_hits_where_normal_misses(monkeypatch: pytest.Monke
     assert victim.hit < 100, "backstab THAC0 bonus should turn the miss into a hit"
 
 
-def test_backstab_skill_mirrors_rom_get_skill() -> None:
-    # ROM get_skill (src/handler.c:346) for gsn_backstab:
-    # PC → learned percent; NPC ACT_THIEF → 20 + 2*level; other NPC → 0.
+def test_backstab_thac0_uses_unified_get_skill() -> None:
+    # HANDLER-008: the backstab THAC0 branch now sources its skill from the unified
+    # get_skill (retiring _backstab_skill). ROM get_skill for gsn_backstab: PC learned;
+    # NPC ACT_THIEF → 20 + 2*level; other NPC → 0 (src/handler.c:346).
+    from mud.skills.skill_lookup import get_skill
+
+    initialize_world("area/area.lst")
     pc = create_test_character("Thief", 3001)
     pc.is_npc = False
+    pc.level = 60  # above any class gate
     pc.skills["backstab"] = 73
-    assert _backstab_skill(pc) == 73
+    assert get_skill(pc, "backstab") == 73
 
     npc_thief = create_test_character("Cutpurse", 3001)
     npc_thief.is_npc = True
     npc_thief.level = 15
     npc_thief.act = int(ActFlag.THIEF)
-    assert _backstab_skill(npc_thief) == 20 + 2 * 15
+    assert get_skill(npc_thief, "backstab") == 20 + 2 * 15
 
     npc_plain = create_test_character("Rat", 3001)
     npc_plain.is_npc = True
     npc_plain.level = 15
     npc_plain.act = 0
-    assert _backstab_skill(npc_plain) == 0
+    assert get_skill(npc_plain, "backstab") == 0

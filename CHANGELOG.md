@@ -58,6 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **HANDLER-008 migration: backstab THAC0 uses `get_skill`.** `attack_round`'s backstab branch sources its skill from unified `get_skill` (retiring `engine._backstab_skill`); daze/drunk now factor into the backstab near-auto-hit.
+
 - **HANDLER-008 migration: `do_kick` routes through `get_skill`.** The kick chance now comes from the unified `get_skill(char, "kick")` — retiring the inline NPC-formula workaround (FIGHT-091) and newly applying ROM's daze/drunk reductions at this site.
 
 - **FIGHT-091: an NPC's kick never landed (chance was 0).** `do_kick` read the

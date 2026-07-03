@@ -201,7 +201,8 @@ def _hand_to_hand_skill(character: Character) -> int:
     backstab); PCs use their learned percent. The systemic daze/drunk get_skill
     modifiers (src/handler.c:434-442) remain unported (HANDLER-008); this is a
     partial, hand-to-hand-only mirror, the same spirit as
-    ``mud.combat.engine._backstab_skill``.
+    the (now-removed) backstab partial mirror — both migrating onto HANDLER-008's
+    unified ``mud.skills.skill_lookup.get_skill``.
     """
     if getattr(character, "is_npc", False):
         return 40 + 2 * int(getattr(character, "level", 0) or 0)
