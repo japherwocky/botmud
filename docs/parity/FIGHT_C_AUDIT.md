@@ -202,10 +202,25 @@ affects every swing) and FIGHT-082 (HIGH).
   `chance == 0` so a negative dry-land chance proceeds to the guaranteed-miss
   WAIT_STATE as in ROM. Test: `tests/integration/test_fight083_dirt_kick_false_zero.py`
   (3 — false-zero at skill 20 INSIDE, negative-chance dry land, water still "no dirt").
-- **`FIGHT-084` — ⚠️ OPEN (MEDIUM, hunter-reported) — `check_parry` visibility
-  operands inverted.** `mud/combat/engine.py:1594` uses `not victim.can_see(attacker)`;
+- **`FIGHT-084` — ✅ FIXED (2.14.225) — `check_parry` visibility
+  operands inverted.** `mud/combat/engine.py:check_parry` used `not victim.can_see(attacker)`;
   ROM `src/fight.c:1311` is `!can_see(ch, victim)` (attacker→victim). `can_see`
-  is not symmetric. (`check_dodge` at :1630 correctly matches ROM :1363.)
+  is not symmetric. Re-verified against ROM. Also found the `getattr(victim,
+  "can_see", lambda x: True)` fallback made the halving **inert** (no `can_see`
+  method → always True → never halved). **Fix (2.14.225):** `not
+  can_see_character(attacker, victim)` — correct direction and functional. Test:
+  `tests/integration/test_fight084_parry_visibility_direction.py` (3 — halved when
+  attacker blind to victim, not halved when attacker sees, direction-lock via an
+  invisible attacker who still sees a visible victim). The identical inert-lambda in
+  `check_dodge` (`:1650`, direction already correct per ROM `:1363`) filed as FIGHT-089.
+- **`FIGHT-089` — ⚠️ OPEN (LOW) — `check_dodge` visibility halving is inert.**
+  `mud/combat/engine.py:check_dodge` (~`:1650`) uses `not getattr(victim, "can_see",
+  lambda x: True)(attacker)`. The direction is correct (ROM `src/fight.c:1363`
+  `!can_see(victim, ch)` = victim→attacker), but the `lambda x: True` fallback (there
+  is no `can_see` method on the runtime entities) means the `chance /= 2` **never
+  fires** — a defender who can't see the attacker dodges at full chance instead of
+  half. Surfaced 2026-07-03 while closing FIGHT-084 (same dead-lambda class).
+  One-line fix: `not can_see_character(victim, attacker)`.
 - **`FIGHT-085` — ⚠️ OPEN (MEDIUM, hunter-reported) — skill wait-states are
   haste/slow-adjusted; ROM `WAIT_STATE` uses raw beats.** `mud/skills/registry.py:301-309`
   (`_compute_skill_lag`) halves lag under AFF_HASTE / doubles under AFF_SLOW;

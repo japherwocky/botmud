@@ -1611,8 +1611,11 @@ def check_parry(attacker: Character, victim: Character) -> bool:
         else:
             return False  # PCs need weapons to parry
 
-    # Visibility modifier
-    if not getattr(victim, "can_see", lambda x: True)(attacker):
+    # Visibility modifier — FIGHT-084: ROM src/fight.c:1311 is `!can_see(ch, victim)`
+    # (attacker→victim), NOT victim→attacker. The pre-fix `victim.can_see(attacker)`
+    # was both the wrong direction and inert (no can_see method → `lambda x: True`
+    # fallback never halved). check_dodge is the opposite direction (ROM :1363).
+    if not can_see_character(attacker, victim):
         chance = c_div(chance, 2)
 
     # Level difference modifier

@@ -157,18 +157,22 @@ def test_shield_block_skill_calculation():
 
 
 def test_visibility_affects_defense():
-    """Test that not being able to see attacker halves defense chances"""
+    """ROM src/fight.c:1311 — check_parry halves chance on `!can_see(attacker, victim)`
+    (the ATTACKER cannot see the VICTIM), not victim→attacker (that's dodge, :1363).
+    FIGHT-084: an invisible victim the attacker can't see parries at half chance."""
+    from mud.models.constants import AffectFlag
+
     attacker, victim = setup_combat()
 
-    # Set up high skill but poor visibility
+    # Set up high skill; victim is invisible so the attacker (no detect-invis) can't see it.
     victim.skills["parry"] = 80
     victim.has_weapon_equipped = True
-    victim.can_see = lambda x: False  # Can't see attacker
+    victim.add_affect(AffectFlag.INVISIBLE)
+    attacker.room.light = 5  # lit so can_see is not dark-gated
 
     with patch("mud.utils.rng_mm.number_percent", return_value=30):
-        # Base chance would be 80/2 = 40, but halved to 20 due to visibility
-        # Plus level diff: 20 + (10-10) = 20
-        # Since RNG returns 30, this should NOT parry (>= 20)
+        # Base chance 80/2 = 40, halved to 20 because the attacker can't see the victim.
+        # Plus level diff: 20 + (10-10) = 20. RNG 30 >= 20 -> does NOT parry.
         result = check_parry(attacker, victim)
         assert not result
 

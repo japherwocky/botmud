@@ -50,6 +50,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **FIGHT-084: `check_parry` visibility halving used the wrong direction and was
+  inert.** ROM `src/fight.c:1311` halves parry on `!can_see(attacker, victim)`;
+  the port used `victim.can_see(attacker)` (wrong direction) with a
+  `lambda x: True` fallback that never halved. Now `not
+  can_see_character(attacker, victim)`. (The sibling inert halving in
+  `check_dodge` is filed as FIGHT-089.)
 - **FIGHT-083: `dirt_kicking` false-zero hack + `chance == 0` terrain gate.**
   `src/fight.c:2566-2608`. Restored ROM's "sloppy hack to prevent false zeroes"
   (`chance % 5 == 0 → += 1`, before the terrain switch) and changed the
