@@ -448,16 +448,17 @@ def test_immortal_can_get_all_from_pit(movable_char_factory, test_room_3001):
     """
     Test: Immortals can 'get all pit'.
 
-    ROM Parity: src/act_obj.c:320-325
+    ROM Parity: src/act_obj.c:320-321
         if (container->pIndexData->vnum == OBJ_VNUM_PIT
-            && get_trust(ch) < god)
+            && !IS_IMMORTAL (ch))
         {
-            send_to_char("Don't be so greedy!\n", ch);
+            send_to_char("Don't be so greedy!\n\r", ch);
             return;
         }
+    IS_IMMORTAL(ch) == get_trust(ch) >= LEVEL_IMMORTAL (52, src/merc.h:149/2091).
     """
     char = movable_char_factory(name="Immortal", room_vnum=3001)
-    char.trust = 51  # ROM: god = 51 (minimum immortal trust)
+    char.trust = 52  # LEVEL_IMMORTAL — minimum immortal trust (was wrongly 51)
 
     # Create pit with items (MUST use OBJ_VNUM_PIT for greed check)
     pit_proto = ObjIndex(
@@ -509,6 +510,41 @@ def test_mortal_cannot_get_all_from_pit(movable_char_factory, test_room_3001):
     test_room_3001.add_object(pit)
 
     # Mortal tries to get all from pit (should fail)
+    result = do_get(char, "all pit")
+
+    assert "greedy" in result.lower()
+    assert sword not in char.inventory
+
+
+def test_hero_trust_51_mortal_cannot_get_all_from_pit(movable_char_factory, test_room_3001):
+    """GET-015: trust 51 (LEVEL_HERO) is a MORTAL — the pit greed gate fires.
+
+    ROM ``do_get`` gates the pit on ``!IS_IMMORTAL(ch)`` (src/act_obj.c:320-321),
+    and ``IS_IMMORTAL`` = ``get_trust(ch) >= LEVEL_IMMORTAL`` (src/merc.h:2091),
+    with ``LEVEL_IMMORTAL = MAX_LEVEL - 8 = 52`` (src/merc.h:149). Trust/level 51
+    is ``LEVEL_HERO`` (the top MORTAL tier), which is < 52 → not immortal → the
+    player is refused with "Don't be so greedy!". A level-51 mortal reaches this
+    via the ``trust or level`` fallback in do_get, so this is normal-play
+    reachable, not just an explicit-trust edge.
+    """
+    char = movable_char_factory(name="Hero", room_vnum=3001)
+    char.trust = 51  # LEVEL_HERO — a mortal, NOT immortal (needs 52)
+
+    pit_proto = ObjIndex(
+        vnum=OBJ_VNUM_PIT,
+        name="pit donation",
+        short_descr="a pit",
+        description="A donation pit.",
+        item_type=int(ItemType.CONTAINER),
+        wear_flags=0,
+        value=[0, 0, 0, 0, 0],
+    )
+    obj_registry[OBJ_VNUM_PIT] = pit_proto
+    pit = Object(instance_id=OBJ_VNUM_PIT, prototype=pit_proto)
+    sword = create_weapon(name="a steel sword")
+    pit.contained_items = [sword]
+    test_room_3001.add_object(pit)
+
     result = do_get(char, "all pit")
 
     assert "greedy" in result.lower()

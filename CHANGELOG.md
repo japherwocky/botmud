@@ -50,6 +50,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **GET-015: `get all <pit>` greed gate treated a level-51 mortal hero as
+  immortal.** The pit donation gate hardcoded `char_trust >= 51`, but ROM gates
+  on `!IS_IMMORTAL(ch)` where `IS_IMMORTAL = get_trust(ch) >= LEVEL_IMMORTAL`
+  and `LEVEL_IMMORTAL = 52` (`src/act_obj.c:320-321`, `src/merc.h:149,2091`).
+  Level/trust 51 is `LEVEL_HERO` — the top *mortal* tier — so a max-level mortal
+  could empty a donation pit in one command. Fixed to compare `>= LEVEL_IMMORTAL`.
+  The prior test encoded the misread (`trust = 51 # ROM: god = 51`) and was
+  corrected; added a hero-trust-51 regression.
 - **FIGHT-080 follow-up: AUTOSPLIT output from `get_obj` is now preserved in
   `do_get` output.** ROM `get_obj` (`src/act_obj.c:162-184`) calls `do_split`
   after the "You get ..." money line, so `PLR_AUTOLOOT` over a mixed corpse must

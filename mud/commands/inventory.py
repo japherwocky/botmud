@@ -9,6 +9,7 @@ from mud.commands.obj_manipulation import CONT_CLOSED, _can_drop_obj, _obj_from_
 from mud.handler import create_money
 from mud.models.character import Character
 from mud.models.constants import (
+    LEVEL_IMMORTAL,
     OBJ_VNUM_COINS,
     OBJ_VNUM_GOLD_ONE,
     OBJ_VNUM_GOLD_SOME,
@@ -598,7 +599,11 @@ def do_get(char: Character, args: str) -> str:
 
                     if container_vnum == OBJ_VNUM_PIT:
                         char_trust = int(getattr(char, "trust", 0) or getattr(char, "level", 0) or 0)
-                        char_is_immortal = char_trust >= 51  # IMMORTAL level
+                        # ROM src/act_obj.c:320 gates the pit on !IS_IMMORTAL(ch);
+                        # IS_IMMORTAL = get_trust(ch) >= LEVEL_IMMORTAL (=52, merc.h:149/2091).
+                        # Trust/level 51 is LEVEL_HERO — the top MORTAL tier — so it must
+                        # NOT bypass the greed gate (was hardcoded 51 → treated a hero as immortal).
+                        char_is_immortal = char_trust >= LEVEL_IMMORTAL
                         if not char_is_immortal:
                             return "Don't be so greedy!"
 
