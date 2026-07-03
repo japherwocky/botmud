@@ -1673,8 +1673,12 @@ def check_dodge(attacker: Character, victim: Character) -> bool:
     dodge_skill = _get_skill_percent(victim, "dodge", "dodge_skill")
     chance = c_div(dodge_skill, 2)
 
-    # Visibility modifier
-    if not getattr(victim, "can_see", lambda x: True)(attacker):
+    # Visibility modifier — ROM src/fight.c:1363: if (!can_see(victim, ch)) chance /= 2.
+    # Direction is victim→attacker (defender's view of the attacker); can_see is not
+    # symmetric. FIGHT-089 (twin of the FIGHT-084 check_parry fix): the old
+    # getattr(victim, "can_see", lambda x: True) fallback was inert — runtime entities
+    # have no can_see method, so the halving never fired.
+    if not can_see_character(victim, attacker):
         chance = c_div(chance, 2)
 
     # Level difference modifier

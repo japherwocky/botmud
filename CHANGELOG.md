@@ -50,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **FIGHT-089: `check_dodge` visibility halving was inert.** The dodge check
+  halved chance when the defender couldn't see the attacker, but the port used a
+  `getattr(victim, "can_see", lambda x: True)` fallback that never fired (runtime
+  entities have no `can_see` method), so a blind defender dodged at full chance.
+  Now `not can_see_character(victim, attacker)` (ROM `src/fight.c:1363`) — the twin
+  of the FIGHT-084 `check_parry` fix.
+
 - **FIGHT-086: backstab THAC0 bonus was missing.** ROM `one_hit`
   (`src/fight.c:474-475`) subtracts `10 * (100 - get_skill(ch, gsn_backstab))`
   from THAC0 for a backstab — a near-guaranteed hit below skill 100. The port

@@ -213,14 +213,17 @@ affects every swing) and FIGHT-082 (HIGH).
   attacker blind to victim, not halved when attacker sees, direction-lock via an
   invisible attacker who still sees a visible victim). The identical inert-lambda in
   `check_dodge` (`:1650`, direction already correct per ROM `:1363`) filed as FIGHT-089.
-- **`FIGHT-089` — ⚠️ OPEN (LOW) — `check_dodge` visibility halving is inert.**
-  `mud/combat/engine.py:check_dodge` (~`:1650`) uses `not getattr(victim, "can_see",
+- **`FIGHT-089` — ✅ FIXED (2.14.228) — `check_dodge` visibility halving was inert.**
+  `mud/combat/engine.py:check_dodge` used `not getattr(victim, "can_see",
   lambda x: True)(attacker)`. The direction is correct (ROM `src/fight.c:1363`
   `!can_see(victim, ch)` = victim→attacker), but the `lambda x: True` fallback (there
-  is no `can_see` method on the runtime entities) means the `chance /= 2` **never
-  fires** — a defender who can't see the attacker dodges at full chance instead of
+  is no `can_see` method on the runtime entities) meant the `chance /= 2` **never
+  fired** — a defender who couldn't see the attacker dodged at full chance instead of
   half. Surfaced 2026-07-03 while closing FIGHT-084 (same dead-lambda class).
-  One-line fix: `not can_see_character(victim, attacker)`.
+  **Fix (2.14.228):** `not can_see_character(victim, attacker)` — functional and
+  correct direction. Test: `tests/integration/test_fight089_dodge_visibility_direction.py`
+  (3 — halved when victim blind to attacker; not halved when victim sees; direction-lock
+  via an invisible victim who still sees a visible attacker).
 - **`FIGHT-085` — ✅ FIXED (2.14.226) — skill wait-states were
   haste/slow-adjusted; ROM `WAIT_STATE` uses raw beats.** `mud/skills/registry.py`
   (`_compute_skill_lag`) halved lag under AFF_HASTE / doubled under AFF_SLOW;
