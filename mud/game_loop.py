@@ -1443,8 +1443,16 @@ def _tick_object_affects(obj: Object) -> None:
         duration = int(getattr(affect, "duration", 0) or 0)
         if duration > 0:
             affect.duration = duration - 1
+            # ROM src/update.c:933 — `if (number_range(0,4) == 0 && paf->level > 0)`.
+            # C `&&` short-circuits left-to-right and number_range advances the MM
+            # stream as a side effect, so the roll is consumed UNCONDITIONALLY for
+            # every duration>0 object affect; `level > 0` only gates the decrement.
+            # Operands must NOT be swapped (`level > 0 and number_range(...)` skips
+            # the roll at level 0, desyncing the global RNG stream — GL-045, the
+            # object-side twin of the character-side GL-026 fix in affects/engine.py).
+            fades = rng_mm.number_range(0, 4) == 0
             level = int(getattr(affect, "level", 0) or 0)
-            if level > 0 and rng_mm.number_range(0, 4) == 0:
+            if fades and level > 0:
                 affect.level = level - 1
             continue
 

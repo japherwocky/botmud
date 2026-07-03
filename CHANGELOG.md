@@ -50,6 +50,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **GL-045: `obj_update` object-affect fade skipped its RNG draw at level 0
+  (RNG desync).** `_tick_object_affects` had the fade-roll operands swapped
+  (`level > 0 and number_range(0,4) == 0`), so a level-0 object affect with
+  `duration > 0` short-circuited past the draw. ROM
+  (`if (number_range(0,4) == 0 && paf->level > 0)`, `src/update.c:933`) consumes
+  the roll unconditionally for every `duration>0` affect. The skipped draw
+  desynced the shared Mitchell-Moore stream for every downstream consumer in the
+  pulse — the object-side twin of the character-side GL-026 fix. Reordered to
+  roll first. Test: `tests/test_obj_update_affect_fade_rng.py`.
 - **PICK-003: `do_pick` door immortal-bypass used the wrong threshold and
   skipped the `get_trust` level fallback.** The door branch had
   `is_immortal = trust >= 51` reading raw `char.trust`. ROM gates on
