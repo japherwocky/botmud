@@ -12,6 +12,7 @@ from mud.math.c_compat import c_div
 from mud.models.constants import AffectFlag, ItemType
 from mud.utils.act import act_to_room
 from mud.utils.rng_mm import number_fuzzy
+from mud.world.obj_find import get_obj_carry
 
 if TYPE_CHECKING:
     from mud.models.character import Character
@@ -36,8 +37,9 @@ def do_eat(ch: Character, args: str) -> str:
     if not args:
         return "Eat what?"
 
-    # Find object in inventory
-    obj = _find_obj_inventory(ch, args)
+    # Find object in inventory — ROM src/act_obj.c:1296 uses get_obj_carry, which
+    # parses the `N.name` count prefix and matches keywords (EAT-008).
+    obj = get_obj_carry(ch, args)
     if not obj:
         return "You do not have that item."
 
@@ -319,32 +321,6 @@ def do_drink(ch: Character, args: str) -> str:
         value[1] -= amount
 
     return "\n".join(messages)
-
-
-def _find_obj_inventory(ch: Character, name: str) -> Object | None:
-    """Find an object in character's inventory by name.
-
-    ROM Reference: src/handler.c get_obj_carry — searches `ch->carrying`.
-    QuickMUD stores the carrying list on `Character.inventory` (see
-    `mud/models/character.py:396`).
-    """
-    inventory = ch.inventory
-    if not inventory or not name:
-        return None
-
-    name_lower = name.lower()
-    for obj in inventory:
-        # Check short description
-        short_descr = getattr(obj, "short_descr", "")
-        if name_lower in short_descr.lower():
-            return obj
-
-        # Check name
-        obj_name = getattr(obj, "name", "")
-        if name_lower in obj_name.lower():
-            return obj
-
-    return None
 
 
 def _destroy_object(ch: Character, obj: Object) -> None:

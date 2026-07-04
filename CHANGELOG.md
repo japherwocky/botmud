@@ -102,6 +102,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **EAT-008: `eat N.item` count prefix now resolves.** `do_eat` found its target
+  with a substring-only helper instead of ROM's `get_obj_carry`
+  (`src/act_obj.c:1296`), so the `N.name` count prefix never parsed — `eat
+  2.mushroom` returned "You do not have that item." where ROM eats the 2nd of two
+  same-named items. Wired `do_eat` to the existing `get_obj_carry` (already used by
+  `do_quaff`/`do_drink`), a strict superset of the old match. Test:
+  `tests/integration/test_consumables.py::test_eat_count_prefix_selects_nth_item`.
+
 - **GL-048: mob delay-trigger ends the tick unconditionally (`mobile_update`).**
   ROM's TRIG_DELAY block (`src/update.c:448-454`) fires the trigger on expiry and
   `continue`s **unconditionally**, so the mob does not scavenge or wander that

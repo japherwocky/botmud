@@ -95,6 +95,28 @@ def test_eat_food_consumes_item(test_character, object_factory):
     assert bread not in test_character.inventory, "Food should be removed from inventory after eating"
 
 
+def test_eat_count_prefix_selects_nth_item(test_character, object_factory):
+    """EAT-008 — ROM do_eat resolves the target via get_obj_carry (src/act_obj.c:1296),
+    which parses the ``N.name`` count prefix; `eat 2.mushroom` eats one of two
+    same-named mushrooms. The pre-fix port used a substring-only finder that never
+    split the ``N.`` prefix, so `eat 2.mushroom` returned "You do not have that item."."""
+    first = _make_obj(
+        object_factory, item_type=ItemType.FOOD, name="mushroom", short_descr="a magic mushroom", value=[4, 4, 0, 0, 0]
+    )
+    second = _make_obj(
+        object_factory, item_type=ItemType.FOOD, name="mushroom", short_descr="a magic mushroom", value=[4, 4, 0, 0, 0]
+    )
+    test_character.add_object(first)
+    test_character.add_object(second)
+
+    result = do_eat(test_character, "2.mushroom")
+
+    assert result != "You do not have that item.", "the N.name count prefix must resolve"
+    assert "You eat" in result
+    remaining = [o for o in test_character.inventory if "mushroom" in (getattr(o, "name", "") or "")]
+    assert len(remaining) == 1, "exactly one mushroom consumed"
+
+
 def test_eat_poisoned_food_applies_choke_message(test_character, object_factory):
     """ROM act_obj.c:1337-1352 — value[3]!=0 yields choke/gag message and AFF_POISON.
 
