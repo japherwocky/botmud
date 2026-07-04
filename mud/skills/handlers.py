@@ -5199,13 +5199,21 @@ def heat_metal(
         _send_to_char(target, "You feel momentarily warmer.")
         return 0
 
-    # ROM L3134-3263: iterate through victim's inventory
+    # ROM L3134: iterate victim->carrying — ONE LIFO list interleaving worn and
+    # carried items in acquisition order. MAGIC-046: the port walked
+    # inventory-then-equipment, so the per-object number_range/saves_spell draws
+    # landed on different objects than ROM. Character.iter_carrying re-merges the
+    # split containers in descending _carry_seq (ROM head-insert = newest-first).
     room = getattr(target, "room", None)
-    inventory = list(getattr(target, "inventory", []) or [])
-    equipment = dict(getattr(target, "equipment", {}) or {})
-
-    # Combine inventory and equipped items for iteration
-    all_items = inventory + list(equipment.values())
+    iter_carrying = getattr(target, "iter_carrying", None)
+    if callable(iter_carrying):
+        all_items = list(iter_carrying())
+    else:
+        # MobInstance has no _carry_seq acquisition tracking yet; fall back to the
+        # inventory (already head-inserted LIFO) + equipment combination.
+        inventory = list(getattr(target, "inventory", []) or [])
+        equipment = dict(getattr(target, "equipment", {}) or {})
+        all_items = inventory + list(equipment.values())
 
     for obj in all_items:
         # ROM L3138-3141: check if item should be heated
@@ -5263,6 +5271,11 @@ def heat_metal(
                     else:
                         _send_to_char(target, f"You can't remove {obj_name}.")
                 if removed:
+                    # ROM L3153 remove_obj — src/act_obj.c:1389-1390 emits these two
+                    # "stop using" lines before the heat throw lines. MAGIC-046(d).
+                    if room:
+                        act_to_room(room, "$n stops using $p.", target, arg1=obj, exclude=target)
+                    _send_to_char(target, f"You stop using {obj_name}.")
                     # ROM L3156-3165 — remove and drop.
                     if room:
                         act_to_room(room, "$n yelps and throws $p to the ground!", target, arg1=obj, exclude=target)
@@ -5310,6 +5323,11 @@ def heat_metal(
                     else:
                         _send_to_char(target, f"You can't remove {obj_name}.")
                 if removed:
+                    # ROM L3210 remove_obj — src/act_obj.c:1389-1390 emits these two
+                    # "stop using" lines before the heat throw lines. MAGIC-046(d).
+                    if room:
+                        act_to_room(room, "$n stops using $p.", target, arg1=obj, exclude=target)
+                    _send_to_char(target, f"You stop using {obj_name}.")
                     # ROM L3213-3222 — burned, throws it down.
                     if room:
                         act_to_room(

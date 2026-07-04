@@ -58,6 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **MAGIC-046: `heat_metal` walks ROM's single `victim->carrying` list + emits `remove_obj` lines.** The spell iterated `inventory + equipment.values()` (carried then worn) instead of ROM's one LIFO list interleaving both by acquisition, so its per-object RNG draws hit different objects. Added `Character.iter_carrying()` (descending `_carry_seq`, the FINDING-020 acquisition counter) and route heat_metal through it; also restored `remove_obj`'s "$n stops using $p." / "You stop using $p." lines before the heat throw lines (src/magic.c:3134, src/act_obj.c:1389-1390).
+
 - **HANDLER-008 test fixes: warrior `ch_class` on disarm/rescue PC casters.** The disarm-skill and do_rescue get_skill migrations enforce ROM's PC class-level gate; cross-file disarm/rescue tests that created default mage-class casters now set `ch_class=3` (+ adequate level) — ROM-faithful, since a mage can't disarm/rescue below level 53. Restores the full suite to green.
 
 - **HANDLER-008 migration: do_rescue uses `get_skill`.** The rescue success roll now comes from unified `get_skill(char, "rescue")` — class-gated for PCs and 40+level for NPCs (was 0 via the dict → NPC rescue never succeeded). Fifth get_skill site migration; all offensive-skill NPC-formula workarounds are now retired.

@@ -802,6 +802,25 @@ class Character:
             obj.carried_by = None
         self._recalculate_carry_weight()
 
+    def iter_carrying(self) -> list[Object]:
+        """Return carried + worn objects in ROM ``ch->carrying`` order.
+
+        ROM keeps worn and carried items in a single LIFO linked list; an
+        object's slot never moves once acquired (equip only flips wear_loc), and
+        the walk ``for (obj = ch->carrying; obj; obj = obj->next_content)`` visits
+        newest → oldest. The Python port splits them into ``inventory`` (carried)
+        and ``equipment`` (worn, by slot), so a faithful walk must re-merge them
+        in descending acquisition order (``_carry_seq``, stamped head-insert ==
+        newest-first by ``add_object``/``equip_object``). Any mechanic mirroring
+        ROM's ``ch->carrying`` loop — ``heat_metal`` etc. — must iterate this, not
+        ``inventory + equipment.values()``, or its per-object RNG draws land on
+        different objects than ROM. FINDING-020 / MAGIC-046. Objects with no seq
+        (seq 0 — direct-set test fixtures / pre-FINDING-020 reload) keep their
+        input order via ``sorted``'s stability (inventory before equipment).
+        """
+        items = [*self.inventory, *self.equipment.values()]
+        return sorted(items, key=lambda o: int(getattr(o, "_carry_seq", 0) or 0), reverse=True)
+
     # START affects_saves
     def _ensure_mod_stat_capacity(self) -> None:
         """Ensure mod_stat can store modifiers for all primary stats."""
