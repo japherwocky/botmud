@@ -62,6 +62,23 @@ hand-derived. Full suite regression-clean.
   `character_registry`.
 - **Tests**: 4 previously-failing tests green; verified in a mixed-file parallel sub-run (85/85).
 
+### `HANDLER-008` do_trip NPC trip-chance — ✅ FIXED (2.14.242, commit `a74371ea`)
+
+- **Python**: `mud/commands/combat.py:do_trip`
+- **ROM C**: `src/handler.c:373-432` (get_skill NPC dispatch); `src/fight.c:2649` (`do_trip`)
+- **Gap**: the NPC branch hardcoded `skill_level = 100`, so any OFF_TRIP mob tripped at a
+  near-certain base chance regardless of level. ROM's `chance = get_skill(ch, gsn_trip)`
+  gives an OFF_TRIP NPC `10 + 3*level`.
+- **Fix**: NPC branch now uses `get_skill(char, "trip")` — a level-10 mob's base drops from
+  100 to 40. OFF_TRIP gate + `""` silent return for descriptor-less mobs unchanged; PC path
+  left on `_character_skill_percent` (separate opportunistic item). This closes the last
+  dict-sourced NPC skill lookup — the get_skill port is now fully complete.
+- **Tests**: `test_fight_026_npc_offensive_skill_no_crash.py` — added
+  `test_npc_trip_chance_uses_get_skill_not_hardcoded_100` (level-10 mob, roll 75 between the
+  ROM chance ~51 and the pre-fix ~111 → must miss) + `test_npc_trip_lands_below_get_skill_chance`
+  (roll 5 still lands — guards against over-correction). Regression: 148 trip-related tests
+  green; full suite 0 failures (same teardown-hang caveat).
+
 ## Files Modified
 
 - `mud/combat/engine.py` — 3 defensive checks use `get_skill(victim, …)` (kept
@@ -93,10 +110,10 @@ hand-derived. Full suite regression-clean.
 
 ## Next Steps
 
-- **HANDLER-008 is complete.** The only remaining sub-item is the minor **do_trip NPC
-  trip-chance** hardcode (`mud/commands/combat.py:do_trip` uses `skill_level=100` instead
-  of `get_skill`'s `10+3*level` for OFF_TRIP mobs) — documented in the HANDLER_C_AUDIT.md
-  row; not a production regression (single gap-closer when convenient).
+- **HANDLER-008 is fully complete** — the do_trip NPC trip-chance follow-up closed this
+  session (2.14.242, `a74371ea`). Every dict-sourced NPC skill lookup now routes through
+  `get_skill`. One opportunistic (non-urgent) item remains: the **PC** side of do_trip still
+  uses `_character_skill_percent` (no class-gate / daze / drunk) — migrate when next touched.
 - Resume **cross-file invariants / cold-path divergence hunting** (per-file audit tracker
   exhausted). Candidate INV areas per AGENTS.md: affect ticks, position transitions, mob
   script triggers, group/follower chain.
