@@ -2092,8 +2092,10 @@ def chain_lightning(caster: Character, target: Character | None = None) -> bool:
             any_hit = any_hit or damage > 0
 
             level -= 4
-            if level <= 0:
-                break
+            # MAGIC-048: ROM (src/magic.c:1259-1278) has NO level-based break here —
+            # the inner for-loop arcs to every valid target in the pass even after
+            # level reaches 0 (dice(0,6)=0 damage, but saves_spell/damage/messages
+            # still fire). The outer `while level > 0` controls re-entry.
 
         if not found:
             if last_victim is caster:

@@ -97,10 +97,14 @@ class TestDirtKickVictimLegs:
         victim = _pc("Garrick", room, level=18, sex=Sex.MALE)
 
         assert skill_handlers.dirt_kicking(kicker, target=victim)
+        # The dirt-kick line is rendered BEFORE the kick connects, so $n masks the
+        # invisible kicker as "Someone" — the point of this test. FIGHT-092
+        # (src/fight.c:763) then reveals the kicker on the connecting hit ("Scout
+        # fades into existence."), so the name legitimately appears in the later
+        # damage line — not asserted here.
         assert "{5Someone kicks dirt in your eyes!{x" in victim.messages, (
             f"Invisible kicker name leaked (no $n PERS masking): {victim.messages}"
         )
-        assert not any("Scout" in m for m in victim.messages), f"Invisible kicker name leaked: {victim.messages}"
 
     def test_kicker_gets_no_invented_self_line(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # ROM's success branch sends the kicker NO self message — only the

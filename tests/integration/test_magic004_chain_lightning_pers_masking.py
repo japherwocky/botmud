@@ -51,8 +51,11 @@ def test_first_strike_room_masks_invisible_caster(monkeypatch: pytest.MonkeyPatc
     skill_handlers.chain_lightning(caster, victim)
 
     # $n (caster) masked lowercase mid-sentence; $N (visible victim) keeps its name.
+    # This is the first-strike arc, rendered BEFORE the bolt connects; that mask is
+    # the point of this test. FIGHT-092 (src/fight.c:763) then reveals the caster on
+    # the connecting hit ("Stormcaller fades into existence."), so their name
+    # legitimately appears in later messages (self-backfire, etc.) — not asserted here.
     assert "A lightning bolt leaps from someone's hand and arcs to Sentinel." in witness.messages, witness.messages
-    assert not any("Stormcaller" in m for m in witness.messages), witness.messages
 
 
 def test_first_strike_vict_masks_invisible_caster(monkeypatch: pytest.MonkeyPatch) -> None:

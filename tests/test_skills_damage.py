@@ -335,8 +335,11 @@ def test_chain_lightning_arcs_room_targets(monkeypatch: pytest.MonkeyPatch) -> N
         character.messages.clear()
     _legal_pk(caster, first)
 
-    dice_values = iter([24, 18, 12])
-    monkeypatch.setattr(rng_mm, "dice", lambda number, size: next(dice_values))
+    # MAGIC-048: ROM arcs to EVERY valid target in the first while-pass. Key dice
+    # by the caster level so the pass runs to completion — the tail arcs (first is
+    # re-hit, then the caster) happen at level <= 0 where ROM rolls dice(<=0,6) == 0.
+    dice_by_level = {12: 24, 8: 18, 4: 12}
+    monkeypatch.setattr(rng_mm, "dice", lambda number, size: dice_by_level.get(number, 0))
     monkeypatch.setattr(skill_handlers, "saves_spell", lambda level, target, dtype: False)
 
     result = skill_handlers.chain_lightning(caster, first)
@@ -344,7 +347,8 @@ def test_chain_lightning_arcs_room_targets(monkeypatch: pytest.MonkeyPatch) -> N
     assert result is True
     assert first.hit == 156
     # Room.add_character head-inserts (ROM obj_to_room LIFO), so room.people order
-    # is third, second, first, caster. Bounce targets: third (18), second (12).
+    # is third, second, first, caster. Pass: third (level 8 → 18 dmg), second
+    # (level 4 → 12 dmg), then first is re-arced at level 0 (dice(0,6) == 0 dmg).
     assert second.hit == 158
     assert third.hit == 142
     assert any("lightning bolt leaps" in message.lower() for message in caster.messages)
@@ -769,3 +773,34 @@ def test_flamestrike_save_halves_damage(monkeypatch: pytest.MonkeyPatch) -> None
 
     assert damage == 41  # cap(c_div(96, 2)) = cap(48) = 41 (FIGHT-056 soft-cap)
     assert victim.hit == 219  # 260 - cap(48) = 260 - 41 = 219
+
+
+def test_chain_lightning_arcs_to_every_target_in_the_pass(monkeypatch: pytest.MonkeyPatch) -> None:
+    """MAGIC-048 — ROM chain_lightning's inner for-loop has no level-based break.
+
+    ROM ``src/magic.c:1259-1278``: once a while-pass begins (``level > 0``), the
+    inner ``for`` over ``ch->in_room->people`` arcs to EVERY valid target in the
+    room — even after ``level`` decrements to 0 (dice(0,6) == 0 damage, but it still
+    draws ``saves_spell`` and emits the arc messages). The port added an early
+    ``if level <= 0: break``, silently skipping later occupants and desyncing the
+    shared RNG stream.
+    """
+    caster = Character(name="Stormlord", level=8, is_npc=False, hit=200, max_hit=200)
+    target = Character(name="Duelist", level=8, is_npc=False, hit=180, max_hit=180)
+    bounce_a = Character(name="orc a", level=6, is_npc=True, hit=170, max_hit=170)
+    bounce_b = Character(name="orc b", level=6, is_npc=True, hit=170, max_hit=170)
+    room = Room(vnum=4290)
+    for c in (caster, target, bounce_a, bounce_b):
+        room.add_character(c)
+        c.messages.clear()
+    _legal_pk(caster, target)
+
+    monkeypatch.setattr(skill_handlers, "saves_spell", lambda level, tgt, dtype: False)
+    monkeypatch.setattr(rng_mm, "dice", lambda number, size: 3)
+
+    skill_handlers.chain_lightning(caster, target)
+
+    # ROM arcs to BOTH bounce mobs in the first pass; the pre-fix break skipped
+    # whichever was reached once level hit 0.
+    assert "The bolt hits you!" in bounce_a.messages, "chain lightning must arc to every valid target in the pass"
+    assert "The bolt hits you!" in bounce_b.messages, "chain lightning must arc to every valid target in the pass"

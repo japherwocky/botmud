@@ -102,6 +102,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **MAGIC-048: `chain lightning` arcs to every target in a bounce pass.** ROM's
+  bounce loop (`src/magic.c:1259-1278`) has no level-based break — once a pass
+  starts, the bolt arcs to every valid target in the room even after `level`
+  reaches 0 (0 damage, but the save roll and messages still fire). The port broke
+  out at `level <= 0`, skipping later occupants and desyncing the shared RNG.
+  Removed the break. Test:
+  `tests/test_skills_damage.py::test_chain_lightning_arcs_to_every_target_in_the_pass`.
+  (Also corrected two invisible-attacker masking tests that predated the FIGHT-092
+  invis-on-hit reveal.)
+
 - **MAGIC-047: `stone skin` already-affected guard checks the caster, not the
   target.** ROM `spell_stone_skin` (`src/magic.c:4447`) is unique among buffs —
   its guard tests `is_affected(ch)` (the caster) while still applying the affect
