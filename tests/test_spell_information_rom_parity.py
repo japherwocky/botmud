@@ -548,6 +548,9 @@ def test_dispel_magic_removes_effect_and_affect_flag_and_emits_wear_off_message(
 def test_dispel_magic_failed_dispel_decrements_effect_level(monkeypatch: pytest.MonkeyPatch) -> None:
     # Force `saves_dispel` to succeed (target saves), so dispel fails and effect level degrades.
     monkeypatch.setattr(rng_mm, "number_percent", lambda: 1)
+    # MAGIC-049: bypass ROM's wholesale opening save (src/magic.c:2082) so the
+    # per-effect dispel path (which then fails and decrements the level) is reached.
+    monkeypatch.setattr("mud.skills.handlers.saves_spell", lambda *a, **k: False)
 
     caster = make_character(name="Caster", level=10)
     target = make_character(name="Target", level=20)

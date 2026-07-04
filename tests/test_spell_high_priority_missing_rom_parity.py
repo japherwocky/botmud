@@ -174,7 +174,12 @@ def test_dispel_magic_removes_effects():
     target.spell_effects["armor"] = SpellEffect(name="armor", duration=10, level=10, ac_mod=-20)
     target.spell_effects["bless"] = SpellEffect(name="bless", duration=10, level=10, hitroll_mod=2)
 
-    with patch("mud.skills.handlers.check_dispel", return_value=True):
+    # MAGIC-049: bypass ROM's wholesale opening save (src/magic.c:2082) so the
+    # per-effect dispel path is exercised.
+    with (
+        patch("mud.skills.handlers.saves_spell", return_value=False),
+        patch("mud.skills.handlers.check_dispel", return_value=True),
+    ):
         result = dispel_magic(caster, target)
 
     assert result is True
@@ -193,7 +198,11 @@ def test_dispel_magic_self_target_defaults():
     caster = make_character(level=20)
     caster.spell_effects["armor"] = SpellEffect(name="armor", duration=10, level=10, ac_mod=-20)
 
-    with patch("mud.skills.handlers.check_dispel", return_value=True):
+    # MAGIC-049: bypass ROM's wholesale opening save so the per-effect path runs.
+    with (
+        patch("mud.skills.handlers.saves_spell", return_value=False),
+        patch("mud.skills.handlers.check_dispel", return_value=True),
+    ):
         result = dispel_magic(caster, None)
 
     assert result is True

@@ -3550,6 +3550,15 @@ def dispel_magic(caster: Character, target: Character | None = None) -> bool:
         raise ValueError("dispel_magic requires a target")
 
     level = max(int(getattr(caster, "level", 0) or 0), 0)
+
+    # MAGIC-049: ROM spell_dispel_magic (src/magic.c:2082-2088) opens with a
+    # wholesale save — on success the spell aborts, stripping nothing. This draw
+    # (number_percent inside saves_spell) is load-bearing for the shared RNG order.
+    if saves_spell(level, target, DamageType.OTHER):
+        _send_to_char(target, "You feel a brief tingling sensation.")
+        _send_to_char(caster, "You failed.")
+        return False
+
     effects = getattr(target, "spell_effects", {})
     if not isinstance(effects, dict) or not effects:
         return False

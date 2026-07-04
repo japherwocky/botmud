@@ -102,6 +102,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **MAGIC-049: `dispel magic` was missing ROM's opening save.** ROM
+  `spell_dispel_magic` (`src/magic.c:2082`) opens with `saves_spell(level, victim,
+  DAM_OTHER)`; on success it aborts ("You feel a brief tingling sensation." /
+  "You failed.") and strips nothing. The port had no gate, so it always proceeded
+  to the per-effect dispel loop — a missing RNG draw, two absent messages, and a
+  high-saving victim losing buffs ROM preserves. Added the gate. Test:
+  `tests/test_utility_spells_parity.py::test_dispel_magic_aborts_when_victim_saves`.
+
 - **AFFECTS-001: `affects` double-colon on the level-20+ duplicate line.** For a
   level-20+ character with two same-spell affects (e.g. `bless`, which applies
   APPLY_HITROLL + APPLY_SAVING_SPELL), the continuation line rendered a double

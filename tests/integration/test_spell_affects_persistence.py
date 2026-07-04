@@ -409,7 +409,7 @@ class TestSpellAffectStacking:
 class TestDispelMagic:
     """Test dispel magic affect removal."""
 
-    def test_dispel_magic_removes_random_affect(self, test_player):
+    def test_dispel_magic_removes_random_affect(self, test_player, monkeypatch):
         """
         Test: Dispel magic attempts to remove spell affects.
 
@@ -442,6 +442,9 @@ class TestDispelMagic:
         # So 95% chance to dispel each affect
         caster = test_player
         caster.level = 50
+        # MAGIC-049: bypass ROM's wholesale opening save (src/magic.c:2082) so the
+        # per-effect dispel path runs (this test exercises the per-affect rolls).
+        monkeypatch.setattr("mud.skills.handlers.saves_spell", lambda *a, **k: False)
         result = dispel_magic(caster, char)
 
         # Should succeed in removing at least one affect

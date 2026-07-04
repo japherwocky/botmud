@@ -160,3 +160,29 @@ def test_dispel_magic_failure():
     dispel_magic(caster, target)
 
     assert "sanctuary" in target.spell_effects
+
+
+def test_dispel_magic_aborts_when_victim_saves(monkeypatch):
+    """MAGIC-049 — ROM spell_dispel_magic opens with a wholesale save.
+
+    ROM ``src/magic.c:2082-2088``: ``if (saves_spell(level, victim, DAM_OTHER))`` →
+    "You feel a brief tingling sensation." (victim) + "You failed." (caster) +
+    return, stripping nothing. The port had no such gate (missing RNG draw + both
+    messages), so a high-saving victim lost buffs ROM would preserve.
+    """
+    from mud.skills import handlers as h
+
+    caster = make_character(name="Caster", level=30)
+    caster.messages = []
+    target = make_character(name="Target", level=20)
+    target.messages = []
+    target.apply_spell_effect(SpellEffect(name="armor", duration=24, level=20, wear_off_message="Your armor fades."))
+
+    monkeypatch.setattr(h, "saves_spell", lambda level, tgt, dtype: True)
+
+    result = h.dispel_magic(caster, target)
+
+    assert result is False, "ROM aborts (found == FALSE) when the victim saves"
+    assert "You feel a brief tingling sensation." in target.messages
+    assert "You failed." in caster.messages
+    assert "armor" in target.spell_effects, "nothing is stripped when the victim saves"
