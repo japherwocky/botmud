@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Coverage-lock: `aggr_update` victim reservoir selection.** New
+  `TestAggressiveUpdateVictimReservoir` in
+  `tests/integration/test_mob_ai.py` pins ROM's reservoir sampling
+  (`src/update.c:1115-1131`): an aggressive NPC facing multiple eligible PCs
+  draws one `number_range(0, count)` per victim in `room.people` order, keeping
+  the first eligible victim (count==0 always selects) unless a later victim's
+  roll wins. Freezes the shared-RNG draw sequence at a classic desync site that
+  had no deterministic regression test.
+
 - **Coverage-lock: `gain_condition` DRUNK sober-message guard.** New
   `tests/integration/test_gain_condition_drunk_sober_guard.py` pins ROM's
   `if (condition != 0)` old-value guard (`src/update.c:391-394`): "You are sober."

@@ -924,3 +924,79 @@ class TestAggressiveUpdateDoesNotAssist:
             character_registry.clear()
             character_registry.extend(saved)
             room_registry.pop(room.vnum, None)
+
+
+class TestAggressiveUpdateVictimReservoir:
+    """Coverage-lock — ROM aggr_update's reservoir victim selection (src/update.c:1115-1131).
+
+    Once an aggressive NPC decides to attack, ROM chooses which PC in the room it
+    hits by reservoir sampling, giving every eligible ``vch`` an equal chance::
+
+        count = 0; victim = NULL;
+        for (vch = ...->people; vch; vch = vch_next)
+            if (eligible(vch)) {
+                if (number_range (0, count) == 0)
+                    victim = vch;
+                count++;
+            }
+
+    ``count == 0`` makes the FIRST eligible victim the initial pick
+    (``number_range(0,0)`` is always 0); each later eligible victim replaces it
+    iff ``number_range(0,count) == 0``. The draw is one ``number_range`` per
+    eligible victim, in ``room.people`` order — a classic shared-RNG desync site.
+    The Python port (``mud/ai/aggressive.py:101-106``) matches (verified by the
+    2026-07-03 position/aggression probe); this locks the draw sequence, which had
+    no deterministic regression test.
+    """
+
+    def _run(self, monkeypatch, *, second_pick: int):
+        import mud.ai.aggressive as aggressive_module
+        from mud.ai.aggressive import _eligible_victims
+
+        saved = list(character_registry)
+        character_registry.clear()
+        room = Room(vnum=999210, name="Reservoir Room")
+        room_registry[room.vnum] = room
+        try:
+            create_test_player("VictimA", room.vnum, level=10)
+            create_test_player("VictimB", room.vnum, level=10)
+            mob = create_test_mob(room.vnum, name="orc", act=int(ActFlag.AGGRESSIVE), level=10)
+
+            eligible = list(_eligible_victims(mob, list(room.people)))
+            assert len(eligible) == 2, "both PCs must be eligible victims for the reservoir"
+
+            # Aggression coin always fires so we reach the reservoir.
+            monkeypatch.setattr(aggressive_module.rng_mm, "number_bits", lambda _width: 1)
+
+            def fake_range(_low: int, high: int) -> int:
+                # count==0 -> number_range(0,0) is always 0 (ROM); count==1 -> scripted.
+                return 0 if high == 0 else second_pick
+
+            monkeypatch.setattr(aggressive_module.rng_mm, "number_range", fake_range)
+
+            attacks: list[tuple[Character, Character]] = []
+
+            def fake_multi_hit(attacker: Character, victim: Character) -> None:
+                attacks.append((attacker, victim))
+                attacker.fighting = victim  # ROM set_fighting: mob is skipped on the next watcher
+
+            monkeypatch.setattr(aggressive_module, "multi_hit", fake_multi_hit)
+
+            aggressive_update()
+            return eligible, attacks
+        finally:
+            character_registry.clear()
+            character_registry.extend(saved)
+            room_registry.pop(room.vnum, None)
+
+    def test_second_eligible_victim_kept_when_its_roll_wins(self, monkeypatch):
+        """number_range(0,1)==0 -> the second eligible victim replaces the first."""
+        eligible, attacks = self._run(monkeypatch, second_pick=0)
+        assert len(attacks) == 1, "the mob aggros exactly once (set_fighting skips the second watcher)"
+        assert attacks[0][1] is eligible[1]
+
+    def test_first_eligible_victim_kept_when_second_roll_loses(self, monkeypatch):
+        """number_range(0,1)!=0 -> the first eligible victim (count==0 pick) stands."""
+        eligible, attacks = self._run(monkeypatch, second_pick=1)
+        assert len(attacks) == 1
+        assert attacks[0][1] is eligible[0]
