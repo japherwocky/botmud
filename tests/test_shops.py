@@ -2162,3 +2162,46 @@ def test_value_uses_keeper_voice_with_item_name():
         assert "gold coins" in response
     finally:
         time_info.hour = previous_hour
+
+
+def test_buy_multi_stock_requires_consecutive_run():
+    """BUY-011 — ROM do_buy counts only a CONSECUTIVE run of matching stock.
+
+    ROM ``src/act_obj.c:2667-2686`` walks ``obj->next_content`` counting matching
+    items and ``break``s at the first non-matching one. Two same-proto lanterns
+    separated by a dagger are therefore NOT "2 in stock", so ``buy 2 lantern`` is
+    refused with "I don't have that many in stock." The pre-fix
+    ``_collect_matching_stock`` scanned the whole inventory (no break), so it
+    collected both non-adjacent lanterns and sold them.
+    """
+    initialize_world("area/area.lst")
+    char = _create_shop_character("Buyer", 3010)
+    char.gold = 1000
+    keeper = next(
+        (p for p in char.room.people if getattr(p, "prototype", None) and p.prototype.vnum in shop_registry),
+        None,
+    )
+    if keeper is None:
+        keeper = spawn_mob(3002)
+        assert keeper is not None
+        keeper.move_to_room(char.room)
+    previous_hour = time_info.hour
+    try:
+        time_info.hour = 10
+        lantern1 = spawn_object(3031)
+        dagger = spawn_object(3020)
+        lantern2 = spawn_object(3031)
+        for o in (lantern1, dagger, lantern2):
+            assert o is not None
+            o.wear_loc = -1
+        # Interleaved: [lantern, dagger, lantern] — the two lanterns are NOT consecutive.
+        keeper.inventory = [lantern1, dagger, lantern2]
+
+        result = process_command(char, "buy 2*lantern")
+
+        assert "don't have that many in stock" in result.lower(), f"got: {result!r}"
+        # Nothing sold: both lanterns remain with the keeper, none reached the buyer.
+        assert lantern1 in keeper.inventory and lantern2 in keeper.inventory
+        assert not any((o.short_descr or "").lower().startswith("a hooded brass lantern") for o in char.inventory)
+    finally:
+        time_info.hour = previous_hour

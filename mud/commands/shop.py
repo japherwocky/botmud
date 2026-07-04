@@ -400,6 +400,12 @@ def _collect_matching_stock(
             collected.append(candidate)
             if len(collected) >= count:
                 break
+        else:
+            # BUY-011: ROM do_buy (src/act_obj.c:2667-2686) counts only a
+            # CONSECUTIVE run of matching stock — it `break`s at the first
+            # non-matching item after the selected object. A duplicate that is
+            # not adjacent does NOT count toward the requested quantity.
+            break
     return collected
 
 

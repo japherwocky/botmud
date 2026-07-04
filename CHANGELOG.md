@@ -102,6 +102,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **BUY-011: `buy N*item` counts only consecutive stock.** The multi-buy stock
+  check scanned the keeper's whole inventory and counted non-adjacent duplicates,
+  but ROM `do_buy` (`src/act_obj.c:2667-2686`) counts only a consecutive run and
+  stops at the first non-matching item. So a keeper carrying `[lantern, dagger,
+  lantern]` refuses `buy 2*lantern` ("I don't have that many in stock.") in ROM,
+  but the port sold both. `_collect_matching_stock` now breaks on the first
+  non-matching candidate. Test:
+  `tests/test_shops.py::test_buy_multi_stock_requires_consecutive_run`.
+
 - **GET-016: magic containers weigh less toward carry limits (WEIGHT_MULT).** The
   command-local `_get_obj_weight` helpers (do_get's `can_carry_w` gate and do_put's
   fit check) summed a container's contents at full weight, ignoring ROM's
