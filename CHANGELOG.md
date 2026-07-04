@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Coverage-lock: `gain_condition` DRUNK sober-message guard.** New
+  `tests/integration/test_gain_condition_drunk_sober_guard.py` pins ROM's
+  `if (condition != 0)` old-value guard (`src/update.c:391-394`): "You are sober."
+  fires only when the DRUNK slot was non-zero before ticking to 0, so an
+  already-sober idle player is never re-notified (unlike HUNGER/THIRST, which
+  announce unconditionally at 0). Locks a previously-untested branch.
+
 - **HANDLER-008: faithful unified `get_skill` port (core).** Added
   `mud/skills/skill_lookup.py:get_skill` mirroring ROM `src/handler.c:346-448` —
   the PC class-level gate + learned percent, the full NPC formula dispatch
