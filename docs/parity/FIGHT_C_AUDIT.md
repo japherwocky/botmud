@@ -289,9 +289,26 @@ affects every swing) and FIGHT-082 (HIGH).
   fight via `victim.fighting is char`; success broadcasts the `$M`-gendered
   TO_NOTVICT to a bystander). Filed **FIGHT-090** (divergent duplicate trip impls).
 
-- **`FIGHT-090` — ⚠️ OPEN (MEDIUM) — `do_trip` and `skill_handlers.trip` are
-  divergent duplicate implementations of ROM `do_trip`.** Surfaced 2026-07-03 while
-  closing FIGHT-088. The `"trip"` command routes to `mud/commands/combat.py:do_trip`;
+- **`FIGHT-090` — ✅ FIXED (2.14.240) — `do_trip` and `skill_handlers.trip` were
+  divergent duplicate implementations of ROM `do_trip`.** `mud/commands/combat.py:do_trip`
+  is now the single canonical implementation; `mud/skills/handlers.py:trip` is a thin
+  delegate (`do_trip(caster, "", victim=target)`). Unifying surfaced **three ROM-parity
+  fixes that had landed only on the `skill_handlers.trip` copy** and were missing from
+  do_trip — all merged in: (1) the self-trip `{5`colour + `act("$n trips over $s own
+  feet!")` room broadcast (FIGHT-039); (2) PERS gate messages — flying `act("$S feet
+  aren't on the ground.")` and position `act("$N is already down.")` (TRIP-001), which
+  do_trip had baked as "Their"/"They"; (3) `check_improve(ch, gsn_trip, TRUE/FALSE, 1)`
+  on success/failure, which do_trip omitted entirely (trip never improved via the
+  command). Delivery model unified to ROM's: do_trip returns the TO_CHAR line and pushes
+  TO_VICT / broadcasts TO_NOTVICT. Retired 5 redundant `TestTripRomParity::test_trip_handler_*`
+  tests (behaviours covered by `test_fight082_do_trip_cluster` + `test_fight071` + the new
+  improve coverage); updated the 5 delivery-model tests. Also removed the old handler's
+  **non-ROM** post-damage RESTING re-set (ROM sets RESTING before `damage()` only) and its
+  self-before-skill-check ordering (ROM gates on the trip skill first). Follow-up: do_trip's
+  NPC trip chance hardcodes `skill_level = 100` (stale "mirror do_kick" comment — do_kick
+  now uses `get_skill`); it should use `get_skill` `10+3*level` — filed under **HANDLER-008**.
+
+- ~~**`FIGHT-090` (original filing)**~~ Superseded above. The `"trip"` command routes to `mud/commands/combat.py:do_trip`;
   the `"trip"` *skill* (`data/skills.json` `"function": "trip"`) routes to
   `mud/skills/handlers.py:trip` (~`:7999`) via the registry — both are live, each
   with its own gate ordering, chance math, and message wording. `skill_handlers.trip`

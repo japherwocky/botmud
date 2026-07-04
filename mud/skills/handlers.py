@@ -8009,121 +8009,25 @@ def teleport(caster: Character, target: Character | None = None) -> bool:
 
 
 def trip(caster: Character, target: Character | None = None) -> str:
-    """ROM ``do_trip`` parity: knock an opponent to the ground."""
+    """ROM ``do_trip`` parity — delegates to the single canonical implementation.
 
+    FIGHT-090: this used to be a divergent second copy of ``do_trip``. Both are
+    live (the ``trip`` command routes to ``do_trip``; the ``trip`` skill maps here),
+    and ROM-parity fixes kept landing on one and missing the other (do_trip had the
+    correct success act-render + failure ``damage(0)`` per FIGHT-088; this copy had
+    the self-trip room broadcast per FIGHT-039). It now forwards to
+    ``mud.commands.combat.do_trip`` with the target passed explicitly, so there is
+    one implementation. do_trip returns the TO_CHAR line and pushes TO_VICT /
+    broadcasts TO_NOTVICT — callers that previously read the caster's mailbox for
+    the TO_CHAR line now read the return value.
+    """
     if caster is None:
         raise ValueError("trip requires a caster")
+    # Lazy import avoids the combat-command <-> handlers module cycle (combat.py
+    # imports this module at load; the reverse is deferred to call time).
+    from mud.commands.combat import do_trip
 
-    victim = target or getattr(caster, "fighting", None)
-    if victim is None:
-        _send_to_char(caster, "But you aren't fighting anyone.")
-        return ""
-
-    if victim is caster:
-        beats = _skill_beats("trip")
-        caster.wait = max(int(getattr(caster, "wait", 0) or 0), beats * 2)
-        # mirroring ROM src/fight.c:2699-2701 (do_trip self-trip): both lines
-        # carry {5..{x colour; the room line renders $n per-recipient via PERS
-        # (an invisible tripper masks to "someone") and $s as the tripper's
-        # gendered possessive (his/her/its). FIGHT-039 — was an uncoloured self
-        # line + a baked-name "their" mailbox loop.
-        _send_to_char(caster, "{5You fall flat on your face!{x")
-        room = getattr(caster, "room", None)
-        if room is not None:
-            act_to_room(room, "{5$n trips over $s own feet!{x", caster, exclude=caster)
-        return ""
-
-    chance = _skill_percent(caster, "trip")
-    caster_off = int(getattr(caster, "off_flags", 0) or 0)
-    caster_level = max(int(getattr(caster, "level", 0) or 0), 0)
-    if chance <= 0:
-        if bool(getattr(caster, "is_npc", False)) and caster_off & int(OffFlag.TRIP):
-            chance = max(chance, 10 + 3 * caster_level)
-        else:
-            _send_to_char(caster, "Tripping?  What's that?")
-            return ""
-
-    if getattr(victim, "is_npc", False):
-        opponent = getattr(victim, "fighting", None)
-        if opponent is not None and not is_same_group(caster, opponent):
-            _send_to_char(caster, "Kill stealing is not permitted.")
-            return ""
-
-    # TRIP-001: ROM src/fight.c do_trip renders these via act() with the victim's
-    # pronouns/PERS name, not baked "Their"/keyword-name:
-    #   act("$S feet aren't on the ground.", ch, NULL, victim, TO_CHAR)  ($S=his/her/its)
-    #   act("$N is already down.", ch, NULL, victim, TO_CHAR)            ($N=PERS short_descr)
-    #   act("$N is your beloved master.", ch, NULL, victim, TO_CHAR)
-    if getattr(victim, "has_affect", None) and victim.has_affect(AffectFlag.FLYING):
-        _send_to_char(caster, act_format("$S feet aren't on the ground.", recipient=caster, actor=caster, arg2=victim))
-        return ""
-
-    if getattr(victim, "position", Position.STANDING) < Position.FIGHTING:
-        _send_to_char(caster, act_format("$N is already down.", recipient=caster, actor=caster, arg2=victim))
-        return ""
-
-    if getattr(caster, "has_affect", None) and caster.has_affect(AffectFlag.CHARM):
-        if getattr(caster, "master", None) is victim:
-            _send_to_char(caster, act_format("$N is your beloved master.", recipient=caster, actor=caster, arg2=victim))
-            return ""
-
-    caster_size = int(getattr(caster, "size", 2) or 0)
-    victim_size = int(getattr(victim, "size", 2) or 0)
-    chance += (caster_size - victim_size) * 10
-
-    caster_dex = caster.get_curr_stat(Stat.DEX) or 0
-    victim_dex = victim.get_curr_stat(Stat.DEX) or 0
-    chance += caster_dex
-    chance -= c_div(victim_dex * 3, 2)
-
-    victim_off = int(getattr(victim, "off_flags", 0) or 0)
-    caster_haste = getattr(caster, "has_affect", None) and caster.has_affect(AffectFlag.HASTE)
-    victim_haste = getattr(victim, "has_affect", None) and victim.has_affect(AffectFlag.HASTE)
-    if caster_off & int(OffFlag.FAST) or caster_haste:
-        chance += 10
-    if victim_off & int(OffFlag.FAST) or victim_haste:
-        chance -= 20
-
-    victim_level = max(int(getattr(victim, "level", 0) or 0), 0)
-    chance += (caster_level - victim_level) * 2
-
-    beats = _skill_beats("trip")
-    roll = rng_mm.number_percent()
-    caster_wait = int(getattr(caster, "wait", 0) or 0)
-
-    if roll < chance:
-        caster.wait = max(caster_wait, beats)
-        victim_name = _character_name(victim)
-        caster_name = _character_name(caster)
-        _send_to_char(victim, f"{caster_name} trips you and you go down!")
-        _send_to_char(caster, f"You trip {victim_name} and {victim_name} goes down!")
-
-        room = getattr(caster, "room", None)
-        if room is not None:
-            message = f"{caster_name} trips {victim_name}, sending them to the ground."
-            for occupant in list(getattr(room, "people", []) or []):
-                if occupant is caster or occupant is victim:
-                    continue
-                # INV-001: single-channel delivery (push_message XOR).
-                _send_to_char(occupant, message)
-
-        from mud.config import get_pulse_violence
-
-        victim.daze = max(int(getattr(victim, "daze", 0) or 0), 2 * get_pulse_violence())
-        victim.position = Position.RESTING
-
-        max_damage = max(2, 2 + 2 * victim_size)
-        damage = rng_mm.number_range(2, max_damage)
-        result = apply_damage(caster, victim, damage, DamageType.BASH, dt="trip")
-        if victim.position > Position.STUNNED and getattr(victim, "hit", 0) > 0:
-            victim.position = Position.RESTING
-        check_improve(caster, "trip", True, 1)
-        return result
-
-    fail_wait = c_div(beats * 2, 3)
-    caster.wait = max(caster_wait, fail_wait)
-    check_improve(caster, "trip", False, 1)
-    return apply_damage(caster, victim, 0, DamageType.BASH, dt="trip")
+    return do_trip(caster, "", victim=target)
 
 
 def ventriloquate(caster: Character, target: str | None = None) -> bool:  # noqa: ARG001 - parity signature

@@ -12,6 +12,17 @@ from mud.models.room import Room
 from mud.skills import handlers as skill_handlers
 
 
+@pytest.fixture(autouse=True)
+def _load_trip_skill() -> None:
+    # FIGHT-090: skill_handlers.trip now delegates to do_trip, which reads
+    # skill_registry.get("trip").beats — load the registry so that lookup works.
+    from pathlib import Path
+
+    from mud.skills.registry import skill_registry
+
+    skill_registry.load(Path("data/skills.json"))
+
+
 def _patch_weapon_defenses(monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
     called: dict[str, bool] = {"shield": False, "parry": False, "dodge": False}
 
@@ -175,10 +186,23 @@ def test_disarm_strips_weapon_and_trains_skill(monkeypatch: pytest.MonkeyPatch) 
     assert any("DISARMS you and sends your weapon flying" in message for message in mercenary.messages)
 
 
-def test_trip_knocks_target_and_triggers_wait_state(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("mud.config.get_pulse_violence", lambda: 4)
-    monkeypatch.setattr(skill_handlers.rng_mm, "number_percent", lambda: 1)
-    monkeypatch.setattr(skill_handlers.rng_mm, "number_range", lambda low, high: high)
+def test_trip_knocks_target_wait_daze_and_improve(monkeypatch: pytest.MonkeyPatch) -> None:
+    # FIGHT-090: skill_handlers.trip delegates to do_trip, so patch the COMBAT
+    # module's RNG / pulse and the registry improve hook (not the handlers module).
+    # do_trip returns the TO_CHAR line and pushes TO_VICT / broadcasts TO_NOTVICT.
+    import mud.commands.combat as combat
+    from mud.skills.registry import SkillRegistry
+
+    monkeypatch.setattr(combat, "get_pulse_violence", lambda: 4)
+    monkeypatch.setattr(combat.rng_mm, "number_percent", lambda: 1)
+    monkeypatch.setattr(combat.rng_mm, "number_range", lambda low, high: high)
+
+    improvements: list[tuple[str, bool]] = []
+    monkeypatch.setattr(
+        SkillRegistry,
+        "_check_improve",
+        lambda self, ch, skill, name, success, multiplier=1: improvements.append((name, success)),
+    )
 
     room = Room(vnum=3000, sector_type=int(Sector.CITY))
 
@@ -199,24 +223,18 @@ def test_trip_knocks_target_and_triggers_wait_state(monkeypatch: pytest.MonkeyPa
     room.add_character(victim)
     room.add_character(bystander)
 
-    improvements: list[tuple[bool, int]] = []
-
-    def _record_improve(ch: Character, name: str, success: bool, multiplier: int) -> None:
-        improvements.append((success, multiplier))
-
-    monkeypatch.setattr(skill_handlers, "check_improve", _record_improve)
-
     result = skill_handlers.trip(tripper, target=victim)
 
-    assert isinstance(result, str)
-    assert victim.position == Position.RESTING
-    assert victim.daze == 8
+    # ROM do_trip sets POS_RESTING before damage(), which then runs update_pos — so
+    # the durable knockdown contract is the DAZE, not the transient position. (The old
+    # handler's non-ROM post-damage RESTING re-set is gone with the unification.)
+    assert victim.daze == 8  # DAZE_STATE(victim, 2 * PULSE_VIOLENCE)
     assert victim.hit < victim.max_hit
-    assert tripper.wait == skill_handlers._skill_beats("trip")
-    assert improvements == [(True, 1)]
-    assert any("trips you" in message for message in victim.messages)
-    assert any("You trip" in message for message in tripper.messages)
-    assert any("trips Victim" in message for message in bystander.messages)
+    assert tripper.wait == 24  # ROM skill_table[gsn_trip].beats
+    assert improvements == [("trip", True)]  # ROM check_improve(ch, gsn_trip, TRUE, 1)
+    assert any("trips you" in message for message in victim.messages)  # TO_VICT (pushed)
+    assert "You trip" in result  # TO_CHAR (returned)
+    assert any("trips Victim" in message for message in bystander.messages)  # TO_NOTVICT (broadcast)
 
 
 def test_trip_checks_flying_and_self_trip(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -248,19 +266,19 @@ def test_trip_checks_flying_and_self_trip(monkeypatch: pytest.MonkeyPatch) -> No
 
     blocked = skill_handlers.trip(tripper, target=victim)
 
-    assert blocked == ""
+    # FIGHT-090: do_trip returns the TO_CHAR gate line rather than pushing it.
+    assert "feet aren't on the ground" in blocked
     assert victim.position == Position.FIGHTING
     assert tripper.wait == 0
     assert not improvements
-    assert any("feet aren't on the ground" in message for message in tripper.messages)
 
     tripper.messages.clear()
 
     slip = skill_handlers.trip(tripper, target=tripper)
 
-    assert slip == ""
+    # Self-trip: TO_CHAR "You fall flat" is returned; the room line is broadcast.
+    assert "fall flat" in slip
     assert tripper.wait == skill_handlers._skill_beats("trip") * 2
-    assert any("fall flat" in message for message in tripper.messages)
 
 
 def test_trip001_messages_use_rom_pronoun_and_pers(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -279,15 +297,13 @@ def test_trip001_messages_use_rom_pronoun_and_pers(monkeypatch: pytest.MonkeyPat
     flyer.add_affect(AffectFlag.FLYING)
     room.add_character(tripper)
     room.add_character(flyer)
-    skill_handlers.trip(tripper, target=flyer)
-    assert any(m == "His feet aren't on the ground." for m in tripper.messages), tripper.messages
+    # FIGHT-090: do_trip returns the TO_CHAR gate line rather than pushing it.
+    assert skill_handlers.trip(tripper, target=flyer) == "His feet aren't on the ground."
 
     # $N: an already-down NPC -> ROM "A sneaky goblin is already down." (short_descr + cap).
-    tripper.messages.clear()
     goblin = _make_combatant("goblin", level=20)
     goblin.is_npc = True
     goblin.short_descr = "a sneaky goblin"
     goblin.position = Position.SLEEPING
     room.add_character(goblin)
-    skill_handlers.trip(tripper, target=goblin)
-    assert any(m == "A sneaky goblin is already down." for m in tripper.messages), tripper.messages
+    assert skill_handlers.trip(tripper, target=goblin) == "A sneaky goblin is already down."

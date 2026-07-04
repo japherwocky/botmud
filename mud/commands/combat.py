@@ -1176,11 +1176,15 @@ def do_dirt(char: Character, args: str) -> str:
     return result
 
 
-def do_trip(char: Character, args: str) -> str:
+def do_trip(char: Character, args: str, *, victim: Character | None = None) -> str:
     """
     Trip opponent to knock them down.
 
     ROM Reference: src/fight.c do_trip (lines 2641-2760)
+
+    FIGHT-090: this is the single canonical trip implementation. The ``victim``
+    keyword lets the skill-registry ``trip`` handler (``skill_handlers.trip``)
+    delegate here with an explicit target instead of maintaining a divergent copy.
     """
     target_name = (args or "").strip()
 
@@ -1197,8 +1201,10 @@ def do_trip(char: Character, args: str) -> str:
         if skill_level == 0:
             return "Tripping? What's that?"
 
-    # Find target
-    if not target_name:
+    # Find target (skip when an explicit victim is supplied via delegation).
+    if victim is not None:
+        pass
+    elif not target_name:
         victim = getattr(char, "fighting", None)
         if victim is None:
             return "But you aren't fighting anyone!"
@@ -1224,27 +1230,38 @@ def do_trip(char: Character, args: str) -> str:
     ):
         return "Kill stealing is not permitted."
 
-    # Can't trip flying targets
+    # Can't trip flying targets — ROM src/fight.c:2686 act("$S feet aren't on the
+    # ground.", ch, NULL, victim, TO_CHAR); $S = victim's possessive pronoun.
+    # FIGHT-090: was a baked "Their" here (the PERS render was only on
+    # skill_handlers.trip via TRIP-001); merged in so do_trip is canonical.
     victim_affected = getattr(victim, "affected_by", 0)
     if victim_affected & AffectFlag.FLYING:
-        return "Their feet aren't on the ground."
+        return act_format("$S feet aren't on the ground.", recipient=char, actor=char, arg2=victim)
 
-    # Can't trip someone already down
+    # Can't trip someone already down — ROM src/fight.c:2689 act("$N is already
+    # down.", …, TO_CHAR); $N = PERS(victim). FIGHT-090 (was baked "They are").
     victim_pos = getattr(victim, "position", Position.STANDING)
     if victim_pos < Position.FIGHTING:
-        return "They are already down."
+        return act_format("$N is already down.", recipient=char, actor=char, arg2=victim)
 
     # FIGHT-082: ROM src/fight.c:2700/2742/2750 — do_trip WAIT_STATE uses the
     # skill's RAW beats (skill_table[gsn_trip].beats == 24), not PULSE_VIOLENCE,
     # with no HASTE/SLOW adjustment (read skill.beats directly, per CAST-010; the
     # _compute_skill_lag haste/slow scaling is FIGHT-085's separate concern and
     # must stay out of ROM WAIT_STATE sites).
-    trip_beats = int(getattr(skill_registry.get("trip"), "beats", 0) or 0)
+    _trip_skill = skill_registry.get("trip")
+    trip_beats = int(getattr(_trip_skill, "beats", 0) or 0)
 
     if victim is char:
-        # ROM src/fight.c:2700 — WAIT_STATE(ch, 2 * skill_table[gsn_trip].beats).
+        # ROM src/fight.c:2697-2703 (do_trip self-trip): colored TO_CHAR + a room
+        # broadcast ($n PERS-masked, $s possessive). FIGHT-090: the room line +
+        # {5..{x colour were on skill_handlers.trip (FIGHT-039) but not here — merged
+        # in so this path is the complete canonical implementation.
         skill_registry._apply_wait_state(char, 2 * trip_beats)
-        return "You fall flat on your face!"
+        self_room = getattr(char, "room", None)
+        if self_room is not None:
+            act_to_room(self_room, "{5$n trips over $s own feet!{x", char, exclude=char)
+        return "{5You fall flat on your face!{x"
 
     # FIGHT-071: ROM src/fight.c:2705-2709 — do_trip's charm gate, checked LAST
     # (after flying/position/self), with act("$N is your beloved master.", …).
@@ -1306,6 +1323,10 @@ def do_trip(char: Character, args: str) -> str:
         damage_amt = rng_mm.number_range(2, 2 + 2 * victim_size)
         apply_damage(char, victim, damage_amt, DamageType.BASH, dt="trip")
 
+        # ROM src/fight.c:2739 — check_improve(ch, gsn_trip, TRUE, 1). FIGHT-090:
+        # do_trip was missing check_improve entirely (it was only on the duplicate
+        # skill_handlers.trip); merged in so trip improvement works via the command.
+        skill_registry._check_improve(char, _trip_skill, "trip", True)
         message = act_format("{5You trip $N and $N goes down!{x", recipient=char, actor=char, arg2=victim)
     else:
         # FIGHT-088: ROM :2749 — the failure branch calls damage(ch, victim, 0,
@@ -1315,6 +1336,8 @@ def do_trip(char: Character, args: str) -> str:
         message = apply_damage(char, victim, 0, DamageType.BASH, dt="trip")
         # ROM :2750 — WAIT_STATE(ch, skill_table[gsn_trip].beats * 2 / 3), after damage.
         skill_registry._apply_wait_state(char, trip_beats * 2 // 3)
+        # ROM src/fight.c:2752 — check_improve(ch, gsn_trip, FALSE, 1). FIGHT-090.
+        skill_registry._check_improve(char, _trip_skill, "trip", False)
 
     check_killer(char, victim)  # mirroring ROM src/fight.c:2753 — unconditional
     return message

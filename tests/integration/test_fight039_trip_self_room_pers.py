@@ -18,10 +18,22 @@ ROM C: src/fight.c:2699-2701 (do_trip self-trip).
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
 from mud.models.character import Character
 from mud.models.constants import AffectFlag, Sector, Sex
 from mud.models.room import Room
 from mud.skills import handlers as skill_handlers
+from mud.skills.registry import skill_registry
+
+
+@pytest.fixture(autouse=True)
+def _load_trip_skill() -> None:
+    # FIGHT-090: skill_handlers.trip delegates to do_trip, which reads
+    # skill_registry.get("trip").beats — load the registry so the lookup resolves.
+    skill_registry.load(Path("data/skills.json"))
 
 
 def _lit_room(vnum: int = 3066) -> Room:
@@ -32,6 +44,7 @@ def _lit_room(vnum: int = 3066) -> Room:
 
 def test_trip_self_lines_colour_pers_and_possessive() -> None:
     caster = Character(name="Scout", level=20, is_npc=False, sex=int(Sex.MALE))
+    caster.skills["trip"] = 50  # ROM do_trip gates on the trip skill before the self check
     witness = Character(name="Witness", level=18, is_npc=False)
     room = _lit_room()
     for ch in (caster, witness):
@@ -39,16 +52,18 @@ def test_trip_self_lines_colour_pers_and_possessive() -> None:
     caster.messages.clear()
     witness.messages.clear()
 
-    skill_handlers.trip(caster, caster)
+    # FIGHT-090: do_trip RETURNS the coloured TO_CHAR self line (ROM :2699); the room
+    # line (ROM :2701) is broadcast to the witness.
+    result = skill_handlers.trip(caster, caster)
 
-    # ROM :2699 — coloured self line.
-    assert "{5You fall flat on your face!{x" in caster.messages, caster.messages
+    assert result == "{5You fall flat on your face!{x"
     # ROM :2701 — $n→name (visible), $s→"his" (male), colour preserved.
     assert witness.messages[-1] == "{5Scout trips over his own feet!{x", witness.messages
 
 
 def test_trip_self_room_line_masks_invisible_tripper() -> None:
     caster = Character(name="Scout", level=20, is_npc=False, sex=int(Sex.FEMALE))
+    caster.skills["trip"] = 50
     witness = Character(name="Witness", level=18, is_npc=False)
     room = _lit_room()
     for ch in (caster, witness):

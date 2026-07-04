@@ -63,7 +63,9 @@ def test_trip_charmed_flying_master_hears_flying_line_not_charm() -> None:
     # charm, so a charmed attacker tripping a flying master gets the flying line.
     attacker, victim = _charmed_attacker("trip", victim_flying=True)
     result = do_trip(attacker, "wizard")
-    assert result == "Their feet aren't on the ground.", result
+    # FIGHT-090: ROM act("$S feet aren't on the ground.") — $S is the victim's
+    # possessive pronoun ("Its" for a genderless master), not a baked "Their".
+    assert result == "Its feet aren't on the ground.", result
 
 
 def test_trip_charmed_master_uses_beloved_master_message() -> None:

@@ -369,6 +369,12 @@ had encoded the same index-1-is-DEX error).
   `level*2`, shield_block `10+2*level` — so NPC mobs currently never dodge/parry/
   shield-block. Same class-gate blast radius for PC-defender tests. The remaining
   migration to close HANDLER-008.
+- ⚠️ `mud/commands/combat.py:do_trip` NPC trip chance — hardcodes `skill_level = 100`
+  with a now-stale "mirror the do_kick NPC pattern" comment (do_kick was migrated to
+  `get_skill` in FIGHT-091). ROM `get_skill(ch, gsn_trip)` for an OFF_TRIP NPC is
+  `10+3*level`. Surfaced 2026-07-03 while unifying the trip impls (FIGHT-090); not a
+  production regression (NPCs already route through do_trip) but the less-faithful of
+  the two merged copies.
 - ⚠️ Other ad-hoc lookups (`_lookup_skill_percent`, `_character_skill_percent`) —
   migrate opportunistically as their surfaces are touched.
 
