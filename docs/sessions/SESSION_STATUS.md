@@ -1,63 +1,57 @@
-# Session Status — 2026-07-04 — update.c cold-path RNG/math sweep (GL-046..048 + 2 locks)
+# Session Status — 2026-07-04 — Autonomous /loop: 15 cold-path parity units (LOCAL, UNPUSHED)
 
 ## Current State
 
 - **Active focus**: Cross-file invariants / cold-path divergence hunting (per-file
-  audit tracker exhausted). This session swept `src/update.c`'s per-tick surface
-  via six parallel probe agents and closed five self-contained units.
-- **Last completed** (2.14.243 → 2.14.247, all committed locally on `master`):
-  - **`GL-046`** (✅ FIXED, `ac71e82f`) — plague-spread RNG draw order/count in
-    `char_update`. Duration drawn once before the loop; `saves_spell` drawn for
-    every occupant (ROM's first `&&` operand); `number_bits(4)` drawn last.
-    `src/update.c:824,829-841`.
-  - **`GL-047`** (✅ FIXED, `5932df92`) — regen drain-room clamp + signed math.
-    `hit_gain`/`mana_gain`/`move_gain` now return `min(gain, deficit)` (ROM UMIN,
-    can drain in a negative-rate room) and use `c_div` for the six post-rate-multiply
-    divisions. `src/update.c:215-229,297-315,365-366`.
-  - **`GL-048`** (✅ FIXED, `4b0d1cf1`) — `mp_delay_trigger` now returns `True`
-    unconditionally on delay expiry (ROM's unconditional `continue`) and is gated on
-    `HAS_TRIGGER(TRIG_DELAY)`, so a failed delay roll no longer leaks into
-    scavenge/wander. `src/update.c:448-454`. Diff-harness golden still converges.
-  - **Coverage-lock** (`6a04a5c8`) — `gain_condition` DRUNK sober-message old-value
-    guard (`src/update.c:391-394`).
-  - **Coverage-lock** (`5a095690`) — `aggr_update` victim reservoir selection order
-    (`src/update.c:1115-1131`).
+  audit tracker exhausted). This session ran a 15-unit autonomous `/loop`.
+- **Last completed** (2.14.249 → **2.14.264**, all committed **locally on
+  `master`, NOT pushed** — `bfe11040` → `86179e98`):
+  - **13 ROM-parity bug fixes**: EAT-008, WEAR-010, PUT-004 (INV-011), GET-016,
+    BUY-011, SELL-005 (act_obj object/shop); FIGHT-092 (invisible attacker revealed
+    on hit); MOVE-008 (container open/close order); MAGIC-047 (stone_skin
+    caster-gate), MAGIC-048 (chain_lightning bounce), MAGIC-049 (dispel_magic save
+    gate); AFFECTS-001 (affects double-colon), LOOK-010 (aura order + double-render);
+    PRACTICE-002 (below-level practice gate).
+  - **2 coverage-locks**: `aggr_update` reservoir (earlier session), and this
+    session's xp_compute neutral-align `c_div` truncation.
 - **Pointer to latest summary**:
-  [SESSION_SUMMARY_2026-07-04_UPDATE_C_COLD_PATH_RNG.md](SESSION_SUMMARY_2026-07-04_UPDATE_C_COLD_PATH_RNG.md)
+  [SESSION_SUMMARY_2026-07-04_AUTONOMOUS_LOOP_15_GAPS.md](SESSION_SUMMARY_2026-07-04_AUTONOMOUS_LOOP_15_GAPS.md)
+  (the earlier same-day update.c cold-path session is
+  [SESSION_SUMMARY_2026-07-04_UPDATE_C_COLD_PATH_RNG.md](SESSION_SUMMARY_2026-07-04_UPDATE_C_COLD_PATH_RNG.md))
 
 ## Project Status (snapshot)
 
 | Metric | Value |
 |--------|-------|
-| Version | 2.14.248 |
-| Tests | Full suite green — **6110 passed, 4 skipped, 0 failed** (the 40 prior starlette-collection errors resolved via the project `.venv`). Run tests from `.venv` — see AGENTS.md "Environment". |
-| Cross-file invariants | INV-054 latest (unchanged) |
-| update.c cold paths | regen / gain_condition / weather / obj_update / char_update / update_pos / aggr_update / mobile_update all probed this session |
+| Version | 2.14.264 |
+| Tests | **6127 passed, 4 skipped, 0 failed** (full suite via `.venv`, 180s) |
+| Cross-file invariants | INV-054 latest (unchanged); INV-011 touched by PUT-004 |
+| Push status | **All local on `master`, UNPUSHED** — awaiting user review |
 | Active focus | Cross-file invariants / cold-path divergence hunting |
+
+## Open follow-ups (filed this session, not yet closed)
+
+- **FIGHT-093** — damage() 1200 loophole cap + check_killer absent from apply_damage.
+- **MOVE-009** — do_flee inline movement skips act broadcasts + follower cascade.
+- **MAGIC-046** — heat_metal MobInstance carry-order.
+- **MAGIC-050** — dispel_magic effect-list order + per-effect room messages.
+- **SPLIT-001** — do_split non-ROM `N gold`/`silver` keyword form (intentional
+  QuickMUD convenience; maintainer to decide whether to strip for strict parity).
+- **LOOK missing char tags** — Python renders 2 of ROM's ~12 (AFK/Invis/Wizi/Hide/
+  Charmed/Translucent/Red-Aura/Golden-Aura/KILLER/THIEF).
 
 ## Next Intended Task
 
-`src/update.c`'s per-tick functions are now swept. Continue cold-path / cross-INV
-divergence hunting on adjacent surfaces: the `affect_update` / `tick_spell_effects`
-wear-off path, the `damage()` core, or `move_char` follower/portal edges. Use the
-probe-then-scope method (read ROM C contract → read Python equivalent → one failing
-test), then close as a gap or file the next free INV-NNN.
+1. **Review + push.** 15 commits are local on `master`, unpushed. Review, then
+   `git push origin master`; optionally release 2.14.264 to PyPI.
+2. **Reindex GitNexus** — the on-disk index is stale (last `bfe1104`); the
+   background `npx gitnexus analyze` was failing with exit 144 this session (grep
+   fallback used, AGENTS.md-sanctioned). Run `npx gitnexus analyze --skip-agents-md`.
+3. **Run tests from `.venv`** (`.venv/bin/python -m pytest`) — the system framework
+   Python is over-constrained (see AGENTS.md "Build / Lint / Test → Environment").
+4. Continue cold-path / cross-INV hunting, or burn down the six OPEN follow-ups.
 
-Opportunistic (non-urgent) carryover: the **PC** side of `do_trip` still uses
-`_character_skill_percent` instead of `get_skill` (no class-gate/daze/drunk) —
-migrate when that surface is next touched.
-
-**Tooling note:** GitNexus MCP was up this session; the on-disk index was reindexed
-after each commit. **Environment:** run tests from the project `.venv`
-(`.venv/bin/python -m pytest`), not the system Python — the shared framework Python
-is over-constrained across projects (fastapi/gradio vs sse-starlette on starlette)
-and silently broke 4 web/session test files at collection. One-time setup + full
-rationale in AGENTS.md "Build / Lint / Test → Environment". A per-test
-`--timeout=120` hang-guard is now in the default addopts. The intermittent xdist
-**sessionfinish** teardown flake still recurs (harmless — a worker IPC hang/error
-*after* all tests report); if the summary line doesn't flush, re-run or trust the
-`0 failed` from the progress stream.
-
-**Push status:** the five commits (`ac71e82f` → `5a095690`) are **local on
-`master`, not pushed to remote or released to PyPI** — awaiting confirmation for the
-outward-facing step.
+**Known flake:** `tests/integration/test_character_advancement.py` (a
+`spec_cast_mage` test mocking `number_bits`→19) hangs when run in isolation
+(`-n0` single file) but passes in the full suite — a pre-existing RNG-leak
+isolation flake, present on HEAD independent of this session.
