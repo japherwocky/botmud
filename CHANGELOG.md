@@ -58,6 +58,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **GL-046: plague-spread RNG draw order/count parity (`char_update`).** The
+  per-tick plague infection loop desynced the shared Mitchell-Moore RNG stream
+  from ROM `src/update.c:824,829-841` three ways: it drew the spread affect's
+  `number_range` **duration** once per infected victim instead of once before the
+  loop; it skipped the carrier/immortals/already-plagued occupants without drawing
+  their `saves_spell` roll (ROM draws the save for every occupant as the first
+  `&&` operand); and it drew `number_bits(4)` **before** the save instead of last.
+  Any of the three shifts every downstream RNG consumer in that pulse (regen,
+  later chars' affect fades, combat) whenever a plagued character stands in a
+  populated room. The loop now mirrors ROM's operand order and draw count exactly.
+  Char-side twin of GL-045/GL-026. Test:
+  `tests/integration/test_gl046_plague_spread_rng_order.py`.
+
 - **HANDLER-008 do_trip NPC trip-chance uses `get_skill` (was hardcoded 100).** `do_trip`'s NPC branch set `skill_level = 100`, so any OFF_TRIP mob tripped at a near-certain base chance regardless of level. It now uses `get_skill(char, "trip")` = ROM's `10 + 3*level` for an OFF_TRIP NPC (`src/handler.c:373-432`, `src/fight.c:2649`) — a level-10 mob's trip base drops from 100 to 40. The OFF_TRIP gate and the `""` silent return for descriptor-less mobs are unchanged. PC path unchanged (a separate opportunistic migration). This closes the last dict-sourced NPC skill lookup — every `get_skill` site in the HANDLER-008 port is now migrated. Test: `test_fight_026_npc_offensive_skill_no_crash.py::test_npc_trip_chance_uses_get_skill_not_hardcoded_100` (+ an over-correction guard confirming a low roll still lands).
 
 - **HANDLER-008 test hygiene: `test_fight035` disarm caster is now a warrior.** The disarm act-structure test's caster was a level-30 mage, but ROM's `disarm` skill is mage@53 — so `get_skill` gates it to 0 ("You don't know how to disarm"). The test only passed because it never calls `initialize_world`, leaving the global `skill_registry` empty so the class-gate was skipped; once a sibling test on the same xdist worker populated the registry, the gate activated and the test flaked. Set `ch_class=3` (warrior, disarm@11) so the gate passes deterministically — the same ROM-faithful fix already applied to the `TestDisarmRomParity` chars when the disarm gate was migrated (2.14.236). Exposed by the defensive-check migration reshuffling worker grouping.

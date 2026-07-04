@@ -787,22 +787,32 @@ def _char_update_tick_effects(character: Character) -> bool:
 
         af_level = int(getattr(plague_af, "level", 1) or 1)
         if af_level > 1:
-            # Spread to room occupants — ROM src/update.c:828-841
+            # Spread to room occupants — ROM src/update.c:823-841.
             spread_level = af_level - 1
+            from mud.affects.saves import saves_spell
+            from mud.models.constants import DamageType
+
+            # GL-046: ROM draws the spread affect's duration ONCE, before the loop
+            # (`plague.duration = number_range(1, 2*plague.level)`, src/update.c:824),
+            # so every victim infected this tick shares the same duration. The
+            # pre-fix port drew it per-victim inside the loop (RNG-count desync).
+            plague_duration = rng_mm.number_range(1, 2 * spread_level)
             for vch in list(getattr(room, "people", [])):
-                if vch is character:
-                    continue
-                if vch.has_affect(AffectFlag.PLAGUE):
+                # GL-046: ROM evaluates the four terms as a short-circuit `&&`
+                # chain (src/update.c:832-834). `saves_spell` is the FIRST operand,
+                # so its `number_percent` draw fires for EVERY occupant — including
+                # the carrier, immortals, and already-plagued victims (they fail a
+                # later, RNG-free term). `number_bits(4)` is the LAST operand and is
+                # only drawn once the save fails and the victim is neither immortal
+                # nor already plagued. The pre-fix port pre-filtered occupants (no
+                # save draw for ch/immortal/plagued) and drew number_bits first.
+                if saves_spell(spread_level - 2, vch, int(DamageType.DISEASE)):
                     continue
                 if int(getattr(vch, "level", 0) or 0) >= LEVEL_IMMORTAL:
                     continue
-                if rng_mm.number_bits(4) != 0:
+                if vch.has_affect(AffectFlag.PLAGUE):
                     continue
-                # saves_spell check — simplified: use level check
-                from mud.affects.saves import saves_spell
-                from mud.models.constants import DamageType
-
-                if saves_spell(spread_level - 2, vch, int(DamageType.DISEASE)):
+                if rng_mm.number_bits(4) != 0:
                     continue
                 _send_to_char(vch, "You feel hot and feverish.\r\n")
                 _act_to_room(room, "$n shivers and looks very ill.", vch)
@@ -812,7 +822,7 @@ def _char_update_tick_effects(character: Character) -> bool:
                     new_af = AffectData(
                         type="plague",
                         level=spread_level,
-                        duration=rng_mm.number_range(1, 2 * spread_level),
+                        duration=plague_duration,
                         location=1,  # APPLY_STR — ROM src/update.c:825 `plague.location = APPLY_STR`
                         modifier=-5,
                         bitvector=int(AffectFlag.PLAGUE),
