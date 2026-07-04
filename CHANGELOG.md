@@ -111,6 +111,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **PRACTICE-002: below-level skills can't be practiced even when already known.**
+  ROM `do_practice` (`src/act_info.c:2744-2757`) rejects a skill whenever
+  `ch->level < skill_level[class]`, unconditionally — a group-granted spell stored
+  at 1% that a low-level character isn't high enough for still can't be practiced.
+  The port only applied the level gate at 0%, so a below-level mage could practice
+  a known-at-1% spell (spending a session, raising the percent). Made the level
+  gate unconditional. Test:
+  `tests/integration/test_do_practice_command.py::test_practice_below_class_level_known_skill_is_rejected`.
+
 - **LOOK-010: room-occupant aura tags — order + double-render.** ROM prints
   `(Pink Aura)` (faerie fire) before `(White Aura)` (sanctuary)
   (`src/act_info.c:266,272`); both Python aura sites had them reversed. The room

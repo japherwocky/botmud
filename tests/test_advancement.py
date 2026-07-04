@@ -374,6 +374,7 @@ def test_practice_requires_trainer_and_caps():
     room = Room(vnum=1, name="Practice Room")
     char = Character(
         name="Learner",
+        level=25,  # PRACTICE-002: at/above fireball's mage class level (22) so the practice is allowed
         practice=2,
         ch_class=0,
         is_npc=False,
@@ -410,6 +411,7 @@ def test_practice_applies_int_based_gain():
     room = Room(vnum=2, name="Practice Hall")
     char = Character(
         name="Scholar",
+        level=25,  # PRACTICE-002: at/above fireball's mage class level (22) so the practice is allowed
         practice=1,
         ch_class=0,
         is_npc=False,

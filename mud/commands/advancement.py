@@ -165,7 +165,12 @@ def do_practice(char: Character, args: str) -> str:
     if required_level is not None:
         if required_level >= LEVEL_IMMORTAL:
             return "You can't practice that."
-        if current <= 0 and char.level < required_level:
+        # PRACTICE-002: ROM src/act_info.c:2744-2757 gates on
+        # `ch->level < skill_table[sn].skill_level[class]` UNCONDITIONALLY (part of
+        # the "You can't practice that." OR) — a below-level character cannot
+        # practice a skill even when it is already known at >=1%. The old
+        # `current <= 0 and` qualifier let a known-but-too-high skill be practiced.
+        if char.level < required_level:
             return "You can't practice that."
 
     rating = _rating_for_class(skill, char.ch_class)

@@ -365,3 +365,23 @@ def test_practice_skill_case_insensitive(practice_char, practice_trainer, test_s
     do_practice(practice_char, "FIREBALL")
 
     assert practice_char.practice == 9
+
+
+def test_practice_below_class_level_known_skill_is_rejected(practice_char, test_skill, practice_trainer):
+    """PRACTICE-002 — ROM do_practice rejects a below-level skill even when already known.
+
+    ROM ``src/act_info.c:2744-2757`` gates on ``ch->level < skill_table[sn].skill_level[class]``
+    UNCONDITIONALLY (part of the "You can't practice that." OR), so a character below the
+    skill's class level cannot practice it regardless of the current percent. The port only
+    applied the level check when the skill was at 0%, so a known-at-1% below-level skill
+    (the normal state for group-granted spells) could be practiced.
+    """
+    practice_char.level = 4  # below fireball's mage class level (5)
+    practice_char.skills["fireball"] = 1  # known at 1%
+    practice_char.practice = 10
+
+    result = do_practice(practice_char, "fireball")
+
+    assert result == "You can't practice that."
+    assert practice_char.practice == 10  # no session consumed
+    assert practice_char.skills["fireball"] == 1  # unchanged
