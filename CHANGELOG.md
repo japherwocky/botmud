@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Coverage-lock: `xp_compute` neutral-branch alignment `c_div` truncation.** A
+  probe verified the XP/group award math is ROM-faithful;
+  `test_fight055…::test_fight055_neutral_align_change_truncates_toward_zero` pins
+  the one signed-math site test_fight055's ±500 branches didn't cover — the
+  neutral-alignment change `gch->alignment * base_exp / 500 * level / total_levels`
+  (`src/fight.c:1908`) truncates toward zero (`c_div`) for a negative killer, not
+  floor (`//`). Also filed SPLIT-001 (`do_split`'s non-ROM `N gold` keyword form)
+  for maintainer review.
+
 - **Dev environment: run tests in a project virtualenv (`.venv`).** Documented in
   AGENTS.md ("Build / Lint / Test" → Environment): the shared system framework
   Python is over-constrained across projects (`fastapi`/`gradio` need

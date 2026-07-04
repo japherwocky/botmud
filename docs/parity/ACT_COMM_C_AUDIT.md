@@ -105,8 +105,10 @@ act_comm.c implements all player-to-player communication, channel management, an
 | do_follow()    | 1536-1683 | group_commands.py:70 | ✅ | P0 | Follow character |
 | do_order()     | 1684-1769 | group_commands.py:343 | ⚠️ | P1 | Order charmed mobs (partial - no command execution) |
 | do_group()     | 1770-1862 | group_commands.py:126 | ✅ | P0 | Manage group |
-| do_split()     | 1863-1983 | group_commands.py:256 | ✅ | P1 | Split currency |
+| do_split()     | 1863-1983 | group_commands.py:256 | ⚠️ | P1 | Split currency — see SPLIT-001 (keyword-form divergence) |
 | do_gtell()     | 1984-2033 | group_commands.py:235 | ⚠️ | P1 | Group tell (partial - no broadcast) |
+
+**SPLIT-001 ⚠️ OPEN (filed 2026-07-04, deferred — intentional-feature call) — `do_split` accepts a non-ROM `<amount> gold`/`<amount> silver` keyword form.** ROM `do_split` (`src/act_comm.c:1873-1885`) parses two args with `atoi`: `amount_silver = atoi(arg1)`, `amount_gold = atoi(arg2)` — a non-numeric token yields 0, so `split 100 gold` splits **100 silver** (gold arg = `atoi("gold")` = 0). Python `do_split` (`mud/commands/group_commands.py:357-364`) adds a documented "legacy QuickMUD" branch: `gold` reinterprets the amount as gold-only, `silver`/`coin`/`coins` as silver-only. So `split 100 gold` moves **100 gold** in the port vs 100 silver in ROM — different currency, amount, success/fail branch, and messages. The XP/group/`do_split` numeric core all match ROM (verified 2026-07-04, incl. `xp_compute`'s signed-alignment `c_div`, now locked by `test_fight055…::test_fight055_neutral_align_change_truncates_toward_zero`). This is a **deliberate, tested** convenience (dedicated tests `test_fight_034…test_do_split_gold_per_member`, `test_act_comm_gaps` line 298), so per the "don't autonomously remove a documented feature" boundary it's filed for the maintainer to decide rather than stripped. Strict-parity fix = delete the keyword branch (`group_commands.py:357-364`) and re-point those tests to the numeric form + assert `split N gold` → N silver.
 
 ### Category 6: Miscellaneous (2 functions)
 

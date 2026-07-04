@@ -166,3 +166,26 @@ def test_fight055_xp_multiplier_uses_post_mutation_alignment():
     )
     # alignment mutation itself is also correctly computed
     assert gch.alignment == 426, f"Expected post-mutation alignment 426, got {gch.alignment}"
+
+
+def test_fight055_neutral_align_change_truncates_toward_zero():
+    """Coverage-lock — the neutral-branch alignment mutation uses c_div (truncate
+    toward 0), not // (floor).
+
+    ROM ``src/fight.c:1908``: ``change = gch->alignment * base_exp / 500 *
+    gch->level / total_levels;`` — for a NEGATIVE ``gch->alignment`` with a
+    product not divisible by 500, C's ``/`` truncates toward 0 while Python ``//``
+    floors, so the two differ by one and over-/under-shift the alignment.
+    Input: gch level 10 align -300, victim level 10 align 0, total_levels 10 →
+    level_range 0 → base_exp 83; align_delta 300 (neutral `else` branch).
+    change = c_div(c_div(-300*83, 500)*10, 10) = c_div(-49*10, 10) = -49
+    (floor `//` would give -50), so alignment = -300 - (-49) = -251 (ROM), not -250.
+    This locks the signed-math site test_fight055's ±500 branches don't cover.
+    """
+    room = _make_room()
+    gch = _make_pc(room, level=10, alignment=-300)
+    victim = _make_victim(room, level=10, alignment=0)
+
+    xp_compute(gch, victim, 10)
+
+    assert gch.alignment == -251, f"neutral-branch c_div truncation; floor // would give -250, got {gch.alignment}"
