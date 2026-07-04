@@ -102,6 +102,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **MOVE-008: container open/close message order (CLOSED before CLOSEABLE).** ROM
+  `do_open`/`do_close` (`src/act_move.c`) check `CONT_CLOSED` before
+  `CONT_CLOSEABLE`, so an already-open non-closeable container reports "It's
+  already open." (and already-closed → "It's already closed."). The port checked
+  `CLOSEABLE` first and wrongly returned "You can't do that." for those states.
+  Reordered both container arms. Test:
+  `tests/integration/test_door_container_message_order.py`.
+
 - **FIGHT-092: attacking reveals an invisible attacker.** ROM `damage()`
   (`src/fight.c:763-769`) strips the attacker's invis/mass-invis affects and
   `AFF_INVISIBLE` and broadcasts "$n fades into existence." on every connecting

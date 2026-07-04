@@ -301,8 +301,10 @@ The dispatcher entry points in `mud/commands/thief_skills.py` previously returne
 
 | Command | ROM C Lines | QuickMUD Lines | Parity Score | Status |
 |---------|-------------|----------------|--------------|--------|
-| `do_open()` | 345-453 (108) | 88-169 (81) | 100% (17/17) | ✅ COMPLETE |
-| `do_close()` | 457-552 (95) | 172-247 (75) | **100% (14/14)** | ✅ COMPLETE ⭐ **FIXED!** |
+| `do_open()` | 345-453 (108) | 88-169 (81) | 100% (17/17) | ✅ COMPLETE (see MOVE-008) |
+| `do_close()` | 457-552 (95) | 172-247 (75) | **100% (14/14)** | ✅ COMPLETE ⭐ **FIXED!** (see MOVE-008) |
+
+**MOVE-008 ✅ FIXED (2.14.257) — container open/close guard order was CLOSEABLE-before-CLOSED (a stale-✅; the prior "100%" missed it).** ROM `do_open`/`do_close` (`src/act_move.c`) evaluate the container guards in the order **CONT_CLOSED → CONT_CLOSEABLE → CONT_LOCKED** — an already-open container reports "It's already open." before the non-closeable "You can't do that." check. `mud/commands/doors.py:do_open` (container arm ~166) and `do_close` (~261) checked `CLOSEABLE` first, so a container that is both **open and non-closeable** (`value[1]==0` — a permanently-open bin/basket) returned "You can't do that." where ROM returns "It's already open." (and closed+non-closeable returned "You can't do that." vs ROM "It's already closed."). Bits match ROM (`CLOSEABLE=1<<0`, `CLOSED=1<<2`), so the case is reachable. **Fix:** reordered both container arms to CLOSED → CLOSEABLE → LOCKED. Portal/door arms already had the correct order. Surfaced 2026-07-04 by a movement/door-mechanics probe in the autonomous loop. Test: `tests/integration/test_door_container_message_order.py` (2). **Secondary (filed, not fixed) → MOVE-009:** `do_flee` re-implements movement inline instead of calling `move_character`, so it skips the `$n leaves`/`$n has arrived` act broadcasts, the follower cascade, and the arrival `do_look` that ROM's `move_char(ch, door, FALSE)` performs.
 | `do_lock()` | 571-702 (131) | 258-334 (76) | **100% (23/23)** | ✅ COMPLETE ⭐ **FIXED!** |
 | `do_unlock()` | 706-837 (131) | 337-413 (76) | **100% (21/21)** | ✅ COMPLETE ⭐ **FIXED!** |
 | `do_pick()` | 841-994 (153) | 416-509 (93) | **100% (29/29)** | ✅ COMPLETE ⭐ **FIXED!** |

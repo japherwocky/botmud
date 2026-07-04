@@ -163,10 +163,13 @@ def do_open(char: Character, args: str) -> str:
 
         # Container
         if item_type == ItemType.CONTAINER:
-            if not (values[1] & ContainerFlag.CLOSEABLE):
-                return "You can't do that."
+            # MOVE-008: ROM do_open (src/act_move.c) checks CONT_CLOSED before
+            # CONT_CLOSEABLE, so an already-open non-closeable container reports
+            # "It's already open.", not "You can't do that."
             if not (values[1] & ContainerFlag.CLOSED):
                 return "It's already open."
+            if not (values[1] & ContainerFlag.CLOSEABLE):
+                return "You can't do that."
             if values[1] & ContainerFlag.LOCKED:
                 return "It's locked."
 
@@ -258,10 +261,13 @@ def do_close(char: Character, args: str) -> str:
 
         # Container
         if item_type == ItemType.CONTAINER:
-            if not (values[1] & ContainerFlag.CLOSEABLE):
-                return "You can't do that."
+            # MOVE-008: ROM do_close (src/act_move.c) checks CONT_CLOSED before
+            # CONT_CLOSEABLE, so an already-closed non-closeable container reports
+            # "It's already closed.", not "You can't do that."
             if values[1] & ContainerFlag.CLOSED:
                 return "It's already closed."
+            if not (values[1] & ContainerFlag.CLOSEABLE):
+                return "You can't do that."
 
             obj.value[1] = values[1] | ContainerFlag.CLOSED
             obj_name = getattr(obj, "short_descr", None) or getattr(obj, "name", "it")
