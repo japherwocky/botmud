@@ -63,11 +63,13 @@ def test_stone_skin_applies_ac_buff():
 
 
 def test_stone_skin_rejects_if_already_affected():
+    # MAGIC-047: ROM spell_stone_skin gates on `is_affected(ch)` — the CASTER —
+    # so recasting fails once the caster is stone-skinned (self-cast here). A
+    # caster who is NOT self-affected can re-cast on a target (ROM re-applies).
     caster = make_character(level=20)
-    target = make_character()
 
-    stone_skin(caster, target)
-    result = stone_skin(caster, target)
+    stone_skin(caster, caster)
+    result = stone_skin(caster, caster)
 
     assert result is False
 

@@ -7828,7 +7828,10 @@ def stone_skin(caster: Character, target: Character | None = None) -> bool:  # n
     if caster is None or target is None:
         raise ValueError("stone_skin requires a target")
 
-    if target.has_spell_effect("stone skin"):
+    # MAGIC-047: ROM spell_stone_skin (src/magic.c:4447) gates on
+    # `is_affected(ch, sn)` — the CASTER — uniquely among the buff spells (siblings
+    # gate on the victim). The affect is still applied to the victim below.
+    if caster.has_spell_effect("stone skin"):
         if target is caster:
             _send_to_char(caster, "Your skin is already as hard as a rock.")
         else:

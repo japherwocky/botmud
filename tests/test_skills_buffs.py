@@ -337,11 +337,13 @@ def test_stone_skin_rejects_duplicates() -> None:
     room.add_character(target)
     target.messages.clear()
 
-    assert skill_handlers.stone_skin(caster, target) is True
-
+    # MAGIC-047: the caster is already stone-skinned (self-cast above), and ROM
+    # spell_stone_skin gates on `is_affected(ch)` — the CASTER — so a cast on ANY
+    # other target fires the guard and applies nothing to that target.
     caster.messages.clear()
     assert skill_handlers.stone_skin(caster, target) is False
     assert caster.messages[-1] == "Guardian is already as hard as can be."
+    assert not target.has_spell_effect("stone skin")
 
 
 def test_giant_strength_applies_strength_bonus() -> None:
@@ -740,3 +742,26 @@ def test_mass_invis_fades_group() -> None:
     assert "You slowly fade out of existence." in ally.messages
     assert caster.messages[-1] == "Ok."
     assert any("slowly fades out of existence." in msg for msg in outsider.messages)
+
+
+def test_stone_skin_guard_checks_caster_not_victim():
+    """MAGIC-047 — ROM spell_stone_skin gates on is_affected(CASTER), not victim.
+
+    Unique among the buff spells (armor/shield/giant_strength/... all gate on
+    ``victim``), ROM ``spell_stone_skin`` (src/magic.c:4447) checks
+    ``is_affected(ch, sn)`` — the CASTER — then still applies the affect to the
+    victim. The port checked the target, so an already-stone-skinned caster casting
+    on a DIFFERENT un-skinned victim wrongly buffed the victim instead of refusing.
+    """
+    caster = Character(name="Mage", level=30)
+    caster.messages = []
+    caster.apply_spell_effect(SpellEffect(name="stone skin", duration=30, level=30, ac_mod=-40))
+
+    victim = Character(name="Ally", level=20)
+    victim.messages = []
+
+    result = skill_handlers.stone_skin(caster, victim)
+
+    assert result is False, "ROM: the caster's own stone-skin affect fires the guard"
+    assert not victim.has_spell_effect("stone skin"), "ROM applies nothing to the victim when the guard fires"
+    assert any("already as hard as can be" in str(m).lower() for m in caster.messages)

@@ -102,6 +102,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **MAGIC-047: `stone skin` already-affected guard checks the caster, not the
+  target.** ROM `spell_stone_skin` (`src/magic.c:4447`) is unique among buffs —
+  its guard tests `is_affected(ch)` (the caster) while still applying the affect
+  to the victim; the port checked the target. So a stone-skinned caster casting on
+  a different un-skinned victim wrongly buffed the victim (and the mirror case
+  wrongly refused). Now gates on the caster, matching ROM. Test:
+  `tests/test_skills_buffs.py::test_stone_skin_guard_checks_caster_not_victim`.
+
 - **MOVE-008: container open/close message order (CLOSED before CLOSEABLE).** ROM
   `do_open`/`do_close` (`src/act_move.c`) check `CONT_CLOSED` before
   `CONT_CLOSEABLE`, so an already-open non-closeable container reports "It's

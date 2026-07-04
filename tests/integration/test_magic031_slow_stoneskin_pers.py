@@ -45,7 +45,10 @@ def test_magic031_stone_skin_already_stoned_npc_uses_pers_cap():
     room = Room(vnum=99203, name="Arena")
     caster = _caster(room)
     goblin = _goblin(room)
-    goblin.apply_spell_effect(SpellEffect(name="stone skin", duration=10, level=30))
+    # MAGIC-047: ROM spell_stone_skin gates on `is_affected(ch)` — the CASTER —
+    # so the "$N is already as hard as can be." line (with PERS-capped $N = the
+    # goblin) fires when the CASTER is already stone-skinned and casts on the goblin.
+    caster.apply_spell_effect(SpellEffect(name="stone skin", duration=10, level=30))
 
     assert stone_skin(caster, target=goblin) is False
     assert any("A green goblin is already as hard as can be." in m for m in caster.messages), caster.messages

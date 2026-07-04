@@ -240,19 +240,20 @@ def test_stone_skin_duration_formula():
 
 
 def test_stone_skin_duplicate_gating():
-    """ROM stone_skin fails when target already has stone skin (magic.c:4447-4455)."""
+    """ROM stone_skin gates on `is_affected(ch)` — the CASTER (magic.c:4447).
+
+    Unlike sibling buffs (which gate on the victim), a stone-skinned caster cannot
+    recast it — on self or anyone. MAGIC-047: the port used to gate on the target.
+    """
     rng_mm.seed_mm(200)
 
     caster = make_character(name="Cleric", level=25)
-    target = make_character(name="Target", level=15)
 
-    # First cast should succeed
-    result1 = stone_skin(caster, target)
-    assert result1 is True
+    # First self-cast succeeds.
+    assert stone_skin(caster, caster) is True
 
-    # Second cast should fail (duplicate)
-    result2 = stone_skin(caster, target)
-    assert result2 is False, "Stone skin should fail when already affected"
+    # Second cast fails — the CASTER is now stone-skinned, so the guard fires.
+    assert stone_skin(caster, caster) is False, "Stone skin should fail once the caster is affected"
 
 
 # ============================================================================
