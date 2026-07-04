@@ -245,8 +245,14 @@ Four guardrails — learned the hard way, durable on purpose:
 ## Build / Lint / Test
 
 ```bash
+# NOTE: run these from the project virtualenv — `.venv/bin/python -m pytest`,
+# `.venv/bin/ruff`, etc. (or `source .venv/bin/activate` first). The bare
+# commands below assume an activated .venv. See "Environment" below for why the
+# system Python is unsafe here.
+
 # All tests — runs in parallel by default (-n auto --dist loadscope via
-# pyproject addopts); ~94s on a 10-core machine (~517s serial).
+# pyproject addopts); ~94s on a 10-core machine (~517s serial). A per-test
+# --timeout=120 hang-guard is also applied (see "Hang-guard" below).
 pytest
 
 # Single-test debugging — disable parallelism for readable output / pdb:
@@ -275,6 +281,63 @@ pytest tests/test_differential_smoke.py tests/test_diff_harness_unit.py
 Three test layers — unit (`tests/test_*.py`), integration
 (`tests/integration/`), and command-registry (`test_all_commands.py`). Run all
 three when adding commands.
+
+### Environment: ALWAYS run in the project virtualenv (`.venv`)
+
+**Run every `pytest` / `ruff` / `mypy` invocation from `.venv`, not the system /
+framework Python.** This machine's global framework Python is shared across
+multiple projects whose dependency pins are **mutually incompatible** — a real
+example that bit us (2026-07-04): `fastapi 0.116.1` and `gradio` require
+`starlette < 1.0`, while `sse-starlette` requires `starlette >= 0.49.1`. **No
+single global `starlette` version satisfies all of them.** When the global env
+drifted to `starlette 1.3.1`, `FastAPI(lifespan=…)` began passing `on_startup=`
+to a `Router.__init__()` that no longer accepts it, and **4 web/session test
+files died at collection** (`TypeError: Router.__init__() got an unexpected
+keyword argument 'on_startup'` — `test_websocket_server.py`,
+`test_prompt_cmd_parity.py`, `test_inv009_registry_disconnect_cleanup.py`,
+`test_nanny_saveload_runtime_path.py`), silently dropping ~18 tests. The project's
+own pins (`requirements*.txt`, `pyproject`) are correct and internally consistent
+(`fastapi 0.116.1` + `starlette 0.47.3`); only the *shared global env* was wrong.
+
+**Durable fix — one-time setup:**
+
+```bash
+python3 -m venv .venv                     # .venv/ is gitignored
+.venv/bin/python -m pip install -U pip
+.venv/bin/python -m pip install -e ".[dev]"   # authoritative dev set from pyproject [dev]
+```
+
+Then use it for every run:
+
+```bash
+.venv/bin/python -m pytest                # NOT `pytest` / `python3 -m pytest`
+.venv/bin/python -m pytest -n0 tests/test_foo.py::test_bar
+.venv/bin/ruff check .
+```
+
+(Or `source .venv/bin/activate` once per shell, then the bare commands work.)
+
+**Gotcha:** the pip-compiled lock `requirements-dev.txt` is **missing** the
+test-only plugins (`pytest-xdist`, `pytest-timeout`, `hypothesis`) that
+`pyproject`'s `[project.optional-dependencies].dev` declares — so
+`pip install -r requirements-dev.txt` alone yields a venv that can't parse the
+default `addopts` (`-n auto`, `--timeout`). **Install with `-e ".[dev]"`**, which
+is the complete, authoritative dev set. (Regenerating the lock from a
+`requirements-dev.in` that includes those plugins would fix the inconsistency —
+not yet done.)
+
+### Hang-guard: `--timeout` in the default addopts
+
+`pyproject`'s `addopts` includes `--timeout=120 --timeout-method=thread`
+(pytest-timeout). No legitimate test runs near 120s (full suite ~171s), so it
+only fires on a genuine **per-test** hang — turning an indefinite stall into a
+failure-with-stack-dump. It does **not** fix the separate, intermittent xdist
+**sessionfinish** teardown flake (a worker IPC "cannot send" / hang at the very
+end of a full parallel run); that is environmental and harmless — all tests have
+already run and reported by then. If a full-suite summary line fails to flush,
+it's that teardown flake, not a test failure: re-run, or trust the `0 failed`
+from the progress stream. Disable the guard with `--timeout=0`; override per test
+with `@pytest.mark.timeout(n)`.
 
 ### Differential testing harness (`tools/diff_harness/`)
 

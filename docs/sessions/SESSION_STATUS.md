@@ -29,8 +29,8 @@
 
 | Metric | Value |
 |--------|-------|
-| Version | 2.14.247 |
-| Tests | Full suite green — 6092 passed, 4 skipped, 0 failed (40 pre-existing starlette/aiohttp collection errors in 4 network files only) |
+| Version | 2.14.248 |
+| Tests | Full suite green — **6110 passed, 4 skipped, 0 failed** (the 40 prior starlette-collection errors resolved via the project `.venv`). Run tests from `.venv` — see AGENTS.md "Environment". |
 | Cross-file invariants | INV-054 latest (unchanged) |
 | update.c cold paths | regen / gain_condition / weather / obj_update / char_update / update_pos / aggr_update / mobile_update all probed this session |
 | Active focus | Cross-file invariants / cold-path divergence hunting |
@@ -48,9 +48,15 @@ Opportunistic (non-urgent) carryover: the **PC** side of `do_trip` still uses
 migrate when that surface is next touched.
 
 **Tooling note:** GitNexus MCP was up this session; the on-disk index was reindexed
-after each commit and again after the final one (background). An intermittent xdist
-teardown hang (master sleeps after all workers exit) recurs on full-suite runs —
-environmental, not a test failure; capture the summary line with a timeout wrapper.
+after each commit. **Environment:** run tests from the project `.venv`
+(`.venv/bin/python -m pytest`), not the system Python — the shared framework Python
+is over-constrained across projects (fastapi/gradio vs sse-starlette on starlette)
+and silently broke 4 web/session test files at collection. One-time setup + full
+rationale in AGENTS.md "Build / Lint / Test → Environment". A per-test
+`--timeout=120` hang-guard is now in the default addopts. The intermittent xdist
+**sessionfinish** teardown flake still recurs (harmless — a worker IPC hang/error
+*after* all tests report); if the summary line doesn't flush, re-run or trust the
+`0 failed` from the progress stream.
 
 **Push status:** the five commits (`ac71e82f` → `5a095690`) are **local on
 `master`, not pushed to remote or released to PyPI** — awaiting confirmation for the

@@ -7,7 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Test suite: per-test hang-guard via `--timeout=120 --timeout-method=thread`
+  in `pyproject` addopts** (pytest-timeout, already a declared dep). A single
+  hung test now fails with a stack dump after 120s instead of stalling the run
+  indefinitely. Does not affect the intermittent xdist *sessionfinish* teardown
+  flake (environmental, harmless — all tests have reported by then). Disable with
+  `--timeout=0`; override per test with `@pytest.mark.timeout(n)`.
+
 ### Added
+
+- **Dev environment: run tests in a project virtualenv (`.venv`).** Documented in
+  AGENTS.md ("Build / Lint / Test" → Environment): the shared system framework
+  Python is over-constrained across projects (`fastapi`/`gradio` need
+  `starlette < 1.0`, `sse-starlette` needs `>= 0.49.1` — no single global version
+  works), which silently broke 4 web/session test files at collection when the
+  global `starlette` drifted to 1.3.1. Setup: `python3 -m venv .venv &&
+  .venv/bin/python -m pip install -e ".[dev]"` (the `[dev]` extra is authoritative;
+  the `requirements-dev.txt` lock is missing the test plugins). The project's own
+  pins were always correct — only the global env was wrong.
 
 - **Coverage-lock: `aggr_update` victim reservoir selection.** New
   `TestAggressiveUpdateVictimReservoir` in

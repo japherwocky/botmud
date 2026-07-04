@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rom24-quickmud-python"
-version = "2.14.247"
+version = "2.14.248"
 description = "A modern Python port of the ROM 2.4b6 MUD engine with full telnet server and JSON world loading"
 readme = "README.md"
 license = "MIT"
@@ -85,7 +85,18 @@ include = ["mud*"]
 # `--dist loadscope` keeps each module/class on one worker so module-scoped
 # fixtures and per-file global state behave as in serial runs. Disable for
 # single-test debugging with `-n0` (e.g. `pytest -n0 tests/foo.py::bar`).
-addopts = "-n auto --dist loadscope"
+#
+# `--timeout=120 --timeout-method=thread`: a per-test hang-guard. No legitimate
+# test runs anywhere near 120s (the whole suite is ~171s), so this only fires on
+# a genuine hang in a single test — surfacing it as a failure with a stack dump
+# instead of stalling the run forever. The `thread` method works under xdist
+# workers (the default `signal` method is unreliable off the main thread).
+# NOTE: this guards *per-test* hangs; it does NOT fix the separate, intermittent
+# xdist *sessionfinish* teardown flake (a worker IPC "cannot send"/hang at the
+# very end of a full run) — that is environmental and harmless (all tests have
+# already run and reported). Override per-test with `@pytest.mark.timeout(n)`;
+# disable entirely with `--timeout=0`.
+addopts = "-n auto --dist loadscope --timeout=120 --timeout-method=thread"
 markers = [
   "integration: Integration tests spanning multiple gameplay systems",
   "p0: Highest-priority parity and regression tests",
