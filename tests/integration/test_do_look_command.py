@@ -302,3 +302,28 @@ def test_room_occupant_line_fighting_left_room_shows_someone_who_left():
     line = _room_occupant_line(observer, victim)
 
     assert line == "Goblin is here, fighting someone who left??"
+
+
+def test_room_occupant_line_aura_order_pink_before_white():
+    """LOOK-010 — ROM show_char_to_char_0 prints (Pink Aura) before (White Aura).
+
+    ROM ``src/act_info.c:266,272`` appends FAERIE_FIRE's ``(Pink Aura)`` before
+    SANCTUARY's ``(White Aura)`` (the strcat order is the print order). The port
+    emitted ``(White Aura)`` first, so a room occupant with both auras displayed
+    them in the wrong order.
+    """
+    room = _basic_room()
+    observer = _basic_char()
+    observer.room = room
+
+    victim = _basic_char()
+    victim.name = "Guard"
+    victim.room = room
+    victim.position = int(Position.STANDING)
+    victim.add_affect(AffectFlag.SANCTUARY)
+    victim.add_affect(AffectFlag.FAERIE_FIRE)
+
+    line = _room_occupant_line(observer, victim)
+
+    assert line.startswith("(Pink Aura) (White Aura) "), f"aura order: {line!r}"
+    assert line.index("(Pink Aura)") < line.index("(White Aura)")

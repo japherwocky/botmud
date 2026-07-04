@@ -505,6 +505,24 @@ act_info.c is **100% complete** when:
      + `tests/test_diff_harness_generated.py::test_generated_look_at_self_no_descr_matches_live_c`
      (converges vs live C oracle). Tracked as FINDING-036.
 
+   - **LOOK-010** ✅ FIXED (2.14.262): affect-aura tag order (and a double-render).
+     ROM `show_char_to_char_0` (`src/act_info.c:266,272`) prints the FAERIE_FIRE
+     tag `(Pink Aura)` **before** the SANCTUARY tag `(White Aura)` (the `strcat`
+     order is the print order). Both Python aura sites — `mud/world/vision.py:describe_character`
+     and `mud/world/look.py:_room_occupant_line` — appended `(White Aura)` first, so
+     a room occupant (or `look`-at-char target) with both auras showed them reversed.
+     **Also fixed a double-render:** `_room_occupant_line`'s PERS branch prepended its
+     own aura prefix AND then used `describe_character()` (which prepends them too),
+     so an aura'd occupant in the room list rendered `(White)(Pink)(White)(Pink) Name`.
+     Fix: both sites now emit Pink→White; `_room_occupant_line` keeps its own prefix
+     ONLY for the NPC `long_descr` branch (which does not call `describe_character`)
+     and relies on `describe_character` for the PERS branch. Surfaced 2026-07-04 by a
+     look/exits-formatting probe in the autonomous loop. Test:
+     `tests/integration/test_do_look_command.py::test_room_occupant_line_aura_order_pink_before_white`.
+     **Note:** Python still implements only 2 of ROM's ~12 char tags ([AFK]/(Invis)/
+     (Wizi)/(Hide)/(Charmed)/(Translucent)/(Red Aura)/(Golden Aura)/(KILLER)/(THIEF)) —
+     a missing-feature backlog, not this gap.
+
 **IMPORTANT Gaps** (P1 - SHOULD FIX):
 
 3. ✅ **FIXED** - **Prototype Extra Descriptions** (ROM C lines 1195-1205, 1229-1235):

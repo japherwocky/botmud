@@ -356,10 +356,12 @@ def describe_character(observer: Character, target: Character | None) -> str:
 
     prefixes = []
     if hasattr(target, "has_affect"):
-        if target.has_affect(AffectFlag.SANCTUARY):
-            prefixes.append("(White Aura)")
+        # LOOK-010: ROM show_char_to_char_0 (src/act_info.c:266,272) prints
+        # (Pink Aura) [FAERIE_FIRE] before (White Aura) [SANCTUARY].
         if target.has_affect(AffectFlag.FAERIE_FIRE):
             prefixes.append("(Pink Aura)")
+        if target.has_affect(AffectFlag.SANCTUARY):
+            prefixes.append("(White Aura)")
 
     if prefixes:
         return " ".join(prefixes) + " " + base_name

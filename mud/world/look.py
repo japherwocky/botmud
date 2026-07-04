@@ -29,12 +29,17 @@ def _room_occupant_line(observer: Character, victim) -> str:
     prefixed), e.g. "Hassan is here, waiting to dispense some justice."
     Otherwise show PERS(victim) + a position suffix ("is resting here.", etc.).
     """
+    # LOOK-010: aura tags. ROM show_char_to_char_0 (src/act_info.c:266,272) prints
+    # (Pink Aura) [FAERIE_FIRE] before (White Aura) [SANCTUARY]. This `prefix` is
+    # used ONLY by the NPC long_descr branch below; the PERS branch gets its auras
+    # from describe_character() (which also prepends them) — prepending here too
+    # double-rendered them.
     prefixes = []
     if hasattr(victim, "has_affect"):
-        if victim.has_affect(AffectFlag.SANCTUARY):
-            prefixes.append("(White Aura)")
         if victim.has_affect(AffectFlag.FAERIE_FIRE):
             prefixes.append("(Pink Aura)")
+        if victim.has_affect(AffectFlag.SANCTUARY):
+            prefixes.append("(White Aura)")
     prefix = (" ".join(prefixes) + " ") if prefixes else ""
 
     long_descr = getattr(victim, "long_descr", None)
@@ -57,10 +62,11 @@ def _room_occupant_line(observer: Character, victim) -> str:
             fight_str = describe_character(observer, fighting) + "."
         else:
             fight_str = "someone who left??"
-        line = prefix + pers + " is here, fighting " + fight_str
+        # pers (describe_character) already carries the aura prefix — do not re-add.
+        line = pers + " is here, fighting " + fight_str
     else:
         suffix = _POSITION_SUFFIX.get(position, "") if position is not None else ""
-        line = prefix + pers + suffix
+        line = pers + suffix
     # mirroring ROM src/act_info.c:421 buf[0] = UPPER(buf[0])
     return line[0].upper() + line[1:] if line else line
 

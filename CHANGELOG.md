@@ -102,6 +102,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **LOOK-010: room-occupant aura tags — order + double-render.** ROM prints
+  `(Pink Aura)` (faerie fire) before `(White Aura)` (sanctuary)
+  (`src/act_info.c:266,272`); both Python aura sites had them reversed. The room
+  list also double-rendered them (`_room_occupant_line` prepended auras and then
+  used `describe_character`, which prepends them too), so an aura'd occupant showed
+  `(White)(Pink)(White)(Pink) Name`. Fixed the order in both sites and removed the
+  duplicate prepend. Test:
+  `tests/integration/test_do_look_command.py::test_room_occupant_line_aura_order_pink_before_white`.
+
 - **MAGIC-049: `dispel magic` was missing ROM's opening save.** ROM
   `spell_dispel_magic` (`src/magic.c:2082`) opens with `saves_spell(level, victim,
   DAM_OTHER)`; on success it aborts ("You feel a brief tingling sensation." /
