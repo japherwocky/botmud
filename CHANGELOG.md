@@ -102,6 +102,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SELL-005: keeper standardizes a sold item's cost even when the existing
+  duplicate is free.** ROM `obj_to_keeper` (`src/act_obj.c:2424`) does
+  `obj->cost = t_obj->cost` unconditionally when stacking onto a same-proto
+  duplicate; the port skipped it for a `cost==0` duplicate. Removed the guard.
+  Test: `tests/test_shops.py::test_obj_to_keeper_standardizes_cost_even_when_existing_is_zero`.
+
 - **BUY-011: `buy N*item` counts only consecutive stock.** The multi-buy stock
   check scanned the keeper's whole inventory and counted non-adjacent duplicates,
   but ROM `do_buy` (`src/act_obj.c:2667-2686`) counts only a consecutive run and

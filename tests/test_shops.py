@@ -2205,3 +2205,30 @@ def test_buy_multi_stock_requires_consecutive_run():
         assert not any((o.short_descr or "").lower().startswith("a hooded brass lantern") for o in char.inventory)
     finally:
         time_info.hour = previous_hour
+
+
+def test_obj_to_keeper_standardizes_cost_even_when_existing_is_zero():
+    """SELL-005 — ROM obj_to_keeper (src/act_obj.c:2424) does `obj->cost = t_obj->cost`
+    UNCONDITIONALLY when a non-ITEM_INVENTORY same-proto duplicate is found in the
+    keeper's stock ("keep it standard"). The pre-fix port guarded with
+    `if existing_cost:`, so a cost-0 existing duplicate left the sold item's own
+    cost intact instead of standardizing it to 0.
+    """
+    from mud.commands.shop import _obj_to_keeper
+
+    initialize_world("area/area.lst")
+    existing = spawn_object(3021)  # a small sword (finite stock, not ITEM_INVENTORY)
+    sold = spawn_object(3021)
+    assert existing is not None and sold is not None
+    existing.cost = 0
+    sold.cost = 250
+
+    keeper = Character(name="Keeper", is_npc=True)
+    keeper.inventory = [existing]
+
+    result = _obj_to_keeper(sold, keeper)
+
+    assert result is False, "a non-inventory duplicate must not destroy the sold object"
+    assert sold.cost == 0, (
+        "sold item cost must be standardized to the existing duplicate's cost (ROM keeps it standard)"
+    )

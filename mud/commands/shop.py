@@ -99,10 +99,11 @@ def _obj_to_keeper(obj: object, keeper) -> bool:
             if hasattr(obj, "location"):
                 obj.location = None
             return True
-        # Non-inventory duplicate: cost sync (keep it standard)
-        existing_cost = int(getattr(existing, "cost", 0) or 0)
-        if existing_cost:
-            obj.cost = existing_cost
+        # Non-inventory duplicate: standardize the sold object's cost to the
+        # existing one. SELL-005: ROM obj_to_keeper (src/act_obj.c:2424) does
+        # `obj->cost = t_obj->cost` UNCONDITIONALLY ("keep it standard") — even a
+        # cost-0 existing duplicate zeroes the sold object's cost.
+        obj.cost = int(getattr(existing, "cost", 0) or 0)
         break
     return False
 
