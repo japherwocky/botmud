@@ -207,7 +207,10 @@ def hit_gain(character: Character) -> int:
             if character.pcdata.condition[Condition.THIRST] == 0:
                 gain //= 2
 
-    gain = gain * getattr(room, "heal_rate", 100) // 100
+    # GL-047: from the room-rate multiply onward `gain` can go negative in a
+    # drain room (heal_rate < 0, ROM src/update.c:215), so every division must
+    # truncate toward zero like C (`c_div`), not floor (`//`).
+    gain = c_div(gain * getattr(room, "heal_rate", 100), 100)
 
     furniture = getattr(character, "on", None)
     if furniture is not None:
@@ -215,17 +218,21 @@ def hit_gain(character: Character) -> int:
         if item_type == ItemType.FURNITURE or item_type == int(ItemType.FURNITURE):
             values = getattr(furniture, "value", [100, 100, 100, 100, 100])
             if len(values) > 3:
-                gain = gain * int(values[3]) // 100
+                gain = c_div(gain * int(values[3]), 100)
 
     if character.has_affect(AffectFlag.POISON):
-        gain //= 4
+        gain = c_div(gain, 4)
     if character.has_affect(AffectFlag.PLAGUE):
-        gain //= 8
+        gain = c_div(gain, 8)
     if character.has_affect(AffectFlag.HASTE) or character.has_affect(AffectFlag.SLOW):
-        gain //= 2
+        gain = c_div(gain, 2)
 
-    deficit = max(0, int(getattr(character, "max_hit", 0)) - int(getattr(character, "hit", 0)))
-    return max(0, min(gain, deficit))
+    # ROM src/update.c:229 `return UMIN(gain, ch->max_hit - ch->hit);` — a plain
+    # min that returns a NEGATIVE drain when gain < 0. The caller gates on
+    # `hit < max_hit` (:698), so the deficit is the raw signed difference; no
+    # max(0, …) clamp (which would swallow the drain).
+    deficit = int(getattr(character, "max_hit", 0)) - int(getattr(character, "hit", 0))
+    return min(gain, deficit)
 
 
 def mana_gain(character: Character) -> int:
@@ -276,8 +283,9 @@ def mana_gain(character: Character) -> int:
             if character.pcdata.condition[Condition.THIRST] == 0:
                 gain //= 2
 
-    # ROM src/update.c:297 — mana uses mana_rate, not heal_rate
-    gain = gain * getattr(room, "mana_rate", 100) // 100
+    # ROM src/update.c:297 — mana uses mana_rate, not heal_rate.
+    # GL-047: c_div (truncate toward 0) once gain can go negative in a drain room.
+    gain = c_div(gain * getattr(room, "mana_rate", 100), 100)
 
     furniture = getattr(character, "on", None)
     if furniture is not None:
@@ -286,17 +294,19 @@ def mana_gain(character: Character) -> int:
             values = getattr(furniture, "value", [100, 100, 100, 100, 100])
             # ROM src/update.c:300 — mana furniture bonus uses value[4], not value[3]
             if len(values) > 4:
-                gain = gain * int(values[4]) // 100
+                gain = c_div(gain * int(values[4]), 100)
 
     if character.has_affect(AffectFlag.POISON):
-        gain //= 4
+        gain = c_div(gain, 4)
     if character.has_affect(AffectFlag.PLAGUE):
-        gain //= 8
+        gain = c_div(gain, 8)
     if character.has_affect(AffectFlag.HASTE) or character.has_affect(AffectFlag.SLOW):
-        gain //= 2
+        gain = c_div(gain, 2)
 
-    deficit = max(0, int(getattr(character, "max_mana", 0)) - int(getattr(character, "mana", 0)))
-    return max(0, min(gain, deficit))
+    # ROM src/update.c:315 UMIN — plain min, can return negative (drain); caller
+    # gates on `mana < max_mana` (:703). No max(0, …) clamp.
+    deficit = int(getattr(character, "max_mana", 0)) - int(getattr(character, "mana", 0))
+    return min(gain, deficit)
 
 
 def move_gain(character: Character) -> int:
@@ -322,7 +332,9 @@ def move_gain(character: Character) -> int:
             if character.pcdata.condition[Condition.THIRST] == 0:
                 gain //= 2
 
-    gain = gain * getattr(room, "heal_rate", 100) // 100
+    # GL-047: c_div (truncate toward 0) once gain can go negative in a drain room
+    # (ROM src/update.c:365 move uses heal_rate).
+    gain = c_div(gain * getattr(room, "heal_rate", 100), 100)
 
     furniture = getattr(character, "on", None)
     if furniture is not None:
@@ -330,17 +342,19 @@ def move_gain(character: Character) -> int:
         if item_type == ItemType.FURNITURE or item_type == int(ItemType.FURNITURE):
             values = getattr(furniture, "value", [100, 100, 100, 100, 100])
             if len(values) > 3:
-                gain = gain * int(values[3]) // 100
+                gain = c_div(gain * int(values[3]), 100)
 
     if character.has_affect(AffectFlag.POISON):
-        gain //= 4
+        gain = c_div(gain, 4)
     if character.has_affect(AffectFlag.PLAGUE):
-        gain //= 8
+        gain = c_div(gain, 8)
     if character.has_affect(AffectFlag.HASTE) or character.has_affect(AffectFlag.SLOW):
-        gain //= 2
+        gain = c_div(gain, 2)
 
-    deficit = max(0, int(getattr(character, "max_move", 0)) - int(getattr(character, "move", 0)))
-    return max(0, min(gain, deficit))
+    # ROM src/update.c:366 UMIN — plain min, can return negative (drain); caller
+    # gates on `move < max_move` (:708). No max(0, …) clamp.
+    deficit = int(getattr(character, "max_move", 0)) - int(getattr(character, "move", 0))
+    return min(gain, deficit)
 
 
 # DUPL-001c — canonical at mud/utils/messaging.py:send_to_char_buffered.

@@ -58,6 +58,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **GL-047: regen drains in a negative-rate room + signed rate math (`char_update`).**
+  `hit_gain`/`mana_gain`/`move_gain` returned `max(0, min(gain, deficit))`, so a
+  room with a negative `heal_rate`/`mana_rate` (a "drain room", fully
+  representable via OLC or the signed area loader) never actually drained HP/mana/
+  move — ROM returns `UMIN(gain, max-cur)`, a plain min that goes negative and the
+  caller subtracts it (`src/update.c:229,698`). The clamp is removed. Separately,
+  once the room-rate multiply makes `gain` negative, the rate `/100`, furniture
+  `/100`, and poison `/4` / plague `/8` / haste `/2` divisions must truncate
+  toward zero like C; the port used floor `//` (off-by-one on a negative
+  dividend) — switched to `c_div`. Test:
+  `tests/integration/test_gl047_regen_drain_room.py`.
+
 - **GL-046: plague-spread RNG draw order/count parity (`char_update`).** The
   per-tick plague infection loop desynced the shared Mitchell-Moore RNG stream
   from ROM `src/update.c:824,829-841` three ways: it drew the spread affect's
