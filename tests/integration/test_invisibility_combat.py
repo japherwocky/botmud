@@ -404,3 +404,49 @@ class TestPositionChangeBroadcastPers:
         finally:
             room_registry.pop(1004, None)
             character_registry.clear()
+
+
+def test_invisible_attacker_revealed_on_connecting_hit():
+    """FIGHT-092 — a connecting hit strips the attacker's invisibility.
+
+    ROM ``damage()`` (src/fight.c:763-769) — "Inviso attacks ... not." — strips
+    ``gsn_invis``/``gsn_mass_invis`` and ``AFF_INVISIBLE`` from the attacker and
+    broadcasts ``"$n fades into existence."`` to the room on every attack that
+    reaches ``damage()``. The port's ``apply_damage`` had no equivalent, so an
+    invisible attacker stayed hidden through an entire fight.
+    """
+    from mud.combat.engine import apply_damage
+    from mud.models.constants import DamageType
+
+    test_room = Room(vnum=1000, name="Test Room", description="", room_flags=0, sector_type=0)
+    test_room.people = []
+    test_room.contents = []
+    room_registry[1000] = test_room
+    try:
+        attacker = create_test_character("Sneak", 1000)
+        attacker.level = 10
+        attacker.add_affect(AffectFlag.INVISIBLE)
+
+        victim = Character(name="Orc", level=10, room=test_room)
+        victim.is_npc = True
+        victim.short_descr = "an orc"
+        victim.hit = 100
+        victim.max_hit = 100
+        test_room.people.append(victim)
+        character_registry.append(victim)
+
+        observer = create_test_character("Watcher", 1000)
+        observer.messages = []
+
+        assert attacker.has_affect(AffectFlag.INVISIBLE)
+        apply_damage(attacker, victim, 10, dam_type=int(DamageType.BASH), dt=None, show=False)
+
+        assert not attacker.has_affect(AffectFlag.INVISIBLE), (
+            "ROM fight.c:767 removes AFF_INVISIBLE on a connecting hit"
+        )
+        assert any("fades into existence" in str(m).lower() for m in observer.messages), (
+            f"room should see the reveal, got: {observer.messages}"
+        )
+    finally:
+        room_registry.pop(1000, None)
+        character_registry.clear()

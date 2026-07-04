@@ -102,6 +102,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **FIGHT-092: attacking reveals an invisible attacker.** ROM `damage()`
+  (`src/fight.c:763-769`) strips the attacker's invis/mass-invis affects and
+  `AFF_INVISIBLE` and broadcasts "$n fades into existence." on every connecting
+  hit; the port's `apply_damage` did nothing, so an invisible caster/thief stayed
+  hidden through a whole fight. Added the strip + room broadcast after the
+  parry/dodge/shield-block checks. Test:
+  `tests/integration/test_invisibility_combat.py::test_invisible_attacker_revealed_on_connecting_hit`.
+
 - **SELL-005: keeper standardizes a sold item's cost even when the existing
   duplicate is free.** ROM `obj_to_keeper` (`src/act_obj.c:2424`) does
   `obj->cost = t_obj->cost` unconditionally when stacking onto a same-proto

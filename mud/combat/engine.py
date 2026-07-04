@@ -740,6 +740,19 @@ def apply_damage(
         if check_shield_block(attacker, victim):
             return capitalize_act_line(f"{pers(victim, attacker)} blocks your attack with a shield.")
 
+    # FIGHT-092 — "Inviso attacks ... not." ROM src/fight.c:763-769: a connecting
+    # hit reveals an invisible attacker. Strip the invis/mass_invis spell affects
+    # and the AFF_INVISIBLE bit, then broadcast "$n fades into existence." to the
+    # room. Placed past the parry/dodge/shield-block early-returns (mirroring ROM,
+    # where parry/dodge resolve in one_hit before damage() is entered) and before
+    # the RIV/immune modifiers, so it fires even on a 0-damage (immune) hit.
+    if attacker.has_affect(AffectFlag.INVISIBLE):
+        if hasattr(attacker, "remove_spell_effect"):
+            attacker.remove_spell_effect("invis")
+            attacker.remove_spell_effect("mass invis")
+        attacker.affected_by = int(getattr(attacker, "affected_by", 0) or 0) & ~int(AffectFlag.INVISIBLE)
+        _broadcast_pos_change(attacker, "{name} fades into existence.")
+
     # Apply damage type resistance/vulnerability modifiers (ROM fight.c:804-816)
     # This must happen AFTER defense checks but BEFORE damage application
     if dam_type is not None:

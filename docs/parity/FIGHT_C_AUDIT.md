@@ -331,6 +331,28 @@ affects every swing) and FIGHT-082 (HIGH).
   NPC-formula class (4th after backstab/hand-to-hand/disarm-skill); the daze/drunk
   modifiers remain deferred to the unified get_skill port.
 
+- **`FIGHT-092` — ✅ FIXED (2.14.256) — an invisible attacker was never revealed
+  by attacking.** ROM `damage()` (`src/fight.c:763-769`, "Inviso attacks ... not.")
+  strips `gsn_invis`/`gsn_mass_invis` and `AFF_INVISIBLE` from the **attacker** and
+  broadcasts `act("$n fades into existence.", ch, NULL, NULL, TO_ROOM)` on every
+  attack that reaches `damage()` — so an invisible caster/thief becomes visible the
+  instant it lands a hit. The port's `mud/combat/engine.py:apply_damage` had **no
+  equivalent**, so an invisible attacker stayed hidden through an entire fight,
+  unseeable/untargetable by players lacking DETECT_INVIS. **Fix (2.14.256):** added
+  the strip after the parry/dodge/shield-block early-returns (mirroring ROM, where
+  those resolve in `one_hit` before `damage()` is entered) and before the RIV/immune
+  modifiers (so it fires even on a 0-damage immune hit): `remove_spell_effect("invis")`
+  + `remove_spell_effect("mass invis")` + clear the `AFF_INVISIBLE` bit, then
+  `_broadcast_pos_change(attacker, "{name} fades into existence.")` (PERS per-listener,
+  actor-excluded, first-letter cap). Surfaced 2026-07-04 by a `damage()` side-effect
+  probe in the autonomous loop. Test: `tests/integration/test_invisibility_combat.py::test_invisible_attacker_revealed_on_connecting_hit`.
+  **Secondary → FIGHT-093 (OPEN):** the `dam > 1200 && dt >= TYPE_HIT` loophole cap +
+  weapon-extract penalty (`src/fight.c:700-713`) and the `check_killer(ch, victim)`
+  call (`:733`) are absent from `apply_damage` (check_killer exists at engine.py:~1270
+  but its invocation on the damage path is unconfirmed). Low priority — the 1200 cap
+  needs an out-of-range damage input, PK-flagging is a broader subsystem. Verify vs
+  ROM C before closing.
+
 ### Follow-ups (FIGHT-022 / FIGHT-023 / FIGHT-025 / FIGHT-026 — filed, not yet closed)
 
 - **`FIGHT-068` — `do_bash` checked `victim == ch` before `position < POS_FIGHTING` (order swap vs ROM), ✅ FIXED (2.14.105).** Surfaced 2026-06-14 while closing FIGHT-067 (full `do_bash` read, `src/fight.c:2392-2403`). ROM checks `position < POS_FIGHTING` ("You'll have to let $M get back up first.", `:2392-2397`) **before** `victim == ch` ("You try to bash your brains out, but fail.", `:2399-2403`). Python `mud/commands/combat.py:do_bash` checked `victim is char` **before** the position check. Observable only in the edge case of bashing *yourself* while you are sitting/sleeping (`position < FIGHTING`): ROM emits the position line, Python emitted "You try to bash your brains out, but fail." **Fix (2.14.105):** swapped the two early-return blocks so the position check precedes the self-target check. Test: `tests/integration/test_fight068_bash_position_before_self.py` (self-bash while POS_SITTING → position gate wins). Verified red before fix, green after. Residual: the position message is the literal `"You'll have to let them get back up first."`, where ROM renders `act("...$M...")` (victim objective pronoun) — filed as **FIGHT-075** below (act()-render class, sibling of FIGHT-073).
