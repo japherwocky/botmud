@@ -65,6 +65,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **GL-048: mob delay-trigger ends the tick unconditionally (`mobile_update`).**
+  ROM's TRIG_DELAY block (`src/update.c:448-454`) fires the trigger on expiry and
+  `continue`s **unconditionally**, so the mob does not scavenge or wander that
+  tick. The port returned `mp_percent_trigger`'s result, so a *failed* delay
+  percent roll let the mob fall through into scavenge/wander — drawing extra RNG
+  off the shared stream (desyncing the whole tick) and sometimes picking up an
+  item or moving when ROM would not. Also added the missing `HAS_TRIGGER` gate so
+  a mob without a delay program no longer counts its `mprog_delay` down. Test:
+  `tests/integration/test_gl048_mp_delay_trigger_parity.py`.
+
 - **GL-047: regen drains in a negative-rate room + signed rate math (`char_update`).**
   `hit_gain`/`mana_gain`/`move_gain` returned `max(0, min(gain, deficit))`, so a
   room with a negative `heal_rate`/`mana_rate` (a "drain room", fully

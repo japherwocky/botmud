@@ -1773,6 +1773,11 @@ def mp_random_trigger(mob: Character) -> bool:
 
 
 def mp_delay_trigger(mob: Character) -> bool:
+    # GL-048: mirror ROM src/update.c:448-454. The whole delay block is gated on
+    # HAS_TRIGGER(ch, TRIG_DELAY) — a mob with no TRIG_DELAY program never counts
+    # its mprog_delay down.
+    if not mob_has_trigger(mob, Trigger.DELAY):
+        return False
     delay = int(getattr(mob, "mprog_delay", 0) or 0)
     if delay <= 0:
         return False
@@ -1781,7 +1786,12 @@ def mp_delay_trigger(mob: Character) -> bool:
     if delay > 0:
         return False
     mob.mprog_delay = 0
-    return mp_percent_trigger(mob, trigger=Trigger.DELAY)
+    # ROM fires the trigger for its side effects then `continue`s UNCONDITIONALLY,
+    # discarding mp_percent_trigger's return — the mob's tick ends here (before
+    # scavenge/wander) whether or not the percent program actually fired. Return
+    # True so the mobile_update caller's `if mp_delay_trigger(mob): continue` fires.
+    mp_percent_trigger(mob, trigger=Trigger.DELAY)
+    return True
 
 
 def mp_speech_trigger(argument: str, mob: Character, ch: object | None) -> bool:
