@@ -102,6 +102,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **AFFECTS-001: `affects` double-colon on the level-20+ duplicate line.** For a
+  level-20+ character with two same-spell affects (e.g. `bless`, which applies
+  APPLY_HITROLL + APPLY_SAVING_SPELL), the continuation line rendered a double
+  colon (`: :`). ROM (`src/act_info.c:1726`) emits 22 spaces then `": modifies…"`
+  — one colon; the port added an extra `": "`. Dropped it. Test:
+  `tests/integration/test_do_affects.py::test_affects_level_20_plus_duplicate_continuation_single_colon`.
+
 - **MAGIC-048: `chain lightning` arcs to every target in a bounce pass.** ROM's
   bounce loop (`src/magic.c:1259-1278`) has no level-based break — once a pass
   starts, the bolt arcs to every valid target in the room even after `level`

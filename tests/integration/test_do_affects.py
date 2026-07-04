@@ -183,3 +183,28 @@ def test_affects_multiple_different_spells():
 if __name__ == "__main__":
     # Run tests with pytest
     pytest.main([__file__, "-v"])
+
+
+def test_affects_level_20_plus_duplicate_continuation_single_colon():
+    """AFFECTS-001 — the continuation line for a duplicate-type affect at level 20+ has ONE colon.
+
+    ROM ``do_affects`` (src/act_info.c:1726) emits 22 spaces (no colon) for a
+    duplicate affect, then appends ``": modifies %s by %d "`` (line 1736) — a single
+    colon. The port built the indent as ``" " * 22 + ": "`` and *also* appended
+    ``": modifies …"``, producing a double colon (``: :``) for e.g. a level-25 bless
+    (which applies two same-type affects: APPLY_HITROLL and APPLY_SAVING_SPELL).
+    """
+    char = Character(name="TestChar", level=25)
+    char.affected.append(
+        AffectData(type="bless", level=25, duration=31, location=APPLY_HITROLL, modifier=3, bitvector=0)
+    )
+    char.affected.append(
+        AffectData(type="bless", level=25, duration=31, location=APPLY_SAVING_SPELL, modifier=-3, bitvector=0)
+    )
+
+    result = do_affects(char, "")
+
+    assert ": :" not in result, f"double colon in continuation line: {result!r}"
+    cont = [ln for ln in result.split("\n") if ln.startswith(" " * 22)]
+    assert cont, f"no 22-space continuation line found: {result!r}"
+    assert cont[0].startswith(" " * 22 + ": modifies"), f"continuation line: {cont[0]!r}"

@@ -147,8 +147,11 @@ def do_affects(char: Character, args: str) -> str:
         # Deduplication: check if same spell as previous affect
         if paf_last and paf.type == paf_last.type:
             if char.level >= 20:
-                # Level 20+: Show duplicate affects with indentation (22 spaces + ": ")
-                buf = " " * 22 + ": "
+                # AFFECTS-001: ROM src/act_info.c:1726 emits exactly 22 spaces (no
+                # colon) for a duplicate affect; the ": modifies …" detail block
+                # below supplies the single colon (matching "Spell: %-15s" width).
+                # The old `+ ": "` produced a double colon (": :").
+                buf = " " * 22
             else:
                 # Level <20: Skip duplicate spells entirely
                 continue
