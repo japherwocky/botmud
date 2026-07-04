@@ -383,3 +383,73 @@ def test_weight_mult_100_is_allowed(test_room_3001):
     assert "you put" in result.lower()
     assert normal_bag in chest.contained_items
     assert normal_bag not in char.inventory
+
+
+def test_put_into_carried_bag_is_net_zero_on_carry_weight(test_room_3001):
+    """PUT-004 — putting an item into a CARRIED container is net-zero on encumbrance.
+
+    ROM ``obj_from_char`` subtracts the item's weight/number (src/handler.c:1678-1679),
+    then ``obj_to_obj`` re-adds ``get_obj_number(obj)`` and
+    ``get_obj_weight(obj) * WEIGHT_MULT(container) / 100`` for each *carried*
+    container in the nesting chain (src/handler.c:1981-1984). For a normal carried
+    bag (WEIGHT_MULT==100) the net change is zero. The pre-fix port's ``_obj_to_obj``
+    re-added nothing, so stuffing a carried bag wrongly dropped carry_weight /
+    carry_number — letting a player slip under the ``can_carry_w`` gate.
+    """
+    from mud.models.character import Character
+
+    char = Character(name="TestChar", is_npc=False, race=0, ch_class=0)
+    char.room = test_room_3001
+    char.location = test_room_3001
+    char.level = 5
+    char.inventory = []
+    char.carry_weight = 0
+    char.carry_number = 0
+
+    # A CARRIED normal bag (WEIGHT_MULT = value[4] = 100).
+    bag_vnum = _get_unique_vnum()
+    bag_proto = ObjIndex(
+        vnum=bag_vnum,
+        name="bag",
+        short_descr="a leather bag",
+        description="A leather bag lies here.",
+        item_type=ItemType.CONTAINER,
+        wear_flags=1,
+        value=[100, 0, 0, 100, 100],
+        weight=5,
+    )
+    obj_registry[bag_vnum] = bag_proto
+    bag = Object(prototype=bag_proto, instance_id=None)
+    bag.value = list(bag_proto.value)
+    bag.carried_by = char
+    bag.wear_loc = -1
+    bag.contained_items = []
+    char.inventory.append(bag)
+
+    sword_vnum = _get_unique_vnum()
+    sword_proto = ObjIndex(
+        vnum=sword_vnum,
+        name="sword",
+        short_descr="a steel sword",
+        description="A steel sword lies here.",
+        item_type=ItemType.WEAPON,
+        wear_flags=1,
+        weight=50,
+    )
+    obj_registry[sword_vnum] = sword_proto
+    sword = Object(prototype=sword_proto, instance_id=None)
+    sword.carried_by = char
+    sword.wear_loc = -1
+    char.inventory.append(sword)
+
+    char.carry_weight = 55  # bag 5 + sword 50
+    char.carry_number = 2
+
+    w0, n0 = char.carry_weight, char.carry_number
+    result = do_put(char, "sword bag")
+
+    assert "you put" in result.lower()
+    assert sword in bag.contained_items
+    assert sword not in char.inventory
+    assert char.carry_weight == w0, "put into a carried WEIGHT_MULT=100 bag must be net-zero on carry_weight"
+    assert char.carry_number == n0, "put into a carried bag must not change carry_number"

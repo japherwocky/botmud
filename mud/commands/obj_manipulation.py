@@ -633,6 +633,15 @@ def _obj_to_obj(obj, container) -> None:
     (`obj->next_content = obj_to->contains; obj_to->contains = obj;`), so a
     container's contents are LIFO (most recently inserted object first),
     observable via `look in <container>` / `get all <container>` (INV-039).
+
+    PUT-004 / INV-011: ROM also re-adds encumbrance for a *carried* container
+    (src/handler.c:1971-1984): it walks the container nesting chain and, for each
+    container carried by a character, adds `get_obj_number(obj)` back to
+    `carry_number` and `get_obj_weight(obj) * WEIGHT_MULT(container) / 100` back to
+    `carry_weight`. This exactly offsets `_obj_from_char`'s subtraction, so putting
+    an item into a normal carried bag (WEIGHT_MULT=100) is net-zero encumbrance and
+    a magic bag (WEIGHT_MULT<100) reduces it — a player could otherwise slip under
+    the `can_carry_w` gate by stuffing a carried bag.
     """
     contained_items = getattr(container, "contained_items", None)
     if contained_items is None:
@@ -640,6 +649,18 @@ def _obj_to_obj(obj, container) -> None:
         contained_items = container.contained_items
     contained_items.insert(0, obj)
     obj.in_obj = container
+
+    # ROM src/handler.c:1971-1984 — walk the nesting chain; re-add to each carrier.
+    weight = _get_obj_weight(obj)
+    node = container
+    while node is not None:
+        carrier = getattr(node, "carried_by", None)
+        if carrier is not None:
+            mult = _get_weight_mult(node)  # WEIGHT_MULT: value[4] for containers, else 100
+            carrier.carry_number = getattr(carrier, "carry_number", 0) + 1
+            # weight and mult are non-negative, so // is bit-identical to ROM C's / here.
+            carrier.carry_weight = getattr(carrier, "carry_weight", 0) + (weight * mult) // 100
+        node = getattr(node, "in_obj", None)
 
 
 def _remove_obj(char: Character, obj) -> None:

@@ -102,6 +102,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **PUT-004: putting into a carried bag no longer corrupts encumbrance (INV-011).**
+  `do_put`'s object move subtracted the item's weight/number from the carrier but
+  never re-added it, so `put sword bag` (a carried bag) permanently dropped
+  `carry_weight`/`carry_number` — a player could stuff a carried bag to slip under
+  the `can_carry_w` movement gate. ROM `obj_to_obj` re-adds
+  `get_obj_weight(obj) * WEIGHT_MULT(container) / 100` (and the number) for each
+  carried container in the nesting chain (`src/handler.c:1971-1984`), so a normal
+  bag (WEIGHT_MULT=100) is net-zero and a magic bag reduces weight. `_obj_to_obj`
+  now performs that walk. Test:
+  `tests/integration/test_put_weight_mult.py::test_put_into_carried_bag_is_net_zero_on_carry_weight`.
+
 - **WEAR-010: `wear/wield/hold N.item` count prefix now resolves.** `do_wear`
   found its target with a substring-only helper instead of ROM's `get_obj_carry`
   (`src/act_obj.c:1726`), so `wear 2.ring` returned "You do not have that item."
