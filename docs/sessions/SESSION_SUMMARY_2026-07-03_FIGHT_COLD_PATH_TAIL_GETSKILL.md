@@ -101,6 +101,45 @@ The systemic root cause was tackled directly rather than papering over more site
   get_skill-based assertions replacing retired-helper unit tests + 8 cross-file
   class-gate fixes. Full suite **6079 passed, 0 failed**.
 
+### `MAGIC-046` — ✅ FIXED (2.14.239) — heat_metal walks ROM carrying order
+
+- **Python**: `mud/models/character.py:iter_carrying` (new); `mud/skills/handlers.py:heat_metal`
+- **ROM C**: `src/magic.c:3134`; `src/act_obj.c:1389-1390`
+- **Fix**: heat_metal iterated `inventory + equipment.values()` (all carried, then worn)
+  vs ROM's single `victim->carrying` LIFO list interleaving both by acquisition — so its
+  per-object RNG draws hit different objects. The FINDING-020 `_carry_seq` counter already
+  stamps every carry-list entry (head-insert = newest), so ROM order = descending
+  `_carry_seq`. Added `Character.iter_carrying()` and routed heat_metal through it (Character
+  victims; MobInstance falls back — no `_carry_seq` yet). Also restored `remove_obj`'s
+  "$n stops using $p." / "You stop using $p." lines before the heat throw lines (part d).
+- **Tests**: `tests/integration/test_magic046_heat_metal_carry_order.py` (2). Green.
+
+### `FIGHT-090` — ✅ FIXED (2.14.240) — unified the two do_trip implementations
+
+- **Python**: `mud/commands/combat.py:do_trip` (canonical); `mud/skills/handlers.py:trip` (delegate)
+- **ROM C**: `src/fight.c:2660-2753`; `src/act_obj.c`
+- **Fix**: the `trip` command (`do_trip`) and the `trip` skill function (`skill_handlers.trip`)
+  were divergent duplicate ports. Made `do_trip` the single canonical impl; `skill_handlers.trip`
+  now delegates (`do_trip(caster, "", victim=target)`). Unifying **surfaced three ROM fixes that
+  had landed only on the handler copy** — merged into do_trip: self-trip colour + `$n trips over
+  $s own feet!` room broadcast (FIGHT-039); PERS gate messages `$S`/`$N` (TRIP-001, do_trip had
+  baked "Their"/"They"); `check_improve` on success/failure (do_trip omitted it → trip never
+  improved via the command). Delivery unified to ROM's return/push model. Removed the handler's
+  non-ROM post-damage RESTING re-set + self-before-skill ordering.
+- **Tests**: retired 5 redundant `TestTripRomParity::test_trip_handler_*` (covered by
+  `test_fight082_do_trip_cluster` + `test_fight071` + new improve coverage); updated 5
+  delivery-model tests. Filed a do_trip NPC-trip-chance (100 vs get_skill 10+3*level)
+  follow-up under HANDLER-008.
+
+### HANDLER-008 defensive checks — attempted + reverted (handoff written)
+
+Migrating `check_dodge`/`check_parry`/`check_shield_block` onto `get_skill` (so NPC mobs
+dodge/parry/shield-block per ROM formulas) was attempted and **reverted** (`aa6cea3a`): the
+3-line change is trivial but the test blast radius is large and semantically delicate (PC
+class-gate, level-diff-preserving fixes, NPC formula expected-value rewrites, `fallback_attr`
+pattern, structural parry+dodge class-gate). Staged as its own session with a full method
+guide: `HANDOFF_2026-07-03_HANDLER-008_DEFENSIVE_CHECK_MIGRATION.md`.
+
 ## New findings filed (durable, not fixed this session)
 
 - **`FIGHT-090`** (MEDIUM, `FIGHT_C_AUDIT.md`) — `do_trip` (command) and `skill_handlers.trip` (skill-registry `"function": "trip"`) are divergent duplicate implementations of ROM `do_trip`; both live, each with its own gate ordering/message wording. Unify to one implementation.

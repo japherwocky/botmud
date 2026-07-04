@@ -21,13 +21,19 @@
     (`src/fight.c:3125`); NPC kicks could never land before.
   - Filed OPEN (out-of-scope, surfaced while reading ROM): **`FIGHT-090`** (MEDIUM —
     `do_trip`/`skill_handlers.trip` duplicate impls).
-  - **`HANDLER-008`** (🔄 IN PROGRESS, 2.14.232–238) — the unified `get_skill` port:
-    core at `mud/skills/skill_lookup.py:get_skill` (self-contained,
-    `tests/test_get_skill.py` × 16); **all 5 offensive-skill sites migrated**
-    (do_kick, backstab, disarm hand-to-hand, disarm-skill gate, do_rescue — every
-    partial mirror retired, NPC formulas + daze/drunk + PC class-gate now apply);
-    8 cross-file disarm/rescue tests fixed to set warrior `ch_class`. Remaining:
-    the defensive `check_dodge`/`check_parry`/`check_shield_block` NPC lookups.
+  - **`HANDLER-008`** (🔄 IN PROGRESS, 2.14.232–238) — unified `get_skill` port:
+    core + **all 5 offensive-skill sites migrated** (do_kick, backstab, disarm×2,
+    do_rescue). Remaining: the **defensive** `check_dodge`/`check_parry`/
+    `check_shield_block` NPC lookups — attempted + reverted this session (blast
+    radius); full handoff at
+    [HANDOFF_2026-07-03_HANDLER-008_DEFENSIVE_CHECK_MIGRATION.md](HANDOFF_2026-07-03_HANDLER-008_DEFENSIVE_CHECK_MIGRATION.md).
+  - **`MAGIC-046`** (✅ FIXED, 2.14.239) — `heat_metal` now walks ROM's single
+    `victim->carrying` LIFO list via new `Character.iter_carrying()` (descending
+    `_carry_seq`) + restored `remove_obj`'s stop-using act lines.
+  - **`FIGHT-090`** (✅ FIXED, 2.14.240) — unified the two `do_trip` impls;
+    `skill_handlers.trip` now delegates to the canonical `do_trip`, which absorbed
+    three fixes that had landed only on the handler copy (self-trip broadcast, PERS
+    gate messages, check_improve). Filed a do_trip NPC-trip-chance HANDLER-008 note.
 - **Pointer to latest summary**:
   [SESSION_SUMMARY_2026-07-03_FIGHT_COLD_PATH_TAIL_GETSKILL.md](SESSION_SUMMARY_2026-07-03_FIGHT_COLD_PATH_TAIL_GETSKILL.md)
 
@@ -35,28 +41,26 @@
 
 | Metric | Value |
 |--------|-------|
-| Version | 2.14.238 |
-| Tests | 6079 passed, 4 skipped, 0 failed (+40 pre-existing aiohttp env collection errors) |
+| Version | 2.14.240 |
+| Tests | 6076 passed, 4 skipped, 0 failed (+40 pre-existing aiohttp env collection errors) |
 | Cross-file invariants | INV-054 latest (unchanged) |
-| Cold-path queue | FIGHT-085/086/087/088/089/091 closed; HANDLER-008 core + all 5 offensive sites done; FIGHT-090 + MAGIC-046 + HANDLER-008 defensive tail OPEN |
-| Active focus | HANDLER-008 get_skill consolidation (5/5 offensive sites); defensive check migration is the last piece |
+| Cold-path queue | FIGHT-085/086/087/088/089/090/091 + MAGIC-046 closed; HANDLER-008 offensive done; HANDLER-008 defensive tail OPEN (handoff written) |
+| Active focus | HANDLER-008 defensive-check migration (handoff ready) is the last get_skill piece |
 
 ## Next Intended Task
 
-**Finish HANDLER-008 — migrate the defensive checks.** The unified `get_skill`
-core is landed and all 5 offensive-skill sites are migrated. The last piece is the
-defensive trio in `mud/combat/engine.py`: `check_dodge`/`check_parry`/
-`check_shield_block` still read `_get_skill_percent(defender, …)` (0 for NPC
-defenders), so NPC mobs never dodge/parry/shield-block — ROM `get_skill` gives an
-OFF_DODGE dodger `level*2`, OFF_PARRY parry `level*2`, shield_block `10+2*level`.
-Migrate each to `get_skill(victim, …)`. **Watch the same class-gate blast radius**:
-per the session just closed, the per-area runs will pass but the full suite will
-catch PC-defender tests that create default mage-class chars — run the FULL suite
-and expect to set a real `ch_class` on the affected defense tests (and mind the
-`_get_skill_percent` `fallback_attr` pattern, e.g. `parry_skill`, which get_skill
-does not read). Then **MAGIC-046** (ROM-ordered `carrying` accessor for
-`heat_metal`) and **FIGHT-090** (unify the two `do_trip` impls), then resume
-cold-path / cross-INV divergence hunting.
+**Finish HANDLER-008 — migrate the defensive checks.** This is the last
+`get_skill` piece. The 3-line code change is trivial but the test blast radius is
+large and semantically delicate (PC class-gate, level-diff-preserving fixes, NPC
+formula expected-value rewrites, the `fallback_attr` pattern, and a structural
+parry+dodge class-gate constraint) — it was attempted and reverted this session
+precisely to avoid rushing silently-wrong test rewrites. **The full method,
+hazards, ROM refs, and the ~13 affected tests are documented in the dedicated
+handoff:**
+[HANDOFF_2026-07-03_HANDLER-008_DEFENSIVE_CHECK_MIGRATION.md](HANDOFF_2026-07-03_HANDLER-008_DEFENSIVE_CHECK_MIGRATION.md).
+Follow it, run the FULL suite (per-area runs lie — the checks fire on every hit).
+After that, HANDLER-008 is complete (modulo the small do_trip NPC trip-chance
+follow-up in the audit row); then resume cold-path / cross-INV divergence hunting.
 
 **Tooling note:** the GitNexus MCP server is disconnected; the on-disk index was
 reindexed twice this session (fresh as of the FIGHT-091 commit). Restart the MCP
