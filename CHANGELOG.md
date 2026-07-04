@@ -102,6 +102,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **GET-016: magic containers weigh less toward carry limits (WEIGHT_MULT).** The
+  command-local `_get_obj_weight` helpers (do_get's `can_carry_w` gate and do_put's
+  fit check) summed a container's contents at full weight, ignoring ROM's
+  `WEIGHT_MULT` (`get_obj_weight(tobj) * WEIGHT_MULT(obj) / 100`,
+  `src/handler.c` / `merc.h:2137`). So a magic bag (`value[4]=50`) holding a
+  100-lb item counted as bag+100 instead of bag+50, and Python could refuse a
+  `get <magic-bag>` that ROM allows. Both helpers now apply the multiplier. Test:
+  `tests/integration/test_get_weight_mult.py`.
+
 - **PUT-004: putting into a carried bag no longer corrupts encumbrance (INV-011).**
   `do_put`'s object move subtracted the item's weight/number from the carrier but
   never re-added it, so `put sword bag` (a carried bag) permanently dropped

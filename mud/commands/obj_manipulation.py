@@ -539,10 +539,12 @@ def _get_obj_weight(obj) -> int:
         if proto:
             weight = getattr(proto, "weight", 0)
 
-    # Add contents weight
+    # Add contents weight — GET-016: ROM get_obj_weight (src/handler.c) scales
+    # contents by the container's WEIGHT_MULT (value[4] for a container, else 100).
+    mult = _get_weight_mult(obj)
     contains = getattr(obj, "contains", [])
     for contained in contains:
-        weight += _get_obj_weight(contained)
+        weight += (_get_obj_weight(contained) * mult) // 100
 
     return weight
 

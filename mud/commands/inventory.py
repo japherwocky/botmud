@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from mud.ai import _can_loot
 from mud.commands.group_commands import do_split, is_same_group
-from mud.commands.obj_manipulation import CONT_CLOSED, _can_drop_obj, _obj_from_char, get_obj_list
+from mud.commands.obj_manipulation import CONT_CLOSED, _can_drop_obj, _get_weight_mult, _obj_from_char, get_obj_list
 from mud.handler import create_money
 from mud.models.character import Character
 from mud.models.constants import (
@@ -49,9 +49,13 @@ def _get_obj_weight(obj: object) -> int:
     else:
         base_weight = int(getattr(obj, "weight", 0) or 0)
 
+    # GET-016: ROM get_obj_weight (src/handler.c) scales contents by the
+    # container's WEIGHT_MULT (value[4] for a container, else 100 — merc.h:2137),
+    # so a magic bag's contents count for less toward the can_carry_w gate.
+    mult = _get_weight_mult(obj)
     contained_items = getattr(obj, "contained_items", []) or []
     for item in contained_items:
-        base_weight += _get_obj_weight(item)
+        base_weight += (_get_obj_weight(item) * mult) // 100
     return base_weight
 
 
