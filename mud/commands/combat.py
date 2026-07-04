@@ -1188,14 +1188,17 @@ def do_trip(char: Character, args: str, *, victim: Character | None = None) -> s
     """
     target_name = (args or "").strip()
 
-    # Check if character has the skill. ROM src/fight.c do_trip: NPCs gate on
-    # OFF_TRIP (no skills dict), PCs on the learned percent. For an NPC ROM's
-    # get_skill returns a nonzero value; mirror the do_kick/do_berserk NPC
-    # pattern and treat the skill as fully learned (100).
+    # Check if character has the skill. ROM src/fight.c:2649 do_trip: NPCs gate on
+    # OFF_TRIP (no skills dict), PCs on the learned percent. HANDLER-008: ROM's
+    # `chance = get_skill(ch, gsn_trip)` gives an OFF_TRIP NPC `10 + 3*level`
+    # (src/handler.c:373-432), NOT 100 — the old hardcode let a low-level mob trip
+    # far too often. The OFF_TRIP gate stays (get_skill's NPC dispatch returns 0
+    # without the flag, but the explicit gate mirrors ROM's IS_SET check + the ""
+    # silent return for descriptor-less mobs).
     if getattr(char, "is_npc", False):
         if not _npc_off_flags(char) & OffFlag.TRIP:
             return ""
-        skill_level = 100
+        skill_level = get_skill(char, "trip")
     else:
         skill_level = _character_skill_percent(char, "trip")
         if skill_level == 0:

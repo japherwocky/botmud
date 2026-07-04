@@ -69,3 +69,48 @@ def test_offensive_skills_gated_out_for_unflagged_npc():
 
     assert do_trip(mob, "") == ""
     assert do_dirt(mob, "") == ""
+
+
+def test_npc_trip_chance_uses_get_skill_not_hardcoded_100(monkeypatch):
+    """HANDLER-008 do_trip site — an OFF_TRIP NPC's trip base chance is ROM
+    ``get_skill(ch, gsn_trip)`` = ``10 + 3*level`` (src/handler.c:373-432,
+    src/fight.c:2649), NOT a hardcoded 100.
+
+    A level-10 mob's trip base is ``10 + 3*10 = 40``; with the small
+    dex/size/level modifiers its total chance is ~51. A roll of 75 must therefore
+    MISS. The pre-fix hardcode (100) gave a total ~111, so 75 wrongly landed —
+    this test fails before the fix and passes after.
+    """
+    initialize_world()
+    mob, victim = _npc_vs_victim(OffFlag.TRIP)
+    mob.level = 10
+    victim.level = 10
+    victim.hit = victim.max_hit = 100
+
+    # Force the trip roll between the ROM chance (~51) and the pre-fix hardcode (~111).
+    monkeypatch.setattr(rng_mm, "number_percent", lambda: 75)
+    result = do_trip(mob, "")
+
+    # ROM get_skill base 40 → total ~51 → 75 >= chance → miss. (The success path is
+    # the only one that renders "goes down"; position is not asserted because
+    # apply_damage re-enters combat and re-sets the victim to FIGHTING.)
+    assert "goes down" not in result, result
+
+
+def test_npc_trip_lands_below_get_skill_chance(monkeypatch):
+    """Companion to the above: a roll below the ROM ``get_skill`` chance lands.
+
+    Pins that the fix didn't over-correct to "NPCs never trip": at roll 5 (< the
+    ~51 total chance for a level-10 OFF_TRIP mob) the trip lands (ROM
+    src/fight.c:2735 — the success act line "you go down!" is rendered).
+    """
+    initialize_world()
+    mob, victim = _npc_vs_victim(OffFlag.TRIP)
+    mob.level = 10
+    victim.level = 10
+    victim.hit = victim.max_hit = 100
+
+    monkeypatch.setattr(rng_mm, "number_percent", lambda: 5)
+    result = do_trip(mob, "")
+
+    assert "goes down" in result, result

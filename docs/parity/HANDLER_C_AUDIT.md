@@ -349,7 +349,7 @@ had encoded the same index-1-is-DEX error).
 | Severity | MODERATE (every skill/spell lookup is over-valued while dazed or drunk — affects hit chance, skill success rolls, backstab THAC0, etc.) |
 | ROM C | `src/handler.c:434-442` — after computing the base skill, `get_skill` applies: `if (ch->daze > 0) { if spell → skill /= 2; else skill = 2*skill/3; }` and `if (!IS_NPC(ch) && condition[COND_DRUNK] > 10) skill = 9*skill/10;`, then clamps `URANGE(0, skill, 100)`. |
 | Python | There is **no unified `get_skill` port**. Skill percents are fetched ad-hoc — `mud/combat/engine.py:_lookup_skill_percent`/`_get_skill_percent`/`_backstab_skill`, `mud/commands/combat.py:_character_skill_percent`, etc. — none of which apply the daze (`skill /= 2` for spells, `2*skill/3` for skills) or drunk (`9*skill/10`) reductions. |
-| Status | ✅ FIXED (2.14.232–241) — the faithful unified `get_skill` is implemented at `mud/skills/skill_lookup.py:get_skill` (PC class-level gate + learned; full NPC formula dispatch; daze `skill/2`/`2*skill/3`; drunk `9*skill/10`; `URANGE(0,skill,100)`), self-contained + unit-tested (`tests/test_get_skill.py`, 16). **All five offensive-skill workaround sites AND the three defensive checks are migrated** (do_kick, backstab, disarm hand-to-hand, disarm-skill gate, do_rescue, check_parry, check_dodge, check_shield_block); every partial mirror is retired. NPC mobs now dodge/parry/shield-block via ROM's formula (`level*2` / `10+2*level`); before, the dict lookup returned 0 so they never defended. Surfaced 2026-07-03 while closing FIGHT-086; defensive trio closed 2026-07-03 (2.14.241). Remaining as a minor follow-up (does not gate ✅): the `do_trip` NPC trip-chance hardcode below. |
+| Status | ✅ FIXED (2.14.232–241) — the faithful unified `get_skill` is implemented at `mud/skills/skill_lookup.py:get_skill` (PC class-level gate + learned; full NPC formula dispatch; daze `skill/2`/`2*skill/3`; drunk `9*skill/10`; `URANGE(0,skill,100)`), self-contained + unit-tested (`tests/test_get_skill.py`, 16). **All five offensive-skill workaround sites AND the three defensive checks are migrated** (do_kick, backstab, disarm hand-to-hand, disarm-skill gate, do_rescue, check_parry, check_dodge, check_shield_block); every partial mirror is retired. NPC mobs now dodge/parry/shield-block via ROM's formula (`level*2` / `10+2*level`); before, the dict lookup returned 0 so they never defended. Surfaced 2026-07-03 while closing FIGHT-086; defensive trio closed 2026-07-03 (2.14.241); the `do_trip` NPC trip-chance follow-up closed 2026-07-03 (2.14.242). Every dict-sourced NPC skill lookup now routes through `get_skill`. |
 
 **Site migration status (onto `mud/skills/skill_lookup.py:get_skill`):**
 - ✅ `mud/commands/combat.py:do_kick` — migrated (2.14.233), NPC-formula workaround retired, daze/drunk now apply.
@@ -376,12 +376,13 @@ had encoded the same index-1-is-DEX error).
   chance recomputed from the ROM formula (60-dict → level*2=20 → /2 → unarmed-half =
   5) and the `test_combat_defenses_prob` NPC victims switched from `skills[...]` to
   `off_flags` with equalized levels. This closes HANDLER-008's last dict-sourced site.
-- ⚠️ `mud/commands/combat.py:do_trip` NPC trip chance — hardcodes `skill_level = 100`
-  with a now-stale "mirror the do_kick NPC pattern" comment (do_kick was migrated to
-  `get_skill` in FIGHT-091). ROM `get_skill(ch, gsn_trip)` for an OFF_TRIP NPC is
-  `10+3*level`. Surfaced 2026-07-03 while unifying the trip impls (FIGHT-090); not a
-  production regression (NPCs already route through do_trip) but the less-faithful of
-  the two merged copies.
+- ✅ `mud/commands/combat.py:do_trip` NPC trip chance — migrated (2.14.242). The NPC
+  branch now uses `get_skill(char, "trip")` (`10+3*level` for an OFF_TRIP mob) instead
+  of the hardcoded `skill_level = 100`; a low-level mob no longer trips far too often.
+  The OFF_TRIP gate + `""` silent return for descriptor-less mobs stays (mirrors ROM's
+  `IS_SET` check). PC path left on `_character_skill_percent` (a separate opportunistic
+  item). Tests: `test_fight_026_npc_offensive_skill_no_crash.py::test_npc_trip_chance_uses_get_skill_not_hardcoded_100`
+  (+ over-correction guard). Surfaced 2026-07-03 while unifying the trip impls (FIGHT-090).
 - ⚠️ Other ad-hoc lookups (`_lookup_skill_percent`, `_character_skill_percent`) —
   migrate opportunistically as their surfaces are touched.
 
