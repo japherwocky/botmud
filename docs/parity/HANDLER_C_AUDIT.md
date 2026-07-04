@@ -349,7 +349,7 @@ had encoded the same index-1-is-DEX error).
 | Severity | MODERATE (every skill/spell lookup is over-valued while dazed or drunk — affects hit chance, skill success rolls, backstab THAC0, etc.) |
 | ROM C | `src/handler.c:434-442` — after computing the base skill, `get_skill` applies: `if (ch->daze > 0) { if spell → skill /= 2; else skill = 2*skill/3; }` and `if (!IS_NPC(ch) && condition[COND_DRUNK] > 10) skill = 9*skill/10;`, then clamps `URANGE(0, skill, 100)`. |
 | Python | There is **no unified `get_skill` port**. Skill percents are fetched ad-hoc — `mud/combat/engine.py:_lookup_skill_percent`/`_get_skill_percent`/`_backstab_skill`, `mud/commands/combat.py:_character_skill_percent`, etc. — none of which apply the daze (`skill /= 2` for spells, `2*skill/3` for skills) or drunk (`9*skill/10`) reductions. |
-| Status | 🔄 IN PROGRESS (2.14.232–237) — the faithful unified `get_skill` is implemented at `mud/skills/skill_lookup.py:get_skill` (PC class-level gate + learned; full NPC formula dispatch; daze `skill/2`/`2*skill/3`; drunk `9*skill/10`; `URANGE(0,skill,100)`), self-contained + unit-tested (`tests/test_get_skill.py`, 16). **All five offensive-skill workaround sites are migrated** (do_kick, backstab, disarm hand-to-hand, disarm-skill gate, do_rescue); the partial mirrors are retired. **Remaining before ✅:** the defensive `check_dodge`/`check_parry`/`check_shield_block` NPC lookups (below) still read the dict. Surfaced 2026-07-03 while closing FIGHT-086. |
+| Status | ✅ FIXED (2.14.232–241) — the faithful unified `get_skill` is implemented at `mud/skills/skill_lookup.py:get_skill` (PC class-level gate + learned; full NPC formula dispatch; daze `skill/2`/`2*skill/3`; drunk `9*skill/10`; `URANGE(0,skill,100)`), self-contained + unit-tested (`tests/test_get_skill.py`, 16). **All five offensive-skill workaround sites AND the three defensive checks are migrated** (do_kick, backstab, disarm hand-to-hand, disarm-skill gate, do_rescue, check_parry, check_dodge, check_shield_block); every partial mirror is retired. NPC mobs now dodge/parry/shield-block via ROM's formula (`level*2` / `10+2*level`); before, the dict lookup returned 0 so they never defended. Surfaced 2026-07-03 while closing FIGHT-086; defensive trio closed 2026-07-03 (2.14.241). Remaining as a minor follow-up (does not gate ✅): the `do_trip` NPC trip-chance hardcode below. |
 
 **Site migration status (onto `mud/skills/skill_lookup.py:get_skill`):**
 - ✅ `mud/commands/combat.py:do_kick` — migrated (2.14.233), NPC-formula workaround retired, daze/drunk now apply.
@@ -359,16 +359,23 @@ had encoded the same index-1-is-DEX error).
   `get_skill(caster, "disarm")` — enforces ROM's PC class-level gate and NPC disarm
   finally works (OFF_DISARM → 20+3*level). The 14 `TestDisarmRomParity` warrior chars
   now set `ch_class=3` + a level ≥ 11 (ROM-faithful: they were asserting ungated
-  behavior a mage-class char couldn't have).
+  behavior a mage-class char couldn't have). Follow-up (2.14.241): `test_fight035`'s
+  disarm caster was also a level-30 mage but only passed because that file never
+  calls `initialize_world` (empty `skill_registry` → gate skipped); it flaked once a
+  sibling xdist test populated the registry. Fixed the same way (`ch_class=3`).
 - ✅ `mud/commands/combat.py:do_rescue` — migrated (2.14.237). `get_skill(char,
   "rescue")` — PC class-gated, NPC 40+level (was 0 → NPC rescue never succeeded);
   `test_rescue_switches_tank` set `ch_class=3`.
-- ⚠️ **Defensive checks** `mud/combat/engine.py:check_dodge`/`check_parry`/
-  `check_shield_block` — still `_get_skill_percent(defender, …)` (0 for NPC
-  defenders). ROM get_skill gives an NPC OFF_DODGE dodger `level*2`, OFF_PARRY parry
-  `level*2`, shield_block `10+2*level` — so NPC mobs currently never dodge/parry/
-  shield-block. Same class-gate blast radius for PC-defender tests. The remaining
-  migration to close HANDLER-008.
+- ✅ **Defensive checks** `mud/combat/engine.py:check_dodge`/`check_parry`/
+  `check_shield_block` — migrated (2.14.241). All three now source their skill from
+  `get_skill(victim, …)`; NPC OFF_DODGE/OFF_PARRY defenders get `level*2` and every
+  NPC gets shield_block `10+2*level` (was 0 via the dict → mobs never defended). PCs
+  are class-gated. Test blast radius (13 tests): PC-defender formula tests set a
+  class that learns the skill early (warrior/thief) preserving the level-diff; the
+  one NPC-defender test (`test_npc_unarmed_parry_half_chance`) had its expected
+  chance recomputed from the ROM formula (60-dict → level*2=20 → /2 → unarmed-half =
+  5) and the `test_combat_defenses_prob` NPC victims switched from `skills[...]` to
+  `off_flags` with equalized levels. This closes HANDLER-008's last dict-sourced site.
 - ⚠️ `mud/commands/combat.py:do_trip` NPC trip chance — hardcodes `skill_level = 100`
   with a now-stale "mirror the do_kick NPC pattern" comment (do_kick was migrated to
   `get_skill` in FIGHT-091). ROM `get_skill(ch, gsn_trip)` for an OFF_TRIP NPC is

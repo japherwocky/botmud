@@ -301,6 +301,12 @@ class TestDefenseChecks:
         """ROM: parry chance = skill / 2 + level_diff."""
         attacker = Character(name="Attacker", level=10)
         victim = Character(name="Victim", level=10)
+        # HANDLER-008: get_skill reads the learned dict only for PCs, and only at
+        # or above the skill's class level. A bare Character defaults to is_npc=True
+        # (whose parry ignores the dict); make it a PC warrior (parry@1) so the
+        # learned 80 is used.
+        victim.is_npc = False
+        victim.ch_class = 3
         victim.skills = {"parry": 80}
         victim.has_weapon_equipped = True
         attacker.room = Room(vnum=3001)
@@ -320,6 +326,10 @@ class TestDefenseChecks:
         """ROM: dodge chance = skill / 2."""
         attacker = Character(name="Attacker", level=10)
         victim = Character(name="Victim", level=10)
+        # HANDLER-008: make it a PC thief (dodge@1) so get_skill uses the learned
+        # dict; a bare Character defaults to is_npc=True (dodge ignores the dict).
+        victim.is_npc = False
+        victim.ch_class = 2
         victim.skills = {"dodge": 60}
         attacker.room = Room(vnum=3001)
         victim.room = attacker.room

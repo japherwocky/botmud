@@ -1575,7 +1575,10 @@ def check_shield_block(attacker: Character, victim: Character) -> bool:
     if not _has_shield_equipped(victim):
         return False
 
-    shield_skill = _get_skill_percent(victim, "shield block", "shield_block_skill")
+    # HANDLER-008: unified get_skill — NPCs get ROM's 10+2*level shield-block
+    # formula (src/handler.c:373-432); the old dict lookup returned 0 for mobs, so
+    # NPCs could never shield-block. PCs gate to 0 below the class skill level.
+    shield_skill = get_skill(victim, "shield block")
     chance = c_div(shield_skill, 5) + 3
 
     # Level difference modifier
@@ -1608,7 +1611,9 @@ def check_parry(attacker: Character, victim: Character) -> bool:
     if not is_awake(victim):
         return False
 
-    parry_skill = _get_skill_percent(victim, "parry", "parry_skill")
+    # HANDLER-008: unified get_skill — NPCs with OFF_PARRY get ROM's level*2
+    # (src/handler.c:373-432); PCs gate to 0 below the parry class level.
+    parry_skill = get_skill(victim, "parry")
     chance = c_div(parry_skill, 2)
 
     has_weapon = getattr(victim, "has_weapon_equipped", False)
@@ -1654,7 +1659,9 @@ def check_dodge(attacker: Character, victim: Character) -> bool:
     if not is_awake(victim):
         return False
 
-    dodge_skill = _get_skill_percent(victim, "dodge", "dodge_skill")
+    # HANDLER-008: unified get_skill — NPCs with OFF_DODGE get ROM's level*2
+    # (src/handler.c:373-432); PCs gate to 0 below the dodge class level.
+    dodge_skill = get_skill(victim, "dodge")
     chance = c_div(dodge_skill, 2)
 
     # Visibility modifier — ROM src/fight.c:1363: if (!can_see(victim, ch)) chance /= 2.

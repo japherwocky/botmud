@@ -444,6 +444,10 @@ def test_parry_blocks_when_skill_learned(monkeypatch: pytest.MonkeyPatch) -> Non
     attacker.hitroll = 100
     attacker.is_npc = True
     victim.is_npc = False
+    # HANDLER-008: get_skill gates a PC below the class skill level. Warrior
+    # (class 3) learns parry@1; default level 0 would still gate, so level=1.
+    victim.ch_class = 3
+    victim.level = 1
     victim.skills["parry"] = 75
     victim.has_weapon_equipped = True
 

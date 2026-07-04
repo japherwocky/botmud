@@ -15,7 +15,7 @@ from mud.combat.engine import (
 )
 from mud.combat.messages import TYPE_HIT
 from mud.models.character import Character
-from mud.models.constants import DamageType, Position
+from mud.models.constants import DamageType, OffFlag, Position
 from mud.world import create_test_character, initialize_world
 
 
@@ -94,6 +94,10 @@ def test_parry_skill_calculation():
     # Set up parry skill
     victim.skills["parry"] = 80
     victim.has_weapon_equipped = True
+    # HANDLER-008: get_skill gates a PC to 0 below the skill's class level.
+    # Default class is mage (parry@22); warrior (class 3) learns parry@1, so the
+    # learned 80 survives at any level and the level-diff below is preserved.
+    victim.ch_class = 3
     attacker.level = 5
     victim.level = 15  # Higher level for better parry
 
@@ -116,6 +120,9 @@ def test_dodge_skill_calculation():
 
     # Set up dodge skill
     victim.skills["dodge"] = 60
+    # HANDLER-008: default class mage learns dodge@20; thief (class 2) learns
+    # dodge@1, so the learned 60 survives and the level-diff below is preserved.
+    victim.ch_class = 2
     attacker.level = 8
     victim.level = 12
 
@@ -204,21 +211,23 @@ def test_npc_unarmed_parry_half_chance():
     """Test that NPCs can parry unarmed at half chance"""
     attacker, victim = setup_combat()
 
-    # Make victim an NPC without weapon
+    # Make victim an NPC without weapon.
+    # HANDLER-008: get_skill ignores the skills dict for NPCs and uses ROM's
+    # formula — parry = level*2 gated by OFF_PARRY (src/handler.c:373-432). The old
+    # skills["parry"]=60 is now inert; set the flag instead. At level 10:
+    # get_skill=20 -> /2 = 10 -> unarmed-NPC halved = 5 (level diff 10-10 = 0).
     victim.is_npc = True
-    victim.skills["parry"] = 60
+    victim.off_flags = int(OffFlag.PARRY)
     victim.has_weapon_equipped = False
     victim.can_see = lambda x: True
 
-    with patch("mud.utils.rng_mm.number_percent", return_value=20):
-        # Base chance = 60/2 = 30, halved for no weapon = 15
-        # Plus level diff: 15 + (10-10) = 15
-        # Since RNG returns 20, this should NOT parry (>= 15)
+    with patch("mud.utils.rng_mm.number_percent", return_value=5):
+        # Chance = 5; RNG 5 >= 5, this should NOT parry
         result = check_parry(attacker, victim)
         assert not result
 
-    with patch("mud.utils.rng_mm.number_percent", return_value=14):
-        # 14 < 15, should parry
+    with patch("mud.utils.rng_mm.number_percent", return_value=4):
+        # 4 < 5, should parry
         result = check_parry(attacker, victim)
         assert result
 

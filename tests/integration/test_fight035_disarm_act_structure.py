@@ -83,6 +83,13 @@ def _wield(victim: Character, *, extra_flags: int = 0) -> SimpleNamespace:
 
 def _caster(room: Room, **kw) -> Character:
     ch = _pc("Duelist", room, **kw)
+    # HANDLER-008: do_disarm gates on get_skill(ch, "disarm"), which returns 0 for a
+    # PC below the class skill level. Default class is mage (disarm@53); this caster
+    # is level 30, so it must be a class that learns disarm early — warrior (class 3,
+    # disarm@11). Without this the gate depends on whether a sibling test populated
+    # the global skill_registry (this file never calls initialize_world), making the
+    # disarm gate a cross-file-ordering flake under xdist.
+    ch.ch_class = 3
     ch.skills.update({"disarm": 85, "hand to hand": 70, "sword": 80})
     return ch
 

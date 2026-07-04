@@ -1,5 +1,5 @@
 from mud.commands import process_command
-from mud.models.constants import DamageType
+from mud.models.constants import DamageType, OffFlag
 from mud.world import create_test_character, initialize_world
 
 
@@ -11,6 +11,15 @@ def _setup_pair():
     attacker = create_test_character("Attacker", 3001)
     victim = create_test_character("Victim", 3001)
     victim.is_npc = True  # Ensure victim is NPC to avoid PK restrictions
+    # HANDLER-008: get_skill ignores an NPC's skills dict and uses ROM's formula
+    # (parry/dodge = level*2 gated by OFF_PARRY/OFF_DODGE; shield block = 10+2*level).
+    # Give the mob a level so the formula yields positive chances; per-test OFF
+    # flags below select which defenses can fire. Equalize attacker/victim level so
+    # the check_* level-diff modifier (victim.level - attacker.level) is 0 — otherwise
+    # a positive diff would grant parry a chance even with no OFF_PARRY (ROM adds the
+    # diff after the skill term, src/fight.c), stealing the win from dodge.
+    victim.level = 10
+    attacker.level = 10
     attacker.hitroll = 100
     attacker.damroll = 3
     attacker.dam_type = int(DamageType.BASH)
@@ -37,10 +46,10 @@ def test_parry_triggers_before_dodge_and_shield_block(monkeypatch):
     from mud.utils import rng_mm
 
     attacker, victim = _setup_pair()
-    # Set ROM-style skill attributes that our implementation uses
-    victim.skills["shield block"] = 100  # Will give 100/5 + 3 = 23% base chance
-    victim.skills["parry"] = 100
-    victim.skills["dodge"] = 100
+    # HANDLER-008: all three defenses enabled via ROM's NPC formula so the
+    # priority order (parry checked before dodge before shield block) is what
+    # selects the winner. At level 10: parry/dodge get_skill=20, shield=30.
+    victim.off_flags = int(OffFlag.PARRY | OffFlag.DODGE)
     # Must have shield equipped for shield block to work
     victim.has_shield_equipped = True
     # Ensure percent roll always hits the threshold
@@ -53,8 +62,8 @@ def test_parry_triggers_when_no_shield(monkeypatch):
     from mud.utils import rng_mm
 
     attacker, victim = _setup_pair()
-    # Set ROM-style skill attribute that our implementation uses
-    victim.skills["parry"] = 100  # Will give 100/2 = 50% base chance
+    # HANDLER-008: OFF_PARRY → get_skill=level*2=20 → chance = 20/2 + leveldiff.
+    victim.off_flags = int(OffFlag.PARRY)
     victim.has_weapon_equipped = True
     monkeypatch.setattr(rng_mm, "number_percent", lambda: 1)
     out = deliver_kill(attacker, "victim")
@@ -65,8 +74,9 @@ def test_dodge_triggers_when_no_shield_or_parry(monkeypatch):
     from mud.utils import rng_mm
 
     attacker, victim = _setup_pair()
-    # Set ROM-style skill attribute that our implementation uses
-    victim.skills["dodge"] = 100  # Will give (100/2) + (victim.level/2) base chance
+    # HANDLER-008: OFF_DODGE only (no OFF_PARRY, no shield) so dodge is the sole
+    # defense that can fire → get_skill=level*2=20 → chance = 20/2 + leveldiff.
+    victim.off_flags = int(OffFlag.DODGE)
     monkeypatch.setattr(rng_mm, "number_percent", lambda: 1)
     out = deliver_kill(attacker, "victim")
     assert out == "Victim dodges your attack."

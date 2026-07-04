@@ -31,6 +31,11 @@ def _world():
 def _pair():
     attacker = create_test_character("Attacker", _ROOM)
     victim = create_test_character("Victim", _ROOM)
+    # HANDLER-008: get_skill gates a PC below the class skill level (default class
+    # mage learns dodge@20). Thief (class 2) learns dodge@1; equal levels keep the
+    # level-diff modifier at 0 so the base chance stays exactly 100/2 = 50.
+    victim.ch_class = 2
+    attacker.level = victim.level = 10
     victim.skills["dodge"] = 100  # base chance = 100 / 2 = 50
     victim.position = Position.STANDING
     attacker.position = Position.STANDING

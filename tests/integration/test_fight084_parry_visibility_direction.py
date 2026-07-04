@@ -30,6 +30,11 @@ def _world():
 def _pair():
     attacker = create_test_character("Attacker", _ROOM)
     victim = create_test_character("Victim", _ROOM)
+    # HANDLER-008: get_skill gates a PC below the class skill level (default class
+    # mage learns parry@22). Warrior (class 3) learns parry@1; equal levels keep the
+    # level-diff modifier at 0 so the base chance stays exactly 100/2 = 50.
+    victim.ch_class = 3
+    attacker.level = victim.level = 10
     victim.skills["parry"] = 100  # base chance = 100 / 2 = 50
     victim.has_weapon_equipped = True
     victim.position = Position.STANDING
