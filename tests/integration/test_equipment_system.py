@@ -191,6 +191,36 @@ def test_wear_shield_sets_shield_slot(test_character, object_factory):
     assert shield in char.equipment.values(), "Shield should be in equipment"
 
 
+def test_wear_count_prefix_selects_nth_item(test_character, object_factory):
+    """WEAR-010 — `wear N.item` count prefix must resolve.
+
+    ROM do_wear finds its target via get_obj_carry (src/act_obj.c:1726), which
+    parses the leading ``N.`` count; the pre-fix port used a substring-only finder
+    that never split the prefix, so `wear 2.ring` returned "You do not have that
+    item." where ROM wears one of two same-named rings (wield/hold delegate here too).
+    """
+    char = test_character
+    for vnum in (1091, 1092):
+        ring = object_factory(
+            {
+                "vnum": vnum,
+                "name": "ring",
+                "short_descr": "a plain ring",
+                "item_type": int(ItemType.ARMOR),
+                "wear_flags": int(WearFlag.WEAR_FINGER),
+                "value": [0, 0, 0, 0],
+            }
+        )
+        char.add_object(ring)
+
+    result = process_command(char, "wear 2.ring")
+
+    assert result != "You do not have that item.", "the N.name count prefix must resolve"
+    assert "wear" in result.lower(), f"should confirm wearing, got: {result}"
+    worn = [o for o in char.equipment.values() if o is not None and "ring" in (getattr(o, "name", "") or "")]
+    assert len(worn) == 1, "exactly one ring worn"
+
+
 def test_cannot_wear_two_shields(test_character, object_factory):
     """
     Test: Cannot wear two shields simultaneously.

@@ -102,6 +102,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **WEAR-010: `wear/wield/hold N.item` count prefix now resolves.** `do_wear`
+  found its target with a substring-only helper instead of ROM's `get_obj_carry`
+  (`src/act_obj.c:1726`), so `wear 2.ring` returned "You do not have that item."
+  where ROM wears the 2nd of two same-named rings. `wield`/`hold` delegate to
+  `do_wear`, so all three were affected. Same finder class as EAT-008; wired to the
+  existing `get_obj_carry`. Test:
+  `tests/integration/test_equipment_system.py::test_wear_count_prefix_selects_nth_item`.
+
 - **EAT-008: `eat N.item` count prefix now resolves.** `do_eat` found its target
   with a substring-only helper instead of ROM's `get_obj_carry`
   (`src/act_obj.c:1296`), so the `N.name` count prefix never parsed — `eat

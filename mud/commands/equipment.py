@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 from mud.handler import equip_char, unequip_char
 from mud.models.constants import ExtraFlag, ItemType, Position, WearFlag, WearLocation
 from mud.utils.act import act_to_room
+from mud.world.obj_find import get_obj_carry
 
 if TYPE_CHECKING:
     from mud.models.character import Character
@@ -155,8 +156,10 @@ def do_wear(ch: Character, args: str) -> str:
     if args.lower() == "all":
         return _wear_all(ch)
 
-    # Find object in inventory
-    obj = _find_obj_inventory(ch, args)
+    # Find object in inventory — ROM src/act_obj.c:1726 uses get_obj_carry, which
+    # parses the `N.name` count prefix and matches keywords (WEAR-010). wield/hold
+    # delegate to do_wear, so this covers all three.
+    obj = get_obj_carry(ch, args)
     if not obj:
         return "You do not have that item."
 
@@ -658,26 +661,5 @@ def _get_wear_location(obj: Object, wear_flags: int, ch: Character | None = None
         return WearLocation.SHIELD
     if wear_flags & WearFlag.WEAR_FLOAT:
         return WearLocation.FLOAT
-
-    return None
-
-
-def _find_obj_inventory(ch: Character, name: str) -> Object | None:
-    """Find an object in character's inventory by name."""
-    inventory = getattr(ch, "inventory", [])
-    if not inventory or not name:
-        return None
-
-    name_lower = name.lower()
-    for obj in inventory:
-        # Check short description
-        short_descr = getattr(obj, "short_descr", "")
-        if name_lower in short_descr.lower():
-            return obj
-
-        # Check name
-        obj_name = getattr(obj, "name", "")
-        if name_lower in obj_name.lower():
-            return obj
 
     return None
