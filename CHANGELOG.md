@@ -24,9 +24,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `starlette < 1.0`, `sse-starlette` needs `>= 0.49.1` — no single global version
   works), which silently broke 4 web/session test files at collection when the
   global `starlette` drifted to 1.3.1. Setup: `python3 -m venv .venv &&
-  .venv/bin/python -m pip install -e ".[dev]"` (the `[dev]` extra is authoritative;
-  the `requirements-dev.txt` lock is missing the test plugins). The project's own
-  pins were always correct — only the global env was wrong.
+  .venv/bin/python -m pip install -r requirements-dev.txt`. The project's own pins
+  were always correct — only the global env was wrong.
+
+### Fixed (dev tooling)
+
+- **`requirements-dev.txt` lock now includes the test plugins.** Added
+  `pytest-xdist`, `pytest-timeout`, and `hypothesis` to `requirements-dev.in` and
+  regenerated the pip-compiled lock (existing pins preserved). Previously the lock
+  omitted these plugins that `pyproject`'s `[dev]` extra and the default `addopts`
+  (`-n auto`, `--timeout`) require, so a fresh `pip install -r requirements-dev.txt`
+  produced a venv that couldn't even parse the pytest options. A clean install from
+  the lock now yields a runnable suite.
 
 - **Coverage-lock: `aggr_update` victim reservoir selection.** New
   `TestAggressiveUpdateVictimReservoir` in

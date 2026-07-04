@@ -302,10 +302,15 @@ own pins (`requirements*.txt`, `pyproject`) are correct and internally consisten
 **Durable fix — one-time setup:**
 
 ```bash
-python3 -m venv .venv                     # .venv/ is gitignored
+python3 -m venv .venv                             # .venv/ is gitignored
 .venv/bin/python -m pip install -U pip
-.venv/bin/python -m pip install -e ".[dev]"   # authoritative dev set from pyproject [dev]
+.venv/bin/python -m pip install -r requirements-dev.txt   # pinned, reproducible lock
 ```
+
+`mud` is imported from the repo root (tests run from there), so the lock — which
+installs deps only, not the package — is sufficient; no `pip install -e .` needed.
+`pip install -e ".[dev]"` also works (unpinned floors from `pyproject`'s `[dev]`
+extra + editable install) if you prefer.
 
 Then use it for every run:
 
@@ -317,14 +322,15 @@ Then use it for every run:
 
 (Or `source .venv/bin/activate` once per shell, then the bare commands work.)
 
-**Gotcha:** the pip-compiled lock `requirements-dev.txt` is **missing** the
-test-only plugins (`pytest-xdist`, `pytest-timeout`, `hypothesis`) that
-`pyproject`'s `[project.optional-dependencies].dev` declares — so
-`pip install -r requirements-dev.txt` alone yields a venv that can't parse the
-default `addopts` (`-n auto`, `--timeout`). **Install with `-e ".[dev]"`**, which
-is the complete, authoritative dev set. (Regenerating the lock from a
-`requirements-dev.in` that includes those plugins would fix the inconsistency —
-not yet done.)
+**Editing dependencies:** `requirements-dev.txt` is a pip-compiled lock — edit
+`requirements-dev.in` (which itself pulls in `requirements.in`), then regenerate
+with pip-tools (`.venv/bin/python -m pip install pip-tools` once):
+`.venv/bin/pip-compile --output-file=requirements-dev.txt requirements-dev.in`
+(without `--upgrade`, so existing pins are preserved and only the delta resolves).
+The lock now includes the test plugins (`pytest-xdist`, `pytest-timeout`,
+`hypothesis`) the default `addopts` needs — a fresh `pip install -r
+requirements-dev.txt` yields a runnable suite. Keep `requirements-dev.in`,
+`requirements.in`, and `pyproject`'s `[dev]` extra in agreement when you touch deps.
 
 ### Hang-guard: `--timeout` in the default addopts
 
