@@ -39,23 +39,31 @@ Replace each `shield_skill = _get_skill_percent(victim, "shield block", "shield_
 `get_skill(victim, "…")`. (`get_skill` is already imported in engine.py.) **Migrate
 all three together — a partial (e.g. shield-only) leaves the trio inconsistent.**
 
-## Why it's delicate — the five hazards (all confirmed this session)
+## Why it's delicate — the five hazards
 
-1. **PC class-level gate.** `get_skill` returns 0 for a PC below the skill's class
+**Evidence grading (read before trusting these).** The migration was live in the
+working tree and `pytest -k "parry or dodge or shield or defense or check_"` returned
+**13 failed / 119 passed** — that trigger and hazards **[1], [3], [4]** are
+*observed* (I read the failing tests). Hazards **[2]** and **[5]** are *inferred* —
+logically derived from the skill-level table and the chance formula, **not** isolated
+to a specific failing test. Treat them as "likely, verify on contact," not fact.
+
+1. **[OBSERVED] PC class-level gate.** `get_skill` returns 0 for a PC below the skill's class
    level. `parry.levels = (22,20,13,1)`, `dodge.levels = (20,22,1,13)`,
    `shield block.levels = (1,1,1,1)` (order: mage, cleric, thief, warrior). Test
    defenders default to `ch_class=0` (mage) — below parry(22)/dodge(20) at typical
    test levels → gated to 0 → the check never fires.
 
-2. **Level-diff-preserving class fixes.** The `check_*` formula tests assert
-   `chance = skill/K + (victim.level - attacker.level)`. You **cannot** just raise
-   the defender's level to clear the gate — that shifts the level-diff modifier and
-   breaks the assertion. Fix by setting a **class** that learns the skill early
+2. **[INFERRED] Level-diff-preserving class fixes.** Deduced from the formula, not
+   broken-then-fixed in a run. The `check_*` formula tests assert
+   `chance = skill/K + (victim.level - attacker.level)`, so raising *only* the
+   defender's level to clear the gate would shift the level-diff modifier and break
+   the assertion. The safe fix is to set a **class** that learns the skill early
    (warrior for parry, thief for dodge) at the *existing* level, OR raise **both**
    attacker and victim levels equally. Caveat: the latter shifts THAC0/damage in
    full-combat `deliver_kill` tests — so per-test judgment, not a blanket sweep.
 
-3. **NPC formula expected-value rewrites (the silently-wrong trap).** NPC defense
+3. **[OBSERVED] NPC formula expected-value rewrites (the silently-wrong trap).** NPC defense
    tests set `victim.skills["parry"] = 60` and assert 60-based chances. ROM
    `get_skill` **ignores the dict for NPCs** and uses the `level*2` formula, so the
    expected chance changes (e.g. `60/2` → `(level*2)/2`). These tests assert non-ROM
@@ -63,7 +71,7 @@ all three together — a partial (e.g. shield-only) leaves the trio inconsistent
    `get_skill`'s actual output; do not guess. Known NPC-defender test:
    `test_combat_rom_parity.py::test_npc_unarmed_parry_half_chance`.
 
-4. **`fallback_attr` pattern.** `_get_skill_percent(victim, "parry", "parry_skill")`
+4. **[OBSERVED] `fallback_attr` pattern.** `_get_skill_percent(victim, "parry", "parry_skill")`
    reads a `victim.parry_skill` attribute fallback; `get_skill` does **not**. Three
    test files set the fallback attrs directly:
    `tests/integration/test_fight_031_combat_act_capitalization.py`,
@@ -71,19 +79,26 @@ all three together — a partial (e.g. shield-only) leaves the trio inconsistent
    etc.). Switch these to `defender.skills["parry"] = …` (PC, with proper class/level)
    or NPC `off_flags` (OFF_PARRY/OFF_DODGE).
 
-5. **Combined parry+dodge is structurally gated.** No single class learns both parry
-   (warrior=1, mage=22) and dodge (thief=1, warrior=13) below level 13. A test that
-   sets a defender's parry AND dodge at a low level is **incompatible with ROM's
-   class-gate** — such a defender can't exist. Give it `level ≥ 13` (bump both
-   attacker+victim to hold the level-diff) or split the test.
+5. **[INFERRED] Combined parry+dodge is structurally gated.** Deduced from the
+   levels table alone — I did **not** confirm a specific existing test sets both
+   defenses below level 13 and fails for this reason; verify before relying on it.
+   The deduction: the minimum level at which any class knows both parry and dodge is
+   13 (thief parry 13 / dodge 1; warrior parry 1 / dodge 13), so a defender with both
+   at level <13 can't exist in ROM. If such a test exists, `get_skill` gates one
+   defense to 0; fix by giving it `level ≥ 13` (bump both attacker+victim to hold the
+   level-diff) or splitting the test.
 
 ## Method (do it this way)
 
 1. Migrate all three lookups.
 2. Run the **full** suite (`pytest`) — the per-area runs *lie*: the defensive
-   checks run on **every combat hit**, so spillover appears in non-defense-named
-   combat tests. (This session's disarm/rescue migration hit exactly this — per-area
-   green, full-suite red with cross-file failures.)
+   checks run on **every combat hit**, so spillover likely appears in non-defense-named
+   combat tests. **[INFERRED for this migration]** — I never ran the full suite with the
+   defensive change live (reverted first); I only saw the `-k` filter (13) and a
+   combat-unit-files probe (9). The "expect full-suite spillover" warning is
+   *transferred* from this session's disarm/rescue migration, where it was measured
+   (per-area green, full suite caught 8 cross-file failures). So: run the full suite to
+   get the real defensive-migration count — don't assume it's 13.
 3. Triage each failure by category above. For a PC test → class/level fix
    (level-diff-preserving). For an NPC test → recompute the expected chance from the
    formula and verify against `get_skill`. For a fallback-attr test → switch to the
@@ -92,7 +107,9 @@ all three together — a partial (e.g. shield-only) leaves the trio inconsistent
    mechanically against `get_skill`'s known output, that's the same signal that
    triggered this revert — don't force it.
 
-## Affected tests (the ~13 confirmed when the migration was live)
+## Affected tests
+
+**The 13 that actually failed** (observed in the `-k` run with the change live):
 
 - `tests/test_critical_function_parity.py::TestDefenseChecks::{test_check_parry_formula, test_check_dodge_formula}`
 - `tests/test_combat_defenses_prob.py::{test_parry_triggers_before_dodge_and_shield_block, test_parry_triggers_when_no_shield, test_dodge_triggers_when_no_shield_or_parry}`
@@ -100,9 +117,14 @@ all three together — a partial (e.g. shield-only) leaves the trio inconsistent
 - `tests/test_combat.py::test_parry_blocks_when_skill_learned` (PC defender; the *attacker* is the NPC)
 - `tests/integration/test_fight084_parry_visibility_direction.py` (2 — PC defender, class/level fix)
 - `tests/integration/test_fight089_dodge_visibility_direction.py` (2 — PC defender, class/level fix)
-- `tests/integration/test_fight_031_*` + `test_fight_032_*` (fallback-attr → dict/off_flags)
 
-Expect a few more from full-suite combat spillover; run the full suite to enumerate.
+**Grep-derived candidate (NOT in the failure run):**
+`tests/integration/test_fight_031_*` + `test_fight_032_*` set the `parry_skill`/`dodge_skill`
+fallback attrs — they'd break once migrated, but I found them via grep, not a failing run, so
+confirm on contact.
+
+Expect more from full-suite combat spillover (see Method step 2 — count not measured for this
+migration); run the full suite to enumerate.
 
 ## After it lands
 
