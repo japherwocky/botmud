@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.267] - 2026-07-05
+
+### Fixed (CI)
+
+- **CI Tests workflow green again after ~10 months red** (last passed 2025-09-15
+  at v1.2.3, when the suite was tiny). Two root causes, both confirmed by
+  reproducing the failure locally:
+  - **Unpinned deps → bleeding-edge crash.** The job installed `.[dev,test]`
+    (unpinned floors), which pip resolved to **pytest 9.1.1 / pytest-xdist 3.8.0**.
+    That stack crashes xdist workers mid-run (`node down: Not properly terminated`
+    → `INTERNALERROR` in `loadscope._reschedule`) — reproduced on a machine with
+    ample RAM, so it is a plugin incompatibility, not OOM. The pinned lock
+    (`requirements-dev.txt`, pytest 8.x — the same stack that runs green locally)
+    does not. **Fix:** the full-suite job now installs `-r requirements-dev.txt`.
+  - **Suite outgrew the 10-minute cap.** 6131 tests need ~13 min at the runner's
+    worker count; the job capped at 10 min and always timed out. **Fix:**
+    `timeout-minutes: 30`.
+- **CI cost reduced.** The 3-way full-suite matrix (3.10/3.11/3.12, ~30 CI-min/push,
+  all failing) is replaced by one full-suite run on **3.12** (the version the lock
+  is built + proven against) plus near-free **`--collect-only`** import smokes on
+  **3.10/3.11** that guard the "Python 3.10+" floor (these would have caught the
+  `datetime.UTC` 3.10 break in 2.14.266). Net: fewer CI minutes *and* green.
+- Note: the separate `CI` workflow (`ci.yml`) remains **disabled** (it was turned
+  off manually); its coverage gate + drift/mypy/rng static checks are not
+  currently enforced. Re-enabling it (pinned, with a timeout) is a follow-up.
+
 ## [2.14.266] - 2026-07-05
 
 ### Fixed

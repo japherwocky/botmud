@@ -7,13 +7,47 @@ on:
     branches: ["master", "main"]
 
 jobs:
+  # Full suite on the version the pinned lock is built + proven green against
+  # (local .venv is 3.12.3). Installing requirements-dev.txt gives the exact
+  # known-good stack (pytest 8.x etc.) — the unpinned `.[dev,test]` floors
+  # resolve to bleeding-edge pytest 9 / xdist 3.8, which crash xdist workers
+  # ("node down: Not properly terminated") and abort the run with an
+  # INTERNALERROR. See CHANGELOG 2.14.267.
   test:
+    name: Full suite (Python 3.12, pinned)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Lint with ruff
+        run: ruff check .
+        continue-on-error: true
+      - name: Test with pytest
+        # Inherits addopts (-n auto --dist loadscope --timeout=120) from pyproject.
+        run: pytest --tb=short
+
+  # Cheap floor/ceiling guard: import + collect every test module on the other
+  # supported Pythons so version-specific breakage (e.g. `datetime.UTC`, a 3.11+
+  # API, on 3.10) is caught for pennies without running the full suite. Uses the
+  # unpinned extras deliberately — collection can't trigger the xdist worker
+  # crash (no tests execute), and testing against latest deps here is a free
+  # early-warning. addopts is cleared so no xdist/-n is involved.
+  collect-smoke:
+    name: Collect-only (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
-
+        python-version: ["3.10", "3.11"]
     steps:
       - uses: actions/checkout@v7
       - name: Set up Python ${{ matrix.python-version }}
@@ -24,16 +58,5 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e .[dev,test]
-      - name: Lint with ruff (if available)
-        run: |
-          # Check if ruff is available and run it
-          if command -v ruff &> /dev/null; then
-            ruff check .
-          else
-            echo "Ruff not available, skipping linting"
-          fi
-        continue-on-error: true
-      - name: Test with pytest
-        run: |
-          pytest --tb=short --timeout=30
-        timeout-minutes: 10
+      - name: Collect-only (guards imports on this Python)
+        run: pytest --collect-only -q -o addopts=""
