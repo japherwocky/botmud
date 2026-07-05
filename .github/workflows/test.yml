@@ -5,6 +5,7 @@ on:
     branches: ["master", "main"]
   pull_request:
     branches: ["master", "main"]
+  workflow_dispatch:
 
 jobs:
   # Full suite on the version the pinned lock is built + proven green against
@@ -13,10 +14,15 @@ jobs:
   # resolve to bleeding-edge pytest 9 / xdist 3.8, which crash xdist workers
   # ("node down: Not properly terminated") and abort the run with an
   # INTERNALERROR. See CHANGELOG 2.14.267.
+  #
+  # Cost: this run is ~32 CI-min. It is therefore gated to pull_request +
+  # manual dispatch only — direct pushes to master run just the cheap smokes
+  # below (the dev validates the full suite locally via .venv). See 2.14.268.
   test:
     name: Full suite (Python 3.12, pinned)
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
       - name: Set up Python 3.12

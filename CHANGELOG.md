@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.268] - 2026-07-05
+
+### Changed (CI)
+
+- **Full test suite gated to pull-request + manual dispatch; master pushes run
+  only the collect-smokes.** Empirically the pinned full suite takes ~32 CI-min
+  on a GitHub runner (verified: it ran clean to 98% with no worker crash, i.e.
+  the 2.14.267 pinning fix works — it just needs headroom), so running it on
+  every push would cost ~36 CI-min/push, no cheaper than the old broken matrix.
+  Direct pushes to master now trigger just the ~4-min 3.10/3.11 import smokes
+  (the full suite is validated locally via `.venv` before pushing); the full
+  suite still gates PRs and is runnable on demand via `workflow_dispatch`.
+  Full-suite `timeout-minutes` raised 30 → 40 for headroom.
+
 ## [2.14.267] - 2026-07-05
 
 ### Fixed (CI)
