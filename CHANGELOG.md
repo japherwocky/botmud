@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.265] - 2026-07-05
+
+### Changed (dev tooling)
+
+- **CI: bump GitHub Actions off deprecated Node 20.** `actions/checkout@v4→v7`,
+  `actions/setup-python@v5→v6`, `actions/upload-artifact@v4→v7`,
+  `actions/download-artifact@v4→v8` across `ci.yml`, `release.yml`, `test.yml`,
+  `docker-image.yml` — GitHub was force-running the v4/v5 actions on Node 24 and
+  warning they target the deprecated Node 20 runtime. `pypa/gh-action-pypi-publish`
+  is Docker-based and unaffected. No workflow logic changed.
+
 ## [2.14.264] - 2026-07-05
 
 ### Changed
