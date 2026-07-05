@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.266] - 2026-07-05
+
+### Fixed
+
+- **Python 3.10 compatibility: `admin_logging` no longer imports `datetime.UTC`.**
+  `datetime.UTC` is a Python **3.11+** alias; `mud/admin_logging/admin.py` used it,
+  and since that module is imported transitively across the engine, every test
+  collecting `mud` failed at import under 3.10 (`ImportError: cannot import name
+  'UTC' from 'datetime'`) — making the advertised "Python 3.10+" support false in
+  CI. Swapped to `timezone.utc` (available since 3.2, behavior-identical). Also
+  fixed the same import in `tests/test_logging_rotation.py`.
+
 ## [2.14.265] - 2026-07-05
 
 ### Changed (dev tooling)

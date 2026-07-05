@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -100,7 +100,7 @@ def log_admin_command(
     """
 
     Path("log").mkdir(exist_ok=True)
-    timestamp = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     sanitized = _sanitize_command_line(command_line)
     if character is not None:
         try:
@@ -132,7 +132,7 @@ def rotate_admin_log(today: datetime | None = None) -> Path:
     active = log_dir / "admin.log"
     if not active.exists():
         return active
-    dt = today or datetime.now(UTC)
+    dt = today or datetime.now(timezone.utc)
     dated = log_dir / f"admin-{dt.strftime('%Y%m%d')}.log"
     # Avoid clobbering: if dated file exists, append current log and remove active
     if dated.exists():

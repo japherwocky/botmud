@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from mud import game_loop
@@ -50,7 +50,7 @@ def test_rotate_on_midnight_tick(tmp_path, monkeypatch):
     game_loop.game_tick()
     # After midnight, admin.log should be rotated to today's date
     # Use current UTC date for naming
-    today = datetime.now(UTC).strftime("%Y%m%d")
+    today = datetime.now(timezone.utc).strftime("%Y%m%d")
     assert (Path("log") / f"admin-{today}.log").exists()
 
 
