@@ -5218,10 +5218,13 @@ def heat_metal(
     room = getattr(target, "room", None)
     iter_carrying = getattr(target, "iter_carrying", None)
     if callable(iter_carrying):
+        # Both Character (re-merged inventory+equipment by _carry_seq) and
+        # MobInstance (single head-inserted inventory list — MAGIC-046) expose
+        # iter_carrying in ROM victim->carrying LIFO order.
         all_items = list(iter_carrying())
     else:
-        # MobInstance has no _carry_seq acquisition tracking yet; fall back to the
-        # inventory (already head-inserted LIFO) + equipment combination.
+        # Last-resort fallback for any other carrier type: inventory (head-inserted
+        # LIFO) + equipment combination.
         inventory = list(getattr(target, "inventory", []) or [])
         equipment = dict(getattr(target, "equipment", {}) or {})
         all_items = inventory + list(equipment.values())

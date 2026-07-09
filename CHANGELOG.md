@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the old room and arriving in the new (`src/act_move.c:196-202`, suppressed when
   sneaking/wizinvis). The Python inline flee move omitted both; bystanders now
   see the fleer come and go. Remaining charmed-follower cascade filed as MOVE-010.
+- **MAGIC-046 (remainder) — `MobInstance.iter_carrying`.** `heat_metal` and any
+  mechanic mirroring ROM's `victim->carrying` walk now iterate a mob's items in
+  ROM LIFO order via a first-class `MobInstance.iter_carrying()`, instead of the
+  generic inventory+equipment fallback. Behaviorally identical (mobs already keep
+  worn+carried gear in one head-inserted list) but explicit and robust.
 
 ## [2.14.268] - 2026-07-05
 

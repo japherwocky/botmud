@@ -500,6 +500,20 @@ class MobInstance:
             self.inventory.insert(0, obj)
         obj.carried_by = self
 
+    def iter_carrying(self) -> list[Object]:
+        """Return this mob's items in ROM ``victim->carrying`` (LIFO) order.
+
+        MAGIC-046: unlike ``Character`` (which splits carried ``inventory`` from
+        worn ``equipment`` and must re-merge by ``_carry_seq``), a mob keeps
+        worn and carried items in the single ``inventory`` list — equip only
+        flips ``wear_loc`` (FINDING-025), and every acquisition path
+        (``add_to_inventory``/``equip``, reset G/E) head-inserts, so the list is
+        already newest → oldest exactly like ROM's ``ch->carrying``. Mechanics
+        mirroring ROM's carrying walk (``heat_metal``) iterate this instead of
+        the generic ``inventory + equipment.values()`` fallback.
+        """
+        return list(self.inventory)
+
     def remove_object(self, obj: Object) -> None:
         # ROM src/handler.c obj_from_char: unequip first if worn, then strip
         # from carried list. Mirror that here so disarm/remove paths actually
