@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and, for non-immortal attackers, sends "You really shouldn't cheat." and
   extracts the wielded weapon. `mud/combat/engine.py:apply_damage` now mirrors
   this. Spell hits (dt below TYPE_HIT) are exempt, matching ROM.
+- **MOVE-009 — `do_flee` now broadcasts "$n leaves"/"$n has arrived".** ROM
+  flees via `move_char` (`src/fight.c:3002`), which announces the fleer leaving
+  the old room and arriving in the new (`src/act_move.c:196-202`, suppressed when
+  sneaking/wizinvis). The Python inline flee move omitted both; bystanders now
+  see the fleer come and go. Remaining charmed-follower cascade filed as MOVE-010.
 
 ## [2.14.268] - 2026-07-05
 

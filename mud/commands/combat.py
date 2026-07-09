@@ -11,6 +11,7 @@ from mud.models.character import Character
 from mud.models.constants import (
     AC_BASH,
     EX_CLOSED,
+    LEVEL_HERO,
     LEVEL_IMMORTAL,
     ActFlag,
     AffectFlag,
@@ -44,6 +45,9 @@ _FLEE_MOVEMENT_LOSS: dict[Sector, int] = {
     Sector.AIR: 10,
     Sector.DESERT: 6,
 }
+
+# mirroring ROM src/act_move.c dir_name[] — indexed by door number (0..5).
+_FLEE_DIR_NAMES: tuple[str, ...] = ("north", "east", "south", "west", "up", "down")
 
 
 def _kill_safety_message(attacker: Character, victim: Character) -> str | None:
@@ -815,8 +819,20 @@ def do_flee(char: Character, args: str) -> str:
                 continue  # too exhausted — mirrors move_char returning without moving
             flee_move_cost = cost
 
+        # MOVE-009: ROM src/fight.c:3002 flees via move_char(ch, door, FALSE),
+        # which broadcasts "$n leaves $T." to the fled-from room and "$n has
+        # arrived." to the destination (src/act_move.c:196-202) — suppressed for
+        # a sneaking or wizinvis fleer. The inline flee move omitted both.
+        show_movement = not (
+            char.has_affect(AffectFlag.SNEAK) or int(getattr(char, "invis_level", 0) or 0) >= LEVEL_HERO
+        )
+        dir_name = _FLEE_DIR_NAMES[door] if door < len(_FLEE_DIR_NAMES) else ""
+        if show_movement:
+            act_to_room(was_in, "$n leaves $T.", char, arg2=dir_name, exclude=char)
         was_in.remove_character(char)
         new_room.add_character(char)
+        if show_movement:
+            act_to_room(new_room, "$n has arrived.", char, exclude=char)
         now_in = new_room
         break
 
