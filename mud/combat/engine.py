@@ -688,6 +688,25 @@ def apply_damage(
     if victim.position == Position.DEAD:
         return "Already dead."
 
+    # FIGHT-093 — "Stop up any residual loopholes." (ROM src/fight.c:697-713).
+    # A physical hit (dt >= TYPE_HIT) dealing more than 1200 raw damage is clamped
+    # to 1200; a non-immortal attacker is penalized with "You really shouldn't
+    # cheat." and has their wielded weapon extracted from the game (extract_obj).
+    # This runs before the >35/>80 reduction, exactly as in ROM.
+    if damage > 1200 and _should_check_weapon_defenses(dt):
+        damage = 1200
+        is_imm = getattr(attacker, "is_immortal", None)
+        attacker_immortal = bool(is_imm()) if callable(is_imm) else False
+        if not attacker_immortal:
+            # mirroring ROM src/fight.c:707-711 — get_eq_char(ch, WEAR_WIELD) then
+            # send "You really shouldn't cheat." and extract_obj on the weapon.
+            weapon = get_wielded_weapon(attacker)
+            _push_message(attacker, "You really shouldn't cheat.")
+            if weapon is not None:
+                from mud.game_loop import _extract_obj
+
+                _extract_obj(weapon)
+
     # mirroring ROM src/fight.c:717-720 — damage soft-cap applied before all other
     # modifiers; reduces raw spikes to prevent instant-kill from single high-damage hits.
     if damage > 35:

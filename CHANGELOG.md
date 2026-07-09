@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **FIGHT-093 — `damage()` 1200-point loophole cap + weapon-extract cheat
+  penalty.** ROM `src/fight.c:697-713` clamps any physical hit (`dt >= TYPE_HIT`)
+  dealing more than 1200 raw damage back to 1200 (before the >35/>80 reduction)
+  and, for non-immortal attackers, sends "You really shouldn't cheat." and
+  extracts the wielded weapon. `mud/combat/engine.py:apply_damage` now mirrors
+  this. Spell hits (dt below TYPE_HIT) are exempt, matching ROM.
+
 ## [2.14.268] - 2026-07-05
 
 ### Changed (CI)

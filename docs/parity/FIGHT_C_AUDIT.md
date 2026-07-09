@@ -346,12 +346,27 @@ affects every swing) and FIGHT-082 (HIGH).
   `_broadcast_pos_change(attacker, "{name} fades into existence.")` (PERS per-listener,
   actor-excluded, first-letter cap). Surfaced 2026-07-04 by a `damage()` side-effect
   probe in the autonomous loop. Test: `tests/integration/test_invisibility_combat.py::test_invisible_attacker_revealed_on_connecting_hit`.
-  **Secondary → FIGHT-093 (OPEN):** the `dam > 1200 && dt >= TYPE_HIT` loophole cap +
-  weapon-extract penalty (`src/fight.c:700-713`) and the `check_killer(ch, victim)`
-  call (`:733`) are absent from `apply_damage` (check_killer exists at engine.py:~1270
-  but its invocation on the damage path is unconfirmed). Low priority — the 1200 cap
-  needs an out-of-range damage input, PK-flagging is a broader subsystem. Verify vs
-  ROM C before closing.
+- **`FIGHT-093` — ✅ FIXED (2.14.269) — the `dam > 1200 && dt >= TYPE_HIT` loophole
+  cap + weapon-extract cheat penalty were absent from `apply_damage`.** ROM `damage()`
+  (`src/fight.c:697-713`, "Stop up any residual loopholes.") clamps any physical hit
+  (`dt >= TYPE_HIT`) whose raw damage exceeds 1200 back to 1200 — *before* the >35/>80
+  reduction — and, if the attacker is not immortal, sends "You really shouldn't cheat."
+  and `extract_obj`s the attacker's wielded weapon (`get_eq_char(ch, WEAR_WIELD)`).
+  Python `mud/combat/engine.py:apply_damage` had no equivalent, so an out-of-range
+  damage input passed straight into the reduction with no cap and no penalty. **Fix
+  (2.14.269):** added the cap block immediately after the `POS_DEAD` guard, gated by
+  the existing `_should_check_weapon_defenses(dt)` helper (which is exactly ROM's
+  `dt >= TYPE_HIT`, `fight.c:793`/`:700`); non-immortal attackers get the cheat message
+  via `_push_message` and lose their weapon via `mud.game_loop._extract_obj` (the ROM
+  `extract_obj` mirror). Test: `tests/integration/test_fight093_damage_1200_loophole.py`
+  (2 — non-immortal physical >1200 → cap + weapon extract + cheat message; spell dt
+  below TYPE_HIT → no penalty). Verified red before fix, green after. **Remaining →
+  FIGHT-094 (OPEN):** the `check_killer(ch, victim)` call at `fight.c:733` is still
+  absent from `apply_damage` — Python calls `check_killer` from the command layer
+  (do_kill/murder/backstab/…) instead of inside `damage()`, so any damage path not
+  routed through one of those verbs (mob one_hit, some spells) misses PK-flagging.
+  This is a broader PK-subsystem placement question (risk of double-flagging on the
+  command paths that already call it); filed for separate assessment.
 
 ### Follow-ups (FIGHT-022 / FIGHT-023 / FIGHT-025 / FIGHT-026 — filed, not yet closed)
 
