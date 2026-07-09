@@ -1,55 +1,56 @@
-# Session Status — 2026-07-04 — Autonomous /loop: 15 cold-path parity units (LOCAL, UNPUSHED)
+# Session Status — 2026-07-09 — Autonomous loop: 5 parity gaps + convergence (LOCAL, UNPUSHED)
 
 ## Current State
 
-- **Active focus**: Cross-file invariants / cold-path divergence hunting (per-file
-  audit tracker exhausted). This session ran a 15-unit autonomous `/loop`.
-- **Last completed** (2.14.249 → **2.14.264**, all committed **locally on
-  `master`, NOT pushed** — `bfe11040` → `86179e98`):
-  - **13 ROM-parity bug fixes**: EAT-008, WEAR-010, PUT-004 (INV-011), GET-016,
-    BUY-011, SELL-005 (act_obj object/shop); FIGHT-092 (invisible attacker revealed
-    on hit); MOVE-008 (container open/close order); MAGIC-047 (stone_skin
-    caster-gate), MAGIC-048 (chain_lightning bounce), MAGIC-049 (dispel_magic save
-    gate); AFFECTS-001 (affects double-colon), LOOK-010 (aura order + double-render);
-    PRACTICE-002 (below-level practice gate).
-  - **2 coverage-locks**: `aggr_update` reservoir (earlier session), and this
-    session's xp_compute neutral-align `c_div` truncation.
+- **Active focus**: Cross-file invariants / cold-path divergence hunting — surface
+  is **converging** (per-file audit tracker exhausted; fresh probes returning
+  already-faithful/already-fixed). This session ran an autonomous loop and closed
+  5 high-value gaps, then **stopped short of a requested "10"** because continued
+  hunting hit convergence (see summary).
+- **Last completed** (2.14.268 → **2.14.273**, all committed **locally on
+  `master`, NOT pushed** — `db31a1a0` → `82c32cf2`):
+  - **FIGHT-093** — damage() 1200 loophole cap + weapon-extract cheat penalty.
+  - **MOVE-009** — do_flee "$n leaves"/"$n has arrived" broadcasts.
+  - **MAGIC-046** (remainder) — `MobInstance.iter_carrying` for ROM carrying order.
+  - **MAGIC-050** — dispel_magic fixed spell-list order + per-effect room messages.
+  - **LOOK-011** — all 12 `show_char_to_char_0` status tags in the room listing.
+  - Doc: CONST str_app header corrected (both sub-gaps already FIXED).
 - **Pointer to latest summary**:
-  [SESSION_SUMMARY_2026-07-04_AUTONOMOUS_LOOP_15_GAPS.md](SESSION_SUMMARY_2026-07-04_AUTONOMOUS_LOOP_15_GAPS.md)
-  (the earlier same-day update.c cold-path session is
-  [SESSION_SUMMARY_2026-07-04_UPDATE_C_COLD_PATH_RNG.md](SESSION_SUMMARY_2026-07-04_UPDATE_C_COLD_PATH_RNG.md))
+  [SESSION_SUMMARY_2026-07-09_AUTONOMOUS_LOOP_5_GAPS.md](SESSION_SUMMARY_2026-07-09_AUTONOMOUS_LOOP_5_GAPS.md)
 
 ## Project Status (snapshot)
 
 | Metric | Value |
 |--------|-------|
-| Version | 2.14.264 |
-| Tests | **6127 passed, 4 skipped, 0 failed** (full suite via `.venv`, 180s) |
-| Cross-file invariants | INV-054 latest (unchanged); INV-011 touched by PUT-004 |
+| Version | 2.14.273 |
+| Tests | **6133 passed, 4 skipped, 0 failed** (full suite via `.venv`, ~330s) |
+| ROM C files audited | 43 / 43 (per-file tracker has no ⚠️ Partial P0/P1 rows) |
 | Push status | **All local on `master`, UNPUSHED** — awaiting user review |
-| Active focus | Cross-file invariants / cold-path divergence hunting |
+| Active focus | Cross-file invariants / cold-path (converging) |
 
 ## Open follow-ups (filed this session, not yet closed)
 
-- **FIGHT-093** — damage() 1200 loophole cap + check_killer absent from apply_damage.
-- **MOVE-009** — do_flee inline movement skips act broadcasts + follower cascade.
-- **MAGIC-046** — heat_metal MobInstance carry-order.
-- **MAGIC-050** — dispel_magic effect-list order + per-effect room messages.
-- **SPLIT-001** — do_split non-ROM `N gold`/`silver` keyword form (intentional
-  QuickMUD convenience; maintainer to decide whether to strip for strict parity).
-- **LOOK missing char tags** — Python renders 2 of ROM's ~12 (AFK/Invis/Wizi/Hide/
-  Charmed/Translucent/Red-Aura/Golden-Aura/KILLER/THIEF).
+- **FIGHT-094** — `check_killer` not in `apply_damage`. No observable KILLER-flag
+  gap today (round 1 flags via command layer; round 2+ early-returns on
+  `attacker.fighting is victim`). Closure is a subsystem-centralization decision.
+- **MOVE-010** — flee follower cascade (standing charmed pets follow a fleeing
+  master, `act_move.c:206-234`). Design-heavy; wants `do_flee`→`move_character`.
+- **SPLIT-001** — non-ROM `N gold`/`silver` keyword form in `do_split`
+  (intentional QuickMUD convenience — maintainer decision, not an auto-close).
+- Low-value OPEN backlog: BAN-001..004, HEDIT-*, BIT-001, DB2-004/005 (OLC/admin/
+  loader; several marked deferred/theoretical).
 
 ## Next Intended Task
 
-1. **Review + push.** 15 commits are local on `master`, unpushed. Review, then
-   `git push origin master`; optionally release 2.14.264 to PyPI.
-2. **Reindex GitNexus** — the on-disk index is stale (last `bfe1104`); the
-   background `npx gitnexus analyze` was failing with exit 144 this session (grep
-   fallback used, AGENTS.md-sanctioned). Run `npx gitnexus analyze --skip-agents-md`.
-3. **Run tests from `.venv`** (`.venv/bin/python -m pytest`) — the system framework
-   Python is over-constrained (see AGENTS.md "Build / Lint / Test → Environment").
-4. Continue cold-path / cross-INV hunting, or burn down the six OPEN follow-ups.
+1. **Review + push** the 6 unpushed commits on `master` (`db31a1a0`→`82c32cf2`);
+   optionally release 2.14.273 to PyPI.
+2. The high-value per-file surface is **converging**. The productive next mode is
+   the designed completeness tooling — a `/rom-divergence-sweep` pass on an
+   unswept class, or a `diff_harness` scenario for enumeration-independent
+   C-ground-truth divergences — rather than more per-file cold-path probing.
+3. If quantity of closures is wanted, burn down the low-value OPEN backlog above,
+   or take on the two design-heavy filed gaps (MOVE-010, FIGHT-094) as dedicated
+   (non-loop) sessions.
 
 **Known flake:** `tests/integration/test_character_advancement.py` (a
 `spec_cast_mage` test mocking `number_bits`→19) hangs when run in isolation
