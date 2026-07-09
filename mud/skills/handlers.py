@@ -3559,16 +3559,114 @@ def dispel_magic(caster: Character, target: Character | None = None) -> bool:
         _send_to_char(caster, "You failed.")
         return False
 
-    effects = getattr(target, "spell_effects", {})
-    if not isinstance(effects, dict) or not effects:
-        return False
+    # MAGIC-050: ROM spell_dispel_magic (src/magic.c:2089-2247) walks a FIXED
+    # hardcoded spell list in order — not the spell_effects dict — calling
+    # check_dispel per spell, with per-effect act(TO_ROOM) wear-off lines for
+    # certain spells, an AFF_SANCTUARY-bit fallback, and a final Ok./Spell failed.
+    # to the caster. The dict-iteration port lost the order, the room messages,
+    # the sanctuary-bit strip, and the result message. This mirrors the sibling
+    # `cancellation` walk (same list) minus its NPC gate and level+2.
+    found = False
+    room = getattr(target, "room", None)
 
-    success = False
-    for effect_name in list(effects.keys()):
-        if check_dispel(level, target, effect_name):
-            success = True
+    def _dispel(effect_name: str) -> bool:
+        return check_dispel(level, target, effect_name)
 
-    return success
+    if _dispel("armor"):
+        found = True
+    if _dispel("bless"):
+        found = True
+    if _dispel("blindness"):
+        found = True
+        act_to_room(room, "$n is no longer blinded.", target, exclude=target)
+    if _dispel("calm"):
+        found = True
+        act_to_room(room, "$n no longer looks so peaceful...", target, exclude=target)
+    if _dispel("change_sex"):
+        found = True
+        act_to_room(room, "$n looks more like $mself again.", target, exclude=target)
+    if _dispel("charm_person"):
+        found = True
+        act_to_room(room, "$n regains $s free will.", target, exclude=target)
+    if _dispel("chill_touch"):
+        found = True
+        act_to_room(room, "$n looks warmer.", target, exclude=target)
+    if _dispel("curse"):
+        found = True
+    if _dispel("detect_evil"):
+        found = True
+    if _dispel("detect_good"):
+        found = True
+    if _dispel("detect_hidden"):
+        found = True
+    if _dispel("detect_invis"):
+        found = True
+    if _dispel("detect_magic"):
+        found = True
+    if _dispel("faerie_fire"):
+        act_to_room(room, "$n's outline fades.", target, exclude=target)
+        found = True
+    if _dispel("fly"):
+        act_to_room(room, "$n falls to the ground!", target, exclude=target)
+        found = True
+    if _dispel("frenzy"):
+        act_to_room(room, "$n no longer looks so wild.", target, exclude=target)
+        found = True
+    if _dispel("giant_strength"):
+        act_to_room(room, "$n no longer looks so mighty.", target, exclude=target)
+        found = True
+    if _dispel("haste"):
+        act_to_room(room, "$n is no longer moving so quickly.", target, exclude=target)
+        found = True
+    if _dispel("infravision"):
+        found = True
+    if _dispel("invis"):
+        act_to_room(room, "$n fades into existance.", target, exclude=target)
+        found = True
+    if _dispel("mass_invis"):
+        act_to_room(room, "$n fades into existance.", target, exclude=target)
+        found = True
+    if _dispel("pass_door"):
+        found = True
+    if _dispel("protection_evil"):
+        found = True
+    if _dispel("protection_good"):
+        found = True
+    if _dispel("sanctuary"):
+        act_to_room(room, "The white aura around $n's body vanishes.", target, exclude=target)
+        found = True
+    # ROM src/magic.c:2209-2217 — an AFF_SANCTUARY *bit* not backed by a
+    # "sanctuary" spell effect (innate/item) is stripped on a failed saves_dispel.
+    if (
+        target.has_affect(AffectFlag.SANCTUARY)
+        and not saves_dispel(level, int(getattr(target, "level", 0) or 0), -1)
+        and "sanctuary" not in getattr(target, "spell_effects", {})
+    ):
+        target.remove_affect(AffectFlag.SANCTUARY)
+        act_to_room(room, "The white aura around $n's body vanishes.", target, exclude=target)
+        found = True
+    if _dispel("shield"):
+        act_to_room(room, "The shield protecting $n vanishes.", target, exclude=target)
+        found = True
+    if _dispel("sleep"):
+        found = True
+    if _dispel("slow"):
+        act_to_room(room, "$n is no longer moving so slowly.", target, exclude=target)
+        found = True
+    if _dispel("stone_skin"):
+        act_to_room(room, "$n's skin regains its normal texture.", target, exclude=target)
+        found = True
+    if _dispel("weaken"):
+        act_to_room(room, "$n looks stronger.", target, exclude=target)
+        found = True
+
+    # ROM src/magic.c:2249-2251 — result message to the caster.
+    if found:
+        _send_to_char(caster, "Ok.")
+    else:
+        _send_to_char(caster, "Spell failed.")
+
+    return found
 
 
 def earthquake(caster: Character, target=None) -> bool:  # noqa: ARG001 - parity signature

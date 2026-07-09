@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ROM LIFO order via a first-class `MobInstance.iter_carrying()`, instead of the
   generic inventory+equipment fallback. Behaviorally identical (mobs already keep
   worn+carried gear in one head-inserted list) but explicit and robust.
+- **MAGIC-050 — `dispel_magic` fixed spell-list order + per-effect room
+  messages.** Past the opening save, `dispel_magic` now walks ROM's hardcoded
+  spell list (`src/magic.c:2089-2251`) instead of the `spell_effects` dict,
+  broadcasting the TO_ROOM wear-off lines ("$n is no longer blinded.", fly →
+  "$n falls to the ground!", sanctuary aura, …), stripping a bare AFF_SANCTUARY
+  bit, and sending "Ok."/"Spell failed." to the caster — matching RNG draw order.
 
 ## [2.14.268] - 2026-07-05
 
