@@ -13,7 +13,7 @@
 |------------|-----------|------------|--------------------|--------|
 | `flag_stat_table[]` | 50-83 | file-static registry | — (not ported) | ⚠️ MISSING (BIT-003) |
 | `is_stat` | 93-104 | file-local helper | — (not ported) | ⚠️ MISSING (BIT-003) |
-| `flag_value` | 111-142 | public (called by `olc.c`, `olc_act.c`) | logic inlined in `mud/commands/remaining_rom.py:do_flag:440-462`; no standalone reusable helper | ⚠️ PARTIAL (BIT-001) |
+| `flag_value` | 111-142 | public (called by `olc.c`, `olc_act.c`) | `mud/utils/bit.py:flag_value` (standalone helper) + inlined accumulator in `mud/commands/remaining_rom.py:do_flag` | ✅ FIXED — BIT-001 closed (standalone `flag_value` ported) |
 | `flag_string` | 151-177 | public (called by `act_olc.c`, `olc.c`, `olc_save.c`) | — (not ported) | ⚠️ MISSING (BIT-002) |
 
 Adjacent helper that ROM keeps in `lookup.c` (called by `flag_value`):

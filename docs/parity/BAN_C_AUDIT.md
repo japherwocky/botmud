@@ -11,8 +11,8 @@
 |------------|-----------|--------------------|--------|
 | `save_bans` | 43-69 | `mud/security/bans.py:save_bans_file` | ✅ AUDITED — only PERMANENT entries written, file deleted when none |
 | `load_bans` | 71-102 | `mud/security/bans.py:load_bans_file` | ✅ AUDITED — letter-encoded flags parsed, only PERMANENT retained |
-| `check_ban` | 104-132 | `mud/security/bans.py:is_host_banned` + `BanEntry.matches` | ⚠️ PARTIAL — see BAN-004 |
-| `ban_site` | 135-254 | `mud/commands/admin_commands.py:_apply_ban` + `_render_ban_listing` | ⚠️ PARTIAL — see BAN-001..003 |
+| `check_ban` | 104-132 | `mud/security/bans.py:is_host_banned` + `BanEntry.matches` | ✅ FIXED — BAN-004 closed |
+| `ban_site` | 135-254 | `mud/commands/admin_commands.py:_apply_ban` + `_render_ban_listing` | ✅ FIXED — BAN-001..003 closed |
 | `do_ban` | 256-259 | `mud/commands/admin_commands.py:cmd_ban` | ✅ AUDITED |
 | `do_permban` | 261-264 | `mud/commands/admin_commands.py:cmd_permban` | ✅ AUDITED |
 | `do_allow` | 266-307 | `mud/commands/admin_commands.py:cmd_allow` | ✅ AUDITED |
