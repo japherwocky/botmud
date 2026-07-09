@@ -37,8 +37,15 @@
   master, `act_move.c:206-234`). Design-heavy; wants `do_flee`→`move_character`.
 - **SPLIT-001** — non-ROM `N gold`/`silver` keyword form in `do_split`
   (intentional QuickMUD convenience — maintainer decision, not an auto-close).
-- Low-value OPEN backlog: BAN-001..004, HEDIT-*, BIT-001, DB2-004/005 (OLC/admin/
-  loader; several marked deferred/theoretical).
+- ~~Low-value OPEN backlog: BAN/HEDIT/BIT~~ — **investigated and found already
+  FIXED** (stale `⚠️ PARTIAL` summary headers over closed sub-gaps; headers
+  corrected this session for CONST/BAN/BIT — `82c32cf2`, `fc38bb7c`). The only
+  genuinely-open code is **DB2-005** (multi-line `fread_string` for mob/obj
+  name/short_descr — theoretical, and `read_string_tilde` isn't a faithful
+  `fread_string`, so it's a risky loader change for a case canonical areas never
+  hit — correctly deferred) and the **OLC audit domain** (olc_mpcode, olc_save,
+  olc_act, hedit_delete/list, JSON convert_*, `check_pet_affected`) — a large,
+  separate, deferred effort, not gap-loop material.
 
 ## Next Intended Task
 
