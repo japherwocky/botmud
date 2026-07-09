@@ -521,7 +521,27 @@ act_info.c is **100% complete** when:
      `tests/integration/test_do_look_command.py::test_room_occupant_line_aura_order_pink_before_white`.
      **Note:** Python still implements only 2 of ROM's ~12 char tags ([AFK]/(Invis)/
      (Wizi)/(Hide)/(Charmed)/(Translucent)/(Red Aura)/(Golden Aura)/(KILLER)/(THIEF)) —
-     a missing-feature backlog, not this gap.
+     a missing-feature backlog, not this gap. **→ closed as LOOK-011 below.**
+
+   - **LOOK-011** ✅ FIXED (2.14.273): the remaining 10 of ROM's 12 char tags.
+     ROM `show_char_to_char_0` (`src/act_info.c:253-276`) prepends a fixed-order
+     status-tag block — `[AFK]` `(Invis)` `(Wizi)` `(Hide)` `(Charmed)`
+     `(Translucent)` `(Pink Aura)` `(Red Aura)` `(Golden Aura)` `(White Aura)`
+     `(KILLER)` `(THIEF)` — to every room-occupant line. Python rendered only
+     `(Pink Aura)`/`(White Aura)` (via `describe_character`); the other ten never
+     appeared, so an AFK/invisible/charmed/wanted player or an aligned target under
+     a detecting observer looked identical to a plain one in the room list.
+     **Fix:** new `mud/world/look.py:_char_tags(observer, victim)` builds the full
+     ROM-ordered prefix (Red/Golden gated on the *observer*'s DETECT_EVIL/GOOD +
+     victim alignment ≤−350/≥350; KILLER/THIEF are PC-only PLR flags; Wizi on
+     `invis_level >= LEVEL_HERO`); `_room_occupant_line` now prepends it to **both**
+     the `long_descr` and the PERS branch, using the pure `pers()` (no aura
+     injection) for the base name so tags render once and in order.
+     `describe_character` is left untouched (its `(White Aura)` output is locked by
+     `tests/integration/test_spell_affects_persistence.py`). Test:
+     `tests/integration/test_look_char_tags_show_char_to_char_0.py` (2 — all tags in
+     ROM order; Golden-vs-Red aura gated on alignment + observer detect). Verified
+     red before fix, green after.
 
 **IMPORTANT Gaps** (P1 - SHOULD FIX):
 

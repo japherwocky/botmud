@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from mud.math.c_compat import c_div
 from mud.models.character import Character
-from mud.models.constants import AffectFlag, Direction, Position
-from mud.world.vision import can_see_character, describe_character
+from mud.models.constants import LEVEL_HERO, AffectFlag, CommFlag, Direction, PlayerFlag, Position
+from mud.world.vision import can_see_character, describe_character, pers
 
 # mirroring ROM src/act_info.c show_char_to_char_0 — buf[0] = UPPER(buf[0]) and
 # position suffixes appended when a mob is not at its start/default position.
@@ -21,26 +21,69 @@ _POSITION_SUFFIX: dict[Position, str] = {
 }
 
 
+def _char_tags(observer: Character, victim) -> str:
+    """Build ROM show_char_to_char_0's status-tag prefix (src/act_info.c:253-276).
+
+    The full fixed order is [AFK] (Invis) (Wizi) (Hide) (Charmed) (Translucent)
+    (Pink Aura) (Red Aura) (Golden Aura) (White Aura) (KILLER) (THIEF). Red/Golden
+    auras depend on the *observer* carrying detect-evil/good and the victim's
+    alignment; KILLER/THIEF are PC-only PLR flags. Tags live here (the room
+    listing), not in PERS/``describe_character`` — see ``pers`` docstring.
+    """
+    tags: list[str] = []
+    has_affect = getattr(victim, "has_affect", None)
+
+    if int(getattr(victim, "comm", 0) or 0) & int(CommFlag.AFK):
+        tags.append("[AFK]")
+    if callable(has_affect):
+        if victim.has_affect(AffectFlag.INVISIBLE):
+            tags.append("(Invis)")
+    if int(getattr(victim, "invis_level", 0) or 0) >= LEVEL_HERO:
+        tags.append("(Wizi)")
+    if callable(has_affect):
+        if victim.has_affect(AffectFlag.HIDE):
+            tags.append("(Hide)")
+        if victim.has_affect(AffectFlag.CHARM):
+            tags.append("(Charmed)")
+        if victim.has_affect(AffectFlag.PASS_DOOR):
+            tags.append("(Translucent)")
+        if victim.has_affect(AffectFlag.FAERIE_FIRE):
+            tags.append("(Pink Aura)")
+
+    victim_align = int(getattr(victim, "alignment", 0) or 0)
+    obs_has_affect = getattr(observer, "has_affect", None)
+    # ROM IS_EVIL: alignment <= -350; IS_GOOD: alignment >= 350.
+    if victim_align <= -350 and callable(obs_has_affect) and observer.has_affect(AffectFlag.DETECT_EVIL):
+        tags.append("(Red Aura)")
+    if victim_align >= 350 and callable(obs_has_affect) and observer.has_affect(AffectFlag.DETECT_GOOD):
+        tags.append("(Golden Aura)")
+
+    if callable(has_affect) and victim.has_affect(AffectFlag.SANCTUARY):
+        tags.append("(White Aura)")
+
+    if not getattr(victim, "is_npc", False):
+        victim_act = int(getattr(victim, "act", 0) or 0)
+        if victim_act & int(PlayerFlag.KILLER):
+            tags.append("(KILLER)")
+        if victim_act & int(PlayerFlag.THIEF):
+            tags.append("(THIEF)")
+
+    return (" ".join(tags) + " ") if tags else ""
+
+
 def _room_occupant_line(observer: Character, victim) -> str:
     """Render a room-list occupant — ROM src/act_info.c show_char_to_char_0.
 
     An NPC whose position equals its start/default position and which has a
-    non-empty long_descr is listed by that long_descr (with affect auras
+    non-empty long_descr is listed by that long_descr (with the status tags
     prefixed), e.g. "Hassan is here, waiting to dispense some justice."
     Otherwise show PERS(victim) + a position suffix ("is resting here.", etc.).
     """
-    # LOOK-010: aura tags. ROM show_char_to_char_0 (src/act_info.c:266,272) prints
-    # (Pink Aura) [FAERIE_FIRE] before (White Aura) [SANCTUARY]. This `prefix` is
-    # used ONLY by the NPC long_descr branch below; the PERS branch gets its auras
-    # from describe_character() (which also prepends them) — prepending here too
-    # double-rendered them.
-    prefixes = []
-    if hasattr(victim, "has_affect"):
-        if victim.has_affect(AffectFlag.FAERIE_FIRE):
-            prefixes.append("(Pink Aura)")
-        if victim.has_affect(AffectFlag.SANCTUARY):
-            prefixes.append("(White Aura)")
-    prefix = (" ".join(prefixes) + " ") if prefixes else ""
+    # LOOK char-tags: ROM builds the full status-tag prefix (all 12) then appends
+    # either long_descr or PERS. Use pers() for the base name (pure PERS, no aura
+    # injection) so the tags render once and in ROM order — describe_character is
+    # left for its combat/other callers, which a direct unit test locks.
+    prefix = _char_tags(observer, victim)
 
     long_descr = getattr(victim, "long_descr", None)
     # ROM uses start_pos for the long_descr gate; Python stores default_pos (same
@@ -49,7 +92,7 @@ def _room_occupant_line(observer: Character, victim) -> str:
     if getattr(victim, "is_npc", False) and long_descr and getattr(victim, "position", None) == ref_pos:
         return prefix + str(long_descr).rstrip("\r\n")
 
-    pers = describe_character(observer, victim)
+    base = prefix + pers(victim, observer)
     position = getattr(victim, "position", None)
     fighting = getattr(victim, "fighting", None)
     if position == Position.FIGHTING:
@@ -62,11 +105,10 @@ def _room_occupant_line(observer: Character, victim) -> str:
             fight_str = describe_character(observer, fighting) + "."
         else:
             fight_str = "someone who left??"
-        # pers (describe_character) already carries the aura prefix — do not re-add.
-        line = pers + " is here, fighting " + fight_str
+        line = base + " is here, fighting " + fight_str
     else:
         suffix = _POSITION_SUFFIX.get(position, "") if position is not None else ""
-        line = pers + suffix
+        line = base + suffix
     # mirroring ROM src/act_info.c:421 buf[0] = UPPER(buf[0])
     return line[0].upper() + line[1:] if line else line
 

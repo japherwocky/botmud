@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   broadcasting the TO_ROOM wear-off lines ("$n is no longer blinded.", fly →
   "$n falls to the ground!", sanctuary aura, …), stripping a bare AFF_SANCTUARY
   bit, and sending "Ok."/"Spell failed." to the caster — matching RNG draw order.
+- **LOOK-011 — room listings now show all 12 status tags.** ROM
+  `show_char_to_char_0` (`src/act_info.c:253-276`) prepends `[AFK]` `(Invis)`
+  `(Wizi)` `(Hide)` `(Charmed)` `(Translucent)` `(Pink Aura)` `(Red Aura)`
+  `(Golden Aura)` `(White Aura)` `(KILLER)` `(THIEF)` to each room occupant; the
+  port rendered only the two auras. All ten missing tags are now shown in ROM
+  order (Red/Golden gated on the observer's detect-evil/good + target alignment).
 
 ## [2.14.268] - 2026-07-05
 
