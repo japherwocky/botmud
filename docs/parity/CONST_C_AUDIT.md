@@ -28,7 +28,7 @@
 | `pc_race_table[]` | 356-393 | playable-race entry (5 races) | `mud/models/races.py:116` `PC_RACE_TABLE` | ✅ AUDITED |
 | `class_table[]` | 394-419 | class metadata (4 classes) | `mud/models/classes.py:35` `CLASS_TABLE` | ✅ AUDITED |
 | `title_table[][]` | 421-721 | 4 classes × 61 levels × 2 (M/F) → title strings (488 strings / 244 title pairs) | `mud/models/titles.py` | ✅ AUDITED (CONST-001 FIXED) |
-| `str_app[26]` | 728-755 | tohit, todam, carry, wield (4 cols × 26 rows) | `mud/world/movement.py:115` (carry only), `mud/commands/equipment.py:21` (wield only); tohit/todam absent | ⚠️ PARTIAL (CONST-002, CONST-003) |
+| `str_app[26]` | 728-755 | tohit, todam, carry, wield (4 cols × 26 rows) | tohit → `mud/math/stat_apps.py::get_hitroll`; todam → `::get_damroll`; carry → `mud/world/movement.py:115`; wield → `mud/commands/equipment.py:21` | ✅ FIXED — all 4 columns ported (CONST-002/003 fixed; carry/wield audited). See rows below. |
 | `int_app[26]` | 759-786 | learn (1 col × 26 rows) | `mud/models/constants.py:232` `INT_APP_LEARN` | ✅ AUDITED — Phase 2 verified all 26 entries |
 | `wis_app[26]` | 790-817 | practice (1 col × 26 rows) | `mud/math/stat_apps.py::WIS_APP` (full single-column port) + `wis_practice_bonus(ch)` accessor; consumed in `mud/advancement.py:advance_level` | ✅ AUDITED (CONST-006 FIXED) |
 | `dex_app[26]` | 821-848 | defensive (1 col × 26 rows) | `mud/math/stat_apps.py::DEX_APP` + `get_ac(ch, type)` accessor with `IS_AWAKE` gate | ✅ AUDITED (CONST-004 FIXED) |
