@@ -38,7 +38,10 @@ def do_compare(char: Character, args: str) -> str:
         # Compare two items
         obj2 = get_obj_carry(char, parts[1])
         if obj2 is None:
-            return "You do not have that second item."
+            # COMPARE-002: ROM src/act_info.c:2338-2341 emits the SAME string as
+            # the missing-first-item branch (:2317) — not a distinct "second item"
+            # variant. The faithful port must reuse "You do not have that item.".
+            return "You do not have that item."
     else:
         # Compare against equipped item of same type
         obj2 = _find_equipped_match(char, obj1)

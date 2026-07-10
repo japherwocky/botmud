@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **COMPARE-002 — `compare X Y` missing-second-item now uses ROM's exact message.**
+  ROM `do_compare` (`src/act_info.c:2338-2341`) emits `"You do not have that
+  item."` when the second item isn't carried — the identical string as the
+  missing-first-item branch. Python returned a distinct `"You do not have that
+  second item."`, a message ROM never produces. Now matches ROM.
+
 - **LOOK-015 — `look in <drink container>` fill band now matches ROM truncation.**
   ROM `do_look` (`src/act_info.c:1141-1145`) picks the fill-level wording with
   `value[1] < value[0]/4` ("less than half-") and `value[1] < 3*value[0]/4`

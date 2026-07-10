@@ -225,6 +225,25 @@ class TestDoCompareCriticalGaps:
         # Verify ROM C message
         assert "can't compare" in result.lower()
 
+    def test_missing_second_item_uses_rom_message(self):
+        """COMPARE-002: when the second item isn't carried, ROM emits the SAME
+        string as the missing-first-item case — `"You do not have that item."`
+        (src/act_info.c:2338-2341, identical to the arg1 branch at :2317). Python
+        returned a distinct `"You do not have that second item."`, leaking a
+        message ROM never produces.
+        """
+        room = Room(vnum=3001)
+        char = Character(name="Cmp", level=10, room=room, is_npc=False)
+        char.pcdata = PCData()
+        room.people.append(char)
+        sword = create_weapon("a sword", dice_num=2, dice_type=6)
+        char.inventory.append(sword)
+
+        # arg1 resolves (sword carried); arg2 ("shield") is not carried.
+        result = do_compare(char, "sword shield")
+
+        assert result == "You do not have that item.", result
+
     def test_non_comparable_items_default_message(self, test_char):
         """
         Test default case for non-comparable items.
