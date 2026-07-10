@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exit-description + door open/closed rendering; it surfaced LOOK-012 (below) as a
   real divergence and now guards it. `scan_directions` locks multi-depth `do_scan`
   visibility + `distance[]` strings; it surfaced FINDING-042 (aura tags in scan).
+  `exits_listing` locks `do_exits`/autoexits closed-exit hiding + room-name
+  rendering across an open/close cycle — converges first pass, no divergence.
 
 ### Changed
 
