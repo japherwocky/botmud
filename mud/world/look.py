@@ -467,10 +467,15 @@ def _look_in(char: Character, args: str) -> str:
         if value[1] <= 0:
             return "It is empty."
         if value[0] > 0:
-            percent = value[1] * 100 // value[0]
-            if percent < 25:
+            # LOOK-015: mirror ROM's exact integer comparisons
+            # (src/act_info.c:1141-1145) — `value[1] < value[0]/4` and
+            # `value[1] < 3*value[0]/4`. A rewritten `value[1]*100//value[0]`
+            # percentage truncates at a different point and mislabels boundary
+            # amounts (e.g. value=(10,2): ROM "about half-", percent form
+            # "less than half-"). value[0]/value[1] are non-negative, so // == C /.
+            if value[1] < value[0] // 4:
                 amount = "less than half-"
-            elif percent < 75:
+            elif value[1] < 3 * value[0] // 4:
                 amount = "about half-"
             else:
                 amount = "more than half-"

@@ -589,6 +589,22 @@ act_info.c is **100% complete** when:
      `tools/diff_harness/scenarios/look_at_character.json` (red before, converges
      after) + `FINDING-045`.
 
+   - **LOOK-015** ✅ FIXED (2.14.280): `look in <drink container>` fill-level band
+     used a rewritten percentage instead of ROM's exact integer comparisons.
+     ROM `do_look` (`src/act_info.c:1141-1145`) selects the band with
+     `value[1] < value[0]/4` → "less than half-", `value[1] < 3*value[0]/4` →
+     "about half-", else "more than half-". Python computed
+     `percent = value[1]*100//value[0]` and compared to 25/75. C truncates each
+     expression independently, so the two forms disagree at boundary amounts:
+     at `value[0]=10`, `value[1]=2` is "about half-" in ROM (2 < 10/4=2 false;
+     2 < 30/4=7 true) but "less than half-" under the percent form (20 < 25), and
+     `value[1]=7` is "more than half-" in ROM (7 < 7 false) but "about half-"
+     under percent (70 < 75). **Fix:** mirror ROM's exact `//` comparisons
+     (`mud/world/look.py`); operands are non-negative so `//` == C `/`. Same
+     "simplified formula diverges at the truncation boundary" shape as prior
+     c_div/c_mod parity gaps. Test:
+     `tests/integration/test_do_look_command.py::test_look_in_drink_container_fill_band_matches_rom_truncation`.
+
 **IMPORTANT Gaps** (P1 - SHOULD FIX):
 
 3. ✅ **FIXED** - **Prototype Extra Descriptions** (ROM C lines 1195-1205, 1229-1235):

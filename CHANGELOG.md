@@ -37,6 +37,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **LOOK-015 — `look in <drink container>` fill band now matches ROM truncation.**
+  ROM `do_look` (`src/act_info.c:1141-1145`) picks the fill-level wording with
+  `value[1] < value[0]/4` ("less than half-") and `value[1] < 3*value[0]/4`
+  ("about half-"), else "more than half-". Python had rewritten this as
+  `value[1]*100//value[0]` compared to 25/75 — algebraically equal over reals,
+  but C truncates each expression independently so the labels diverge at
+  boundary amounts (e.g. a 10-unit container holding 2 shows "about half-" in
+  ROM but "less than half-" under the percent form; holding 7 shows "more than
+  half-" vs "about half-"). Now mirrors ROM's exact integer comparisons.
+
 - **SCORE-002 — `score` carry-weight line now includes coin burden.** ROM
   `do_score` (`src/act_info.c:1517`) prints `get_carry_weight (ch) / 10`, and
   `get_carry_weight` (`src/merc.h:2118`) adds coin weight

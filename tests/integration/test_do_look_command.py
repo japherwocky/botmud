@@ -176,6 +176,39 @@ def test_look_in_drink_container_uses_rom_liquid_color_wording():
     assert output == "It's more than half-filled with  a clear liquid."
 
 
+def test_look_in_drink_container_fill_band_matches_rom_truncation():
+    """LOOK-015: the fill-level band must use ROM's exact integer comparisons
+    `value[1] < value[0]/4` and `value[1] < 3*value[0]/4` (src/act_info.c:1141-1145),
+    NOT a rewritten `value[1]*100//value[0]` percentage. C truncates each
+    expression independently, so at value[0]=10 the two forms disagree:
+    value[1]=2 is "about half-" in ROM (2 < 10/4=2 is false; 2 < 30/4=7 is true)
+    but "less than half-" under the percent form (20 < 25); value[1]=7 is
+    "more than half-" in ROM (7 < 7 false) but "about half-" under percent (70 < 75).
+    """
+    room = _basic_room()
+
+    def _drink(v0: int, v1: int):
+        class Drink:
+            name = "flask water"
+            short_descr = "a flask of water"
+            item_type = int(ItemType.DRINK_CON)
+            value = [v0, v1, 0, 0, 0]
+
+        return Drink()
+
+    char = _basic_char()
+    char.room = room
+    room.people = [char]
+
+    # value[0]=10, value[1]=2 → ROM "about half-" (percent form gives "less than half-")
+    room.contents = [_drink(10, 2)]
+    assert do_look(char, "in flask") == "It's about half-filled with  a clear liquid."
+
+    # value[0]=10, value[1]=7 → ROM "more than half-" (percent form gives "about half-")
+    room.contents = [_drink(10, 7)]
+    assert do_look(char, "in flask") == "It's more than half-filled with  a clear liquid."
+
+
 def test_look_in_closed_container_uses_rom_cont_closed_bit():
     """ROM uses CONT_CLOSED=4, not a hardcoded low bit."""
     room = _basic_room()
