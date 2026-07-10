@@ -265,9 +265,9 @@ def do_put(char: Character, args: str) -> str:
                     messages.append(f"You put {obj_short} in {container_short}.")
             count += 1
 
-        if count == 0:
-            return "You have nothing to put."
-
+        # PUT-005: ROM do_put's put-all branch (src/act_obj.c:451-491) is a bare
+        # loop with no `found` flag and no trailing message — nothing eligible ⇒
+        # ROM prints nothing. The prior "You have nothing to put." was non-ROM.
         return "\n".join(messages)
 
 

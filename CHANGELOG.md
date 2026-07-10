@@ -37,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **PUT-005 — `put all <container>` with nothing eligible now silent (was a
+  non-ROM "You have nothing to put.").** ROM's put-all loop
+  (`src/act_obj.c:451-491`) has no such message.
 - **BASH-001 — `bash` delivered no flavor line to the attacker and dropped
   message color.** ROM `do_bash` (`src/fight.c:2460-2482`) calls `damage(…, FALSE)`
   on both branches — the dam_message is suppressed and the three `{5…{x` flavor
