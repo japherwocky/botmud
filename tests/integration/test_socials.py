@@ -141,6 +141,28 @@ class TestSocialExecution:
 
         assert result == "Huh?"
 
+    def test_sleeping_snore_exception_uses_resolved_social_name(self, alice):
+        """SOCIAL-001: ROM check_social (src/interp.c:623) allows the "snore"
+        social while sleeping via `!str_cmp(social_table[cmd].name, "snore")` —
+        it compares the RESOLVED social's name, not the typed argument. So a
+        prefix like "snor" that resolves to snore (snore loads before snort in
+        data/socials.json) is allowed while asleep. Python compared the typed
+        string `name`, so "snor" while sleeping was wrongly blocked with
+        "In your dreams, or what?".
+        """
+        alice.position = Position.SLEEPING
+
+        # A non-snore social while sleeping is blocked (unchanged ROM behavior).
+        assert perform_social(alice, "smile", "") == "In your dreams, or what?"
+
+        # Full "snore" is allowed (executes → returns "").
+        alice.messages.clear()
+        assert perform_social(alice, "snore", "") == ""
+
+        # "snor" resolves to the snore social; ROM allows it while sleeping.
+        alice.messages.clear()
+        assert perform_social(alice, "snor", "") == ""
+
 
 class TestSocialPlaceholders:
     def test_placeholder_expansion_actor_name(self, alice, bob):

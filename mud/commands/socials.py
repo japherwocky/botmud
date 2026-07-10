@@ -57,8 +57,11 @@ def perform_social(char: Character, name: str, arg: str) -> str:
     if position == Position.STUNNED:
         return "You are too stunned to do that."
     # mirroring ROM src/interp.c:618-626 — POS_SLEEPING blocks every social
-    # except "snore" (the canonical Furey exception).
-    if position == Position.SLEEPING and name.lower() != "snore":
+    # except "snore" (the canonical Furey exception). SOCIAL-001: ROM compares
+    # the RESOLVED social's name (`social_table[cmd].name`, interp.c:623), NOT
+    # the typed argument, so a prefix like "snor" that resolves to snore is also
+    # allowed while asleep. `social` was already resolved via find_social above.
+    if position == Position.SLEEPING and social.name.lower() != "snore":
         return "In your dreams, or what?"
     victim = None
     if arg:

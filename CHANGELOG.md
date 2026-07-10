@@ -37,6 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **INTERP-035 — sleeping "snore" social exception now keys on the resolved
+  social.** ROM `check_social` (`src/interp.c:623`) allows a social while
+  sleeping via `!str_cmp(social_table[cmd].name, "snore")` — comparing the
+  *resolved* social's name. Python compared the *typed* argument, so a prefix
+  like `snor` (which resolves to the snore social, per INTERP-021 prefix lookup)
+  was wrongly blocked with "In your dreams, or what?" while asleep. Now compares
+  the resolved `social.name`. Refinement of INTERP-019.
+
 - **COMPARE-002 — `compare X Y` missing-second-item now uses ROM's exact message.**
   ROM `do_compare` (`src/act_info.c:2338-2341`) emits `"You do not have that
   item."` when the second item isn't carried — the identical string as the
