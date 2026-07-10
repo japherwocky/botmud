@@ -43,9 +43,9 @@ The JSON schema was produced by `mud/scripts/convert_are_to_json.py` (not audite
 | `load_specials` | `src/db.c:1344-1376` | `apply_specials_from_json` (delegated) | `mud/loaders/specials_loader.py` | ✅ COMPLETE |
 | `fix_exits` | `src/db.c:1384-1518` | `_link_exits_for_area` | `mud/loaders/json_loader.py:364-411` | ⚠️ PARTIAL |
 | `load_mobprogs` | `src/db.c:1519-1571` | `_load_mob_programs_from_json` | `mud/loaders/json_loader.py:556-590` | ✅ COMPLETE |
-| `convert_mobile` | `src/db2.c:869-970` | **MISSING** — not called from JSON path | — | ❌ MISSING |
-| `convert_objects` | `src/db2.c:612-751` | **MISSING** — not called from JSON path | — | ❌ MISSING |
-| `convert_object` | `src/db2.c:763-857` | **MISSING** — not called from JSON path | — | ❌ MISSING |
+| `convert_mobile` | `src/db2.c:869-970` | not applicable to JSON path | — | N/A — old-format (`new_format==FALSE`) only; see Phase-3 note below |
+| `convert_objects` | `src/db2.c:612-751` | not applicable to JSON path | — | N/A — old-format (`new_format==FALSE`) only; see Phase-3 note below |
+| `convert_object` | `src/db2.c:763-857` | not applicable to JSON path | — | N/A — old-format (`new_format==FALSE`) only; see Phase-3 note below |
 
 **Functional coverage**: 8/14 (57%); 2 N/A (convert_* only apply to old-format `.are` mobs, not ROM 2.4 new-format — see notes in Phase 3 gap table). Critical gaps in `load_mobiles`, `load_objects`, `load_rooms`, `load_area`.
 

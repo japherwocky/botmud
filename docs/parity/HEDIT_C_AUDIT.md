@@ -11,15 +11,15 @@
 | ROM Function | Lines | Python Counterpart | File | Status |
 |---|---|---|---|---|
 | `get_help_area` | 40–51 | (no direct port — Python uses dict registry) | — | N/A |
-| `hedit_show` | 53–67 | `_hedit_show` | `mud/commands/build.py:4164` | ⚠️ PARTIAL |
-| `hedit_level` | 69–94 | `_interpret_hedit` level branch | `mud/commands/build.py:4149` | ⚠️ PARTIAL |
-| `hedit_keyword` | 96–113 | `_interpret_hedit` keyword branch | `mud/commands/build.py:4135` | ⚠️ PARTIAL |
-| `hedit_new` | 115–186 | `cmd_hedit` new branch | `mud/commands/build.py:4043` | ⚠️ PARTIAL |
-| `hedit_text` | 188–203 | `_interpret_hedit` text branch | `mud/commands/build.py:4142` | ⚠️ PARTIAL |
-| `hedit` (dispatcher) | 205–260 | `_interpret_hedit` | `mud/commands/build.py:4086` | ⚠️ PARTIAL |
-| `do_hedit` | 284–333 | `cmd_hedit` | `mud/commands/build.py:4024` | ⚠️ PARTIAL |
-| `hedit_delete` | 336–398 | (missing) | — | ❌ MISSING |
-| `hedit_list` | 400–462 | (missing) | — | ❌ MISSING |
+| `hedit_show` | 53–67 | `_hedit_show` | `mud/commands/build.py:4164` | ✅ FIXED (HEDIT-001) |
+| `hedit_level` | 69–94 | `_interpret_hedit` level branch | `mud/commands/build.py:4149` | ✅ FIXED (HEDIT-002/004/014) |
+| `hedit_keyword` | 96–113 | `_interpret_hedit` keyword branch | `mud/commands/build.py:4135` | ✅ FIXED (HEDIT-003/004/014) |
+| `hedit_new` | 115–186 | `cmd_hedit` new branch | `mud/commands/build.py:4043` | ✅ FIXED (HEDIT-012) |
+| `hedit_text` | 188–203 | `_interpret_hedit` text branch | `mud/commands/build.py:4142` | ✅ FIXED (HEDIT-005) |
+| `hedit` (dispatcher) | 205–260 | `_interpret_hedit` | `mud/commands/build.py:4086` | ✅ FIXED (HEDIT-006/007/008/009) |
+| `do_hedit` | 284–333 | `cmd_hedit` | `mud/commands/build.py:4024` | ✅ FIXED (HEDIT-013) |
+| `hedit_delete` | 336–398 | `_hedit_delete` | `mud/commands/build.py:4239` | ✅ FIXED (HEDIT-010) |
+| `hedit_list` | 400–462 | `_hedit_list` | `mud/commands/build.py:4289` | ✅ FIXED (HEDIT-011) |
 
 ---
 

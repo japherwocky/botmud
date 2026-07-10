@@ -10,13 +10,13 @@
 
 | ROM Function | ROM Lines | Python File : Line | Status |
 |---|---|---|---|
-| `mpedit_table[]` (dispatch table) | 22–33 | `mud/commands/build.py` — no table | ❌ MISSING |
-| `mpedit()` (session interpreter) | 35–94 | `mud/commands/imm_olc.py` — stub | ⚠️ PARTIAL |
-| `do_mpedit()` (entry command) | 96–151 | `mud/commands/imm_olc.py:517` | ⚠️ PARTIAL |
-| `mpedit_create()` | 153–196 | none | ❌ MISSING |
-| `mpedit_show()` | 198–211 | none | ❌ MISSING |
-| `mpedit_code()` | 213–226 | none | ❌ MISSING |
-| `mpedit_list()` | 228–272 | none | ❌ MISSING |
+| `mpedit_table[]` (dispatch table) | 22–33 | `_MPEDIT_TABLE` / `_interpret_mpedit` (imm_olc.py) | ✅ FIXED (MPEDIT-001) |
+| `mpedit()` (session interpreter) | 35–94 | `_interpret_mpedit` (imm_olc.py) | ✅ FIXED (MPEDIT-001) |
+| `do_mpedit()` (entry command) | 96–151 | `mud/commands/imm_olc.py:517` | ✅ FIXED (MPEDIT-002) |
+| `mpedit_create()` | 153–196 | `_mpedit_create` (imm_olc.py:579) | ✅ FIXED (MPEDIT-003) |
+| `mpedit_show()` | 198–211 | `_mpedit_show` (imm_olc.py:629) | ✅ FIXED (MPEDIT-004) |
+| `mpedit_code()` | 213–226 | `_mpedit_code` (imm_olc.py:638) | ✅ FIXED (MPEDIT-005) |
+| `mpedit_list()` | 228–272 | `_mpedit_list` (imm_olc.py:658) | ✅ FIXED (MPEDIT-006) |
 
 **Infrastructure gap**: ROM has `MPROG_CODE` — a separate model for standalone code blocks with their own vnum registry (`mprog_list`). Python has `MobProgram` (trigger list attached to mobs) but no standalone `MprogCode` class or registry. This underpins all subcommands.
 

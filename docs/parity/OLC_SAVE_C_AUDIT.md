@@ -71,22 +71,22 @@ find the prototype reverted to a degraded state.
 | ROM Symbol | ROM Lines | Python Counterpart | Tier | Status |
 |---|---|---|---|---|
 | `fix_string` | 50–67 | — | C | N/A — JSON encodes `\r`/`~` natively |
-| `save_area_list` | 76–110 | `save_area_list` (mud/olc/save.py:273) | B | ⚠️ PARTIAL — missing `social.are` prepend, missing HELP_AREA filenames; sorts by vnum (ROM uses `area_first` linked list — equivalent under dict insertion order) |
+| `save_area_list` | 76–110 | `save_area_list` (mud/olc/save.py:273) | B | ✅ FIXED (OLC_SAVE-013) — `social.are` prepend added; HELP_AREA standalone-help rows remain N/A under JSON-authoritative framing |
 | `fwrite_flag` | 122–149 | — | C | N/A — JSON stores ints |
-| `save_mobprogs` | 151–169 | — (no Python counterpart) | B | ❌ MISSING — `_serialize_mobile` does not persist mprog list |
-| `save_mobile` | 176–253 | `_serialize_mobile` (mud/olc/save.py:136) | A | ⚠️ PARTIAL — many fields missing (off/imm/res/vuln flags, form, parts, size, material, mprog list, race-DIF logic) |
+| `save_mobprogs` | 151–169 | `_collect_mob_programs` → `mob_programs` (save.py) | B | ✅ FIXED (OLC_SAVE-003) — structured `mob_programs` list grouped by program vnum |
+| `save_mobile` | 176–253 | `_serialize_mobile` (mud/olc/save.py:136) | A | ✅ FIXED (OLC_SAVE-001/002/003/004/005) — off/imm/res/vuln flags, form/parts/size/material, mprog list, shop, spec_fun all persisted |
 | `save_mobiles` | 262–277 | inline in `save_area_to_json` (mud/olc/save.py:219) | C | ✅ AUDITED — section wrapper; iterates per-area registry |
-| `save_object` | 289–438 | `_serialize_object` (mud/olc/save.py:171) | A | ⚠️ PARTIAL — missing `level`, item-type-specific value layouts (DRINK_CON/CONTAINER/WEAPON/POTION/PILL/SCROLL/STAFF/WAND), structured affect serialization (TO_OBJECT vs TO_AFFECTS/IMMUNE/RESIST/VULN), structured extra_descr serialization, condition letter encoding |
+| `save_object` | 289–438 | `_serialize_object` (mud/olc/save.py:171) | A | ✅ FIXED (OLC_SAVE-006/007/008) — `level` persisted, structured affect serialization (`_serialize_affect`) and structured extra_descr serialization. Item-type value layouts round-trip via JSON ints (JSON-authoritative framing) |
 | `save_objects` | 449–464 | inline in `save_area_to_json` (mud/olc/save.py:225) | C | ✅ AUDITED — section wrapper |
 | `save_rooms` | 475–569 | `_serialize_room` (mud/olc/save.py:72) | A | ⚠️ PARTIAL — Python writes raw `exit_info` int; ROM derives `locks` (0..4) from EX_ISDOOR/PICKPROOF/NOPASS combinations and writes that. JSON-authoritative framing means raw int round-trips correctly, so this is a documented divergence not a behavioral gap. Missing: any ROM-reset propagation of `EX_ISDOOR` based on lock-bit bundle (ROM lines 511–522). |
-| `save_specials` | 578–606 | — (no Python counterpart) | B | ❌ MISSING — `_serialize_mobile` does not persist `spec_fun` |
+| `save_specials` | 578–606 | `_collect_specials` (mud/olc/save.py:323) | B | ✅ FIXED (OLC_SAVE-005) — top-level `specials` list; loader `apply_specials_from_json` rehydrates |
 | `save_door_resets` | 616–658 | — (transitively via `_serialize_reset`) | C | ⚠️ PARTIAL — Python persists raw reset list; ROM emits synthetic D-resets for closed/locked exits. JSON-authoritative framing covers this if loader rehydrates door state from exit flags. |
 | `save_resets` | 668–777 | `_serialize_reset` (mud/olc/save.py:62) | A | ⚠️ PARTIAL — Python emits generic command/arg1..4 dump; ROM emits per-command structured rows (M/O/P/G/E/D/R) with verbose annotations. JSON-authoritative framing accepts the dump form, but missing fields beyond arg1..arg4 (none in ROM) — verify. |
-| `save_shops` | 786–824 | — (no Python counterpart) | A | ❌ MISSING — `_serialize_mobile` does not persist `MobShop` data (keeper, buy_type[5], profit_buy/sell, open_hour/close_hour) |
-| `save_helps` | 826–843 | — (no Python counterpart) | B | ❌ MISSING — no help-write path; `mud/models/help.py` is read-only via loader |
-| `save_other_helps` | 845–872 | — | C | ❌ MISSING — depends on `save_helps` |
-| `save_area` | 879–914 | `save_area_to_json` (mud/olc/save.py:196) | A | ⚠️ PARTIAL — orchestrator-level; missing sections: specials, shops, mobprogs, helps. AREADATA section covered (name, builders, vnum range, credits, security). |
-| `do_asave` | 922–1136 | `cmd_asave` (mud/commands/build.py:1370) | A | ⚠️ PARTIAL — all 5 subcommands wired (numeric vnum, world, changed, list, area), but message strings drift from ROM, `area` branch only covers `redit` (ROM covers AEDIT/REDIT/OEDIT/MEDIT/HELP), no autosave path (ROM `if (!ch) sec = 9`), no NPC/security gate matching ROM line 933 |
+| `save_shops` | 786–824 | `_collect_shops` (mud/olc/save.py:342) | A | ✅ FIXED (OLC_SAVE-004) — top-level `shops` list (keeper, buy_types, profit_buy/sell, open/close_hour); loader `_load_shops_from_json` re-attaches `MobIndex.pShop` |
+| `save_helps` | 826–843 | `_serialize_help` → per-area `helps` (save.py) | B | ✅ FIXED (OLC_SAVE-009) — area-grouped `helps` list; loader `_load_helps_from_json` rehydrates `help_registry` |
+| `save_other_helps` | 845–872 | — | C | N/A — HAD standalone-help-file fan-out has no equivalent under JSON-authoritative framing (no global `had_list`; helps live on owning area) |
+| `save_area` | 879–914 | `save_area_to_json` (mud/olc/save.py:196) | A | ✅ FIXED — all sections now emitted: specials (OLC_SAVE-005), shops (OLC_SAVE-004), mobprogs (OLC_SAVE-003), helps (OLC_SAVE-009). AREADATA section covered (name, builders, vnum range, credits, security). |
+| `do_asave` | 922–1136 | `cmd_asave` (mud/commands/build.py:1370) | A | ✅ FIXED (OLC_SAVE-010..017) — all 5 subcommands wired; message strings corrected; `area` branch dispatches across aedit/redit/oedit/medit/hedit; autosave path (`char=None`) and NPC/security gate added |
 
 ---
 
