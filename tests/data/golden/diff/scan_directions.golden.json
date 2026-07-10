@@ -1,0 +1,524 @@
+{
+  "scenario": "scan_directions",
+  "c_commit": "fe7b58da7b783da93724ec92da889a06aa7ce876",
+  "build_flags": "-DOLD_RAND",
+  "seed": 1234,
+  "trace": [
+    {
+      "step": 1,
+      "command": "__goto=3054",
+      "chars": [
+        {
+          "key": "Tester",
+          "room": 3054,
+          "position": "STANDING",
+          "hp": 20,
+          "max_hp": 20,
+          "mana": 100,
+          "move": 100,
+          "level": 5,
+          "align": 0,
+          "gold": 0,
+          "silver": 0,
+          "fighting": null,
+          "affects": [],
+          "affect_flags": [],
+          "inventory": [],
+          "equipment": {},
+          "eff_hitroll": 0,
+          "eff_damroll": 0,
+          "eff_ac": [
+            100,
+            100,
+            100,
+            100
+          ],
+          "master": null
+        }
+      ],
+      "rooms": [
+        {
+          "vnum": 3001,
+          "people": [
+            "Hassan"
+          ],
+          "contents": []
+        },
+        {
+          "vnum": 3054,
+          "people": [
+            "Tester",
+            "healer"
+          ],
+          "contents": [
+            3010
+          ]
+        }
+      ],
+      "output": []
+    },
+    {
+      "step": 2,
+      "command": "__mload=3062",
+      "chars": [
+        {
+          "key": "Tester",
+          "room": 3054,
+          "position": "STANDING",
+          "hp": 20,
+          "max_hp": 20,
+          "mana": 100,
+          "move": 100,
+          "level": 5,
+          "align": 0,
+          "gold": 0,
+          "silver": 0,
+          "fighting": null,
+          "affects": [],
+          "affect_flags": [],
+          "inventory": [],
+          "equipment": {},
+          "eff_hitroll": 0,
+          "eff_damroll": 0,
+          "eff_ac": [
+            100,
+            100,
+            100,
+            100
+          ],
+          "master": null
+        }
+      ],
+      "rooms": [
+        {
+          "vnum": 3001,
+          "people": [
+            "Hassan"
+          ],
+          "contents": []
+        },
+        {
+          "vnum": 3054,
+          "people": [
+            "fido",
+            "Tester",
+            "healer"
+          ],
+          "contents": [
+            3010
+          ]
+        }
+      ],
+      "output": []
+    },
+    {
+      "step": 3,
+      "command": "__goto=3001",
+      "chars": [
+        {
+          "key": "Tester",
+          "room": 3001,
+          "position": "STANDING",
+          "hp": 20,
+          "max_hp": 20,
+          "mana": 100,
+          "move": 100,
+          "level": 5,
+          "align": 0,
+          "gold": 0,
+          "silver": 0,
+          "fighting": null,
+          "affects": [],
+          "affect_flags": [],
+          "inventory": [],
+          "equipment": {},
+          "eff_hitroll": 0,
+          "eff_damroll": 0,
+          "eff_ac": [
+            100,
+            100,
+            100,
+            100
+          ],
+          "master": null
+        }
+      ],
+      "rooms": [
+        {
+          "vnum": 3001,
+          "people": [
+            "Tester",
+            "Hassan"
+          ],
+          "contents": []
+        },
+        {
+          "vnum": 3054,
+          "people": [
+            "fido",
+            "healer"
+          ],
+          "contents": [
+            3010
+          ]
+        }
+      ],
+      "output": []
+    },
+    {
+      "step": 4,
+      "command": "scan",
+      "chars": [
+        {
+          "key": "Tester",
+          "room": 3001,
+          "position": "STANDING",
+          "hp": 20,
+          "max_hp": 20,
+          "mana": 100,
+          "move": 100,
+          "level": 5,
+          "align": 0,
+          "gold": 0,
+          "silver": 0,
+          "fighting": null,
+          "affects": [],
+          "affect_flags": [],
+          "inventory": [],
+          "equipment": {},
+          "eff_hitroll": 0,
+          "eff_damroll": 0,
+          "eff_ac": [
+            100,
+            100,
+            100,
+            100
+          ],
+          "master": null
+        }
+      ],
+      "rooms": [
+        {
+          "vnum": 3001,
+          "people": [
+            "Tester",
+            "Hassan"
+          ],
+          "contents": []
+        },
+        {
+          "vnum": 3054,
+          "people": [
+            "fido",
+            "healer"
+          ],
+          "contents": [
+            3010
+          ]
+        }
+      ],
+      "output": [
+        "",
+        "\rLooking around you see:",
+        "\rHassan, right here.",
+        "\rthe beastly fido, nearby to the north.",
+        "\rthe healer, nearby to the north.",
+        ""
+      ]
+    },
+    {
+      "step": 5,
+      "command": "scan north",
+      "chars": [
+        {
+          "key": "Tester",
+          "room": 3001,
+          "position": "STANDING",
+          "hp": 20,
+          "max_hp": 20,
+          "mana": 100,
+          "move": 100,
+          "level": 5,
+          "align": 0,
+          "gold": 0,
+          "silver": 0,
+          "fighting": null,
+          "affects": [],
+          "affect_flags": [],
+          "inventory": [],
+          "equipment": {},
+          "eff_hitroll": 0,
+          "eff_damroll": 0,
+          "eff_ac": [
+            100,
+            100,
+            100,
+            100
+          ],
+          "master": null
+        }
+      ],
+      "rooms": [
+        {
+          "vnum": 3001,
+          "people": [
+            "Tester",
+            "Hassan"
+          ],
+          "contents": []
+        },
+        {
+          "vnum": 3054,
+          "people": [
+            "fido",
+            "healer"
+          ],
+          "contents": [
+            3010
+          ]
+        }
+      ],
+      "output": [
+        "",
+        "\rYou peer intently north.",
+        "\rthe beastly fido, nearby to the north.",
+        "\rthe healer, nearby to the north.",
+        ""
+      ]
+    },
+    {
+      "step": 6,
+      "command": "scan south",
+      "chars": [
+        {
+          "key": "Tester",
+          "room": 3001,
+          "position": "STANDING",
+          "hp": 20,
+          "max_hp": 20,
+          "mana": 100,
+          "move": 100,
+          "level": 5,
+          "align": 0,
+          "gold": 0,
+          "silver": 0,
+          "fighting": null,
+          "affects": [],
+          "affect_flags": [],
+          "inventory": [],
+          "equipment": {},
+          "eff_hitroll": 0,
+          "eff_damroll": 0,
+          "eff_ac": [
+            100,
+            100,
+            100,
+            100
+          ],
+          "master": null
+        }
+      ],
+      "rooms": [
+        {
+          "vnum": 3001,
+          "people": [
+            "Tester",
+            "Hassan"
+          ],
+          "contents": []
+        },
+        {
+          "vnum": 3054,
+          "people": [
+            "fido",
+            "healer"
+          ],
+          "contents": [
+            3010
+          ]
+        }
+      ],
+      "output": [
+        "",
+        "\rYou peer intently south.",
+        "\rthe cityguard, not far south.",
+        "\rthe beastly fido, off in the distance south.",
+        ""
+      ]
+    },
+    {
+      "step": 7,
+      "command": "scan up",
+      "chars": [
+        {
+          "key": "Tester",
+          "room": 3001,
+          "position": "STANDING",
+          "hp": 20,
+          "max_hp": 20,
+          "mana": 100,
+          "move": 100,
+          "level": 5,
+          "align": 0,
+          "gold": 0,
+          "silver": 0,
+          "fighting": null,
+          "affects": [],
+          "affect_flags": [],
+          "inventory": [],
+          "equipment": {},
+          "eff_hitroll": 0,
+          "eff_damroll": 0,
+          "eff_ac": [
+            100,
+            100,
+            100,
+            100
+          ],
+          "master": null
+        }
+      ],
+      "rooms": [
+        {
+          "vnum": 3001,
+          "people": [
+            "Tester",
+            "Hassan"
+          ],
+          "contents": []
+        },
+        {
+          "vnum": 3054,
+          "people": [
+            "fido",
+            "healer"
+          ],
+          "contents": [
+            3010
+          ]
+        }
+      ],
+      "output": [
+        "",
+        "\rYou peer intently up.",
+        ""
+      ]
+    },
+    {
+      "step": 8,
+      "command": "scan down",
+      "chars": [
+        {
+          "key": "Tester",
+          "room": 3001,
+          "position": "STANDING",
+          "hp": 20,
+          "max_hp": 20,
+          "mana": 100,
+          "move": 100,
+          "level": 5,
+          "align": 0,
+          "gold": 0,
+          "silver": 0,
+          "fighting": null,
+          "affects": [],
+          "affect_flags": [],
+          "inventory": [],
+          "equipment": {},
+          "eff_hitroll": 0,
+          "eff_damroll": 0,
+          "eff_ac": [
+            100,
+            100,
+            100,
+            100
+          ],
+          "master": null
+        }
+      ],
+      "rooms": [
+        {
+          "vnum": 3001,
+          "people": [
+            "Tester",
+            "Hassan"
+          ],
+          "contents": []
+        },
+        {
+          "vnum": 3054,
+          "people": [
+            "fido",
+            "healer"
+          ],
+          "contents": [
+            3010
+          ]
+        }
+      ],
+      "output": [
+        "",
+        "\rYou peer intently down.",
+        ""
+      ]
+    },
+    {
+      "step": 9,
+      "command": "scan sideways",
+      "chars": [
+        {
+          "key": "Tester",
+          "room": 3001,
+          "position": "STANDING",
+          "hp": 20,
+          "max_hp": 20,
+          "mana": 100,
+          "move": 100,
+          "level": 5,
+          "align": 0,
+          "gold": 0,
+          "silver": 0,
+          "fighting": null,
+          "affects": [],
+          "affect_flags": [],
+          "inventory": [],
+          "equipment": {},
+          "eff_hitroll": 0,
+          "eff_damroll": 0,
+          "eff_ac": [
+            100,
+            100,
+            100,
+            100
+          ],
+          "master": null
+        }
+      ],
+      "rooms": [
+        {
+          "vnum": 3001,
+          "people": [
+            "Tester",
+            "Hassan"
+          ],
+          "contents": []
+        },
+        {
+          "vnum": 3054,
+          "people": [
+            "fido",
+            "healer"
+          ],
+          "contents": [
+            3010
+          ]
+        }
+      ],
+      "output": [
+        "",
+        "\rWhich way do you want to scan?",
+        ""
+      ]
+    }
+  ]
+}

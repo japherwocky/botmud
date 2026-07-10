@@ -35,6 +35,11 @@ missing was stale.
   - only visible characters listed
 - Empty scans do **not** invent Python-only fallbacks like `No one is nearby.` or
   `Nothing of note.`
+- Each listed character is rendered with **bare PERS** (`PERS(victim, ch)`,
+  `src/scan.c:133`) — the short_descr/name only, with **no** `show_char_to_char`
+  aura tags. An aura'd target (e.g. a healer with sanctuary) shows just its name,
+  not `(White Aura) the healer` (FINDING-042, fixed 2.14.275). Python's `do_scan`
+  now uses `pers()`, not `describe_character()`, for this reason.
 
 ## Test coverage
 
@@ -45,5 +50,10 @@ missing was stale.
 
 ## Notes
 
-- This audit closes the stale tracker row for `scan.c`; no production code changes were
-  required in this pass.
+- This audit closed the stale tracker row for `scan.c`.
+- **Follow-up (2026-07-09, v2.14.275):** the differential harness scenario
+  `scan_directions` surfaced FINDING-042 — `do_scan` rendered visible characters
+  via `describe_character` (aura tags) instead of ROM's bare `PERS`. Fixed by
+  switching to `pers()`. The per-file audit had marked scan complete because the
+  divergence lived in the name-render call, not the audited control flow — an
+  enumeration-independent catch.

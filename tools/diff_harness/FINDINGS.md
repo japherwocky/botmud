@@ -8,6 +8,34 @@ goes clean). Resolving the root cause is separate from building the harness.
 
 ---
 
+## FINDING-042 — `scan` prepended aura tags to visible characters (should use bare PERS) — ✅ RESOLVED
+
+**Status:** ✅ RESOLVED 2026-07-09 (v2.14.275). Fixed in `mud/commands/inspection.py::do_scan`;
+`scan.c` audit note updated.
+
+**Scenario:** `scan_directions` — start at the Temple of Mota (3001), `__mload`
+a fido north (3054), then `scan` / `scan <dir>` in each direction. The temple and
+adjacent rooms carry reset mobs (Hassan, the healer, cityguards), so scan lists
+real characters at depths 0–3 with ROM `distance[]` strings.
+
+**Divergence:** for the healer (which spawns with sanctuary → White Aura), the C
+oracle rendered `the healer, nearby to the north.` while Python rendered
+`(White Aura) the healer, nearby to the north.`
+
+**Root cause:** `do_scan`'s `list_room` used `describe_character(char, p)` to
+render each visible character. `describe_character` prepends aura tags
+(`(Pink Aura)`/`(White Aura)`), but ROM `scan_char` (`src/scan.c:133`) uses
+`PERS(victim, ch)` — the bare short_descr/name with **no** show_char_to_char aura
+block. So any aura'd mob/PC in scan range showed a spurious aura tag.
+
+**Fix:** render with `pers(p, char)` (pure PERS) instead of `describe_character`.
+The visibility gate (`can_see_character`) already runs first, so `pers` returns
+the correct visible name. The `scan_directions` golden was red before, converges
+after. (The per-file `SCAN_C_AUDIT.md` had marked scan "✅ Complete" — the bug
+lived in the render call, not the audited control flow; a differential-layer catch.)
+
+---
+
 ## FINDING-041 — `look <direction>` reported every keyword'd door as "closed" (swapped EX_ bits) — ✅ RESOLVED
 
 **Status:** ✅ RESOLVED 2026-07-09 (v2.14.274). Fixed under **LOOK-012**

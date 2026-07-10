@@ -9,11 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Differential-harness scenarios `position_transitions` and `look_direction`.**
-  `position_transitions` locks the no-object arms of do_stand/rest/sit/sleep/wake
-  (POS_* state machine + message strings) against the C oracle — converges first
-  pass. `look_direction` locks `look <dir>` exit-description + door open/closed
-  rendering; it surfaced LOOK-012 (below) as a real divergence and now guards it.
+- **Differential-harness scenarios `position_transitions`, `look_direction`,
+  `scan_directions`.** `position_transitions` locks the no-object arms of
+  do_stand/rest/sit/sleep/wake (POS_* state machine + message strings) against the
+  C oracle — converges first pass. `look_direction` locks `look <dir>`
+  exit-description + door open/closed rendering; it surfaced LOOK-012 (below) as a
+  real divergence and now guards it. `scan_directions` locks multi-depth `do_scan`
+  visibility + `distance[]` strings; it surfaced FINDING-042 (aura tags in scan).
 
 ### Changed
 
@@ -25,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ROM source (same stale-summary-header pattern fixed earlier for CONST/BAN/BIT).
 
 ### Fixed
+
+- **`scan` no longer prepends aura tags to characters (FINDING-042).** ROM
+  `scan_char` (`src/scan.c:133`) lists each visible character with bare
+  `PERS(victim, ch)` — name only, no `(Pink Aura)`/`(White Aura)` block. Python's
+  `do_scan` rendered via `describe_character`, so any aura'd target in scan range
+  (e.g. a sanctuary'd healer) showed a spurious aura tag. Now uses `pers()`.
+  Surfaced by the new `scan_directions` diff_harness scenario.
 
 - **LOOK-012 — `look <direction>` reported every door as "closed".** ROM
   `do_look` (`src/act_info.c:1298-1309`) says "The <door> is open." for an open

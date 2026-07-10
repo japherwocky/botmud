@@ -4,7 +4,7 @@ from mud.models.character import Character
 from mud.models.constants import Direction
 from mud.utils.act import act_to_room
 from mud.world.look import dir_names, look
-from mud.world.vision import can_see_character, describe_character
+from mud.world.vision import can_see_character, pers
 
 
 def do_scan(char: Character, args: str = "") -> str:
@@ -61,7 +61,11 @@ def do_scan(char: Character, args: str = "") -> str:
                 continue
             if not can_see_character(char, p):
                 continue
-            who = describe_character(char, p)
+            # ROM scan_char (src/scan.c:133) uses PERS(victim, ch) — the bare
+            # short_descr/name, NOT show_char_to_char aura tags. describe_character
+            # injects (Pink/White Aura) prefixes, which ROM's scan never shows
+            # (FINDING-042).
+            who = pers(p, char)
             if depth == 0:
                 lines.append(f"{who}, {distance[0]}")
             else:
