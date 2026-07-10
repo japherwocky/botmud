@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   visibility + `distance[]` strings; it surfaced FINDING-042 (aura tags in scan).
   `exits_listing` locks `do_exits`/autoexits closed-exit hiding + room-name
   rendering across an open/close cycle — converges first pass, no divergence.
+  `where_command` locks `do_where` arg-search PERS + char_list-order match; it
+  surfaced FINDING-044 (wrong duplicate returned).
 
 ### Changed
 
@@ -29,6 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ROM source (same stale-summary-header pattern fixed earlier for CONST/BAN/BIT).
 
 ### Fixed
+
+- **`where <name>` now returns ROM's char_list-order match (FINDING-044).** ROM
+  `do_where` (`src/act_info.c:2445`) walks `char_list` head-first (newest-first,
+  because `create_mobile` head-inserts) and returns the first match. Python
+  iterated `character_registry` forward (oldest-first, since `spawn_mob`
+  appends), so with two same-named mobs in an area (e.g. Midgaard's two fidos)
+  `where fido` reported the wrong one. Now iterates `reversed(character_registry)`.
+  Surfaced by the new `where_command` diff_harness scenario.
 
 - **LOOK-013 — room-occupant fight line no longer leaks aura tags (FINDING-043).**
   ROM `show_char_to_char_0` (`src/act_info.c:412`) renders a victim's fighting

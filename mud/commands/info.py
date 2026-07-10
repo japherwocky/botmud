@@ -353,8 +353,13 @@ def do_where(char: Character, args: str) -> str:
 
         found = False
 
-        # ROM C iterates char_list for all characters (NPCs + players)
-        for victim in character_registry:
+        # ROM C iterates char_list from the head and returns the FIRST match
+        # (src/act_info.c:2445, with `break`). ROM head-inserts new chars into
+        # char_list (`create_mobile`, src/db.c:2256-2257), so a head-first walk is
+        # newest-first. Python `character_registry` is append-ordered (oldest
+        # first), so we iterate it reversed to reproduce ROM's newest-first match
+        # when several same-named mobs share an area (FINDING-044).
+        for victim in reversed(character_registry):
             victim_room = getattr(victim, "room", None)
             if not victim_room:
                 continue

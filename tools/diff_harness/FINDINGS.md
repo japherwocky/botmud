@@ -8,6 +8,34 @@ goes clean). Resolving the root cause is separate from building the harness.
 
 ---
 
+## FINDING-044 — `where <name>` returned the wrong duplicate (char_list order) — ✅ RESOLVED
+
+**Status:** ✅ RESOLVED 2026-07-09 (v2.14.277). Fixed in `mud/commands/info.py::do_where`.
+
+**Scenario:** `where_command` — `__mload` a beastly fido into the Temple of Mota
+(3001), then `where fido`. Midgaard resets a second beastly fido elsewhere in the
+same area (Poor Alley), so two same-named mobs coexist.
+
+**Divergence:** C oracle → `the beastly fido             The Temple Of Mota`
+(the just-loaded one); Python → `... Eastern End of Poor Alley` (the reset one).
+
+**Root cause:** ROM `do_where` arg-search (`src/act_info.c:2445`) walks
+`char_list` from the head and returns the **first** match (`break`). ROM
+head-inserts new chars into `char_list` (`create_mobile`, `src/db.c:2256-2257`),
+so a head-first walk is **newest-first** — the freshly loaded fido wins. Python
+`spawn_mob` **appends** to `character_registry` (`mob_spawner.py:19`,
+oldest-first), and `do_where` iterated it forward, so the *oldest* fido (the
+reset one) won.
+
+**Fix:** iterate `reversed(character_registry)` in the arg-search — append-order
+reversed = newest-first = ROM's char_list head-first walk. Narrow and
+ROM-justified (does not touch the global registry ordering, which is a separate
+structural concern). All 21 `where` tests pass; the `where_command` golden was
+red before, converges after. (Ties to the char_list head-insert class — INV-039
+is its object-list analog.)
+
+---
+
 ## FINDING-043 — room-occupant fight line leaked aura tags (should use bare PERS) — ✅ RESOLVED
 
 **Status:** ✅ RESOLVED 2026-07-09 (v2.14.276). Fixed under **LOOK-013**
