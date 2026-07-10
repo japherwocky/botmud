@@ -8,6 +8,29 @@ goes clean). Resolving the root cause is separate from building the harness.
 
 ---
 
+## FINDING-043 — room-occupant fight line leaked aura tags (should use bare PERS) — ✅ RESOLVED
+
+**Status:** ✅ RESOLVED 2026-07-09 (v2.14.276). Fixed under **LOOK-013**
+(`docs/parity/ACT_INFO_C_AUDIT.md`). **Not** harness-surfaced — found by the
+`describe_character`-call-site sweep that closing FINDING-042 triggered.
+
+**Divergence:** ROM `show_char_to_char_0` POS_FIGHTING (`src/act_info.c:412`)
+renders a victim's fighting target with `PERS(victim->fighting, ch)` — bare name,
+no aura block. Python `mud/world/look.py:_room_occupant_line` used
+`describe_character(observer, fighting)`, so a room occupant fighting a
+sanctuary'd target rendered `"Victim is here, fighting (White Aura) Target."`
+instead of `"... fighting Target."`.
+
+**Root cause & fix:** identical to FINDING-042 — `describe_character` (aura tags)
+used where ROM uses bare `PERS`. Switched to `pers(fighting, observer)`. This was
+the last remaining production `describe_character` call; the two others in
+`look.py` are ROM-correct (`_room_occupant_line` uses the full show_char_to_char
+tag block for the occupant *itself*, which ROM does render). Test:
+`tests/integration/test_look_char_tags_show_char_to_char_0.py::test_fighting_target_uses_bare_pers_not_aura_tags`
+(red before, green after).
+
+---
+
 ## FINDING-042 — `scan` prepended aura tags to visible characters (should use bare PERS) — ✅ RESOLVED
 
 **Status:** ✅ RESOLVED 2026-07-09 (v2.14.275). Fixed in `mud/commands/inspection.py::do_scan`;

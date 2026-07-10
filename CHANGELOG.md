@@ -30,6 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **LOOK-013 — room-occupant fight line no longer leaks aura tags (FINDING-043).**
+  ROM `show_char_to_char_0` (`src/act_info.c:412`) renders a victim's fighting
+  target with bare `PERS`, no aura block. Python `_room_occupant_line` used
+  `describe_character`, so a room occupant fighting a sanctuary'd target showed
+  `"... fighting (White Aura) Target."` instead of `"... fighting Target."`. Now
+  uses `pers()`. Found by the call-site sweep that fixing FINDING-042 triggered
+  (same aura/PERS class); this was the last mis-rendered `describe_character` site.
+
 - **`scan` no longer prepends aura tags to characters (FINDING-042).** ROM
   `scan_char` (`src/scan.c:133`) lists each visible character with bare
   `PERS(victim, ch)` — name only, no `(Pink Aura)`/`(White Aura)` block. Python's

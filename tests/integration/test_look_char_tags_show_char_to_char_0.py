@@ -85,3 +85,28 @@ def test_golden_aura_requires_good_alignment_and_observer_detect_good():
     line = _room_occupant_line(observer, victim)
     assert "(Golden Aura)" in line
     assert "(Red Aura)" not in line
+
+
+def test_fighting_target_uses_bare_pers_not_aura_tags():
+    """ROM show_char_to_char_0 POS_FIGHTING (src/act_info.c:412) renders the
+    victim's fighting target with PERS(victim->fighting, ch) — the bare name,
+    NOT the show_char_to_char aura block. A sanctuary'd target must show as
+    "... fighting Target." not "... fighting (White Aura) Target." (FINDING-043,
+    same class as the scan FINDING-042 aura/PERS bug)."""
+    room = Room(vnum=3001, name="Test Room", description="A test room.")
+    observer = _pc("Observer")
+    observer.act = int(PlayerFlag.HOLYLIGHT)
+
+    target = _pc("Target")
+    target.affected_by = int(AffectFlag.SANCTUARY)  # (White Aura), ungated
+
+    victim = _pc("Victim", position=Position.FIGHTING)
+    victim.fighting = target
+
+    room.add_character(observer)
+    room.add_character(victim)
+    room.add_character(target)
+
+    line = _room_occupant_line(observer, victim)
+    assert "is here, fighting Target." in line, line
+    assert "(White Aura)" not in line, f"scan/PERS aura leak into fight line: {line!r}"

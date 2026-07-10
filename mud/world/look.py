@@ -3,7 +3,7 @@ from __future__ import annotations
 from mud.math.c_compat import c_div
 from mud.models.character import Character
 from mud.models.constants import LEVEL_HERO, AffectFlag, CommFlag, Direction, PlayerFlag, Position
-from mud.world.vision import can_see_character, describe_character, pers
+from mud.world.vision import can_see_character, pers
 
 # mirroring ROM src/act_info.c show_char_to_char_0 — buf[0] = UPPER(buf[0]) and
 # position suffixes appended when a mob is not at its start/default position.
@@ -102,7 +102,11 @@ def _room_occupant_line(observer: Character, victim) -> str:
         elif fighting is observer:
             fight_str = "YOU!"
         elif getattr(victim, "room", None) is getattr(fighting, "room", object()):
-            fight_str = describe_character(observer, fighting) + "."
+            # ROM src/act_info.c:412 uses PERS(victim->fighting, ch) — the bare
+            # name, NOT the show_char_to_char aura block. describe_character injects
+            # (Pink/White Aura), which ROM never shows here (FINDING-043, same class
+            # as the scan FINDING-042 aura/PERS leak).
+            fight_str = pers(fighting, observer) + "."
         else:
             fight_str = "someone who left??"
         line = base + " is here, fighting " + fight_str

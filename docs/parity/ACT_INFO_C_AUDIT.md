@@ -561,6 +561,20 @@ act_info.c is **100% complete** when:
      `tools/diff_harness/scenarios/look_direction.json` (C-oracle golden; Python
      red before fix, converges after) + `FINDING-041`.
 
+   - **LOOK-013** ✅ FIXED (2.14.276): fighting-target line leaked aura tags.
+     ROM `show_char_to_char_0` POS_FIGHTING (`src/act_info.c:412`) renders the
+     victim's fighting target with `PERS(victim->fighting, ch)` — the bare name,
+     **no** `show_char_to_char` aura block. Python `mud/world/look.py:_room_occupant_line`
+     rendered it via `describe_character(observer, fighting)`, which prepends
+     `(Pink/White Aura)`, so a room occupant fighting a sanctuary'd (or
+     faerie-fired) target showed `"Victim is here, fighting (White Aura) Target."`
+     instead of `"... fighting Target."`. **Fix:** use `pers(fighting, observer)`
+     (pure PERS). Found by the `describe_character`-call-site sweep triggered when
+     `FINDING-042` fixed the identical class in `do_scan` — the last remaining
+     production `describe_character` call that ROM renders with bare PERS. Test:
+     `tests/integration/test_look_char_tags_show_char_to_char_0.py::test_fighting_target_uses_bare_pers_not_aura_tags`
+     (red before, green after) + `FINDING-043`.
+
 **IMPORTANT Gaps** (P1 - SHOULD FIX):
 
 3. ✅ **FIXED** - **Prototype Extra Descriptions** (ROM C lines 1195-1205, 1229-1235):
