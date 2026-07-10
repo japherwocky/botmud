@@ -1,64 +1,71 @@
-# Session Status — 2026-07-09 — Autonomous loop: differential harness finds 5 render-layer divergences (LOCAL, UNPUSHED)
+# Session Status — 2026-07-09 — Autonomous loop batch 2: 10 render + wear/equip divergences (LOCAL, UNPUSHED)
 
 ## Current State
 
-- **Active focus**: **Differential-harness-on-unswept-command-surfaces** — this is
-  the productive mode right now. The per-file audit tracker was declared
-  "converging" last session; **that is now disproven for the command render
-  layer.** Driving the C-oracle ⇄ Python replay at unswept commands surfaced
-  **5 real ROM-parity divergences** the per-file audits marked complete (the bug
-  lived in a name-render call / swapped constant / list order / capitalization,
-  not the audited control flow).
-- **This session (v2.14.273 → v2.14.278, all committed LOCALLY on `master`,
-  NOT pushed):** 10 units — 5 real bug fixes, 4 differential locks, 1 verified
-  doc reconciliation. See the summary for the full table.
-  - **LOOK-012** — `look <dir>` reported every door "closed" (swapped `EX_ISDOOR`/
-    `EX_CLOSED` bits).
-  - **FINDING-042** — `scan` leaked aura tags (`describe_character` vs bare PERS).
-  - **LOOK-013 / FINDING-043** — fight-line leaked aura tags (found by sweeping
-    every `describe_character` call site after 042).
-  - **FINDING-044** — `where <name>` returned the wrong duplicate (char_list
-    head-insert order vs registry append order).
-  - **LOOK-014 / FINDING-045** — look-at-char health line not capitalized (missing
-    ROM `buf[0]=UPPER`).
-  - 4 new converging locks: `position_transitions`, `exits_listing`,
-    `drink_liquid_messages` (act_obj.c), `emote_command` (act_comm.c).
-  - Doc: reconciled stale OLC/JSON audit function-inventory rows.
+- **Active focus**: **Source-read + parallel-hunter sweep of unswept command
+  surfaces** — still the productive mode. Driving ROM-C-vs-Python comparison at
+  command render/dispatch surfaces (via careful source reading and `general-purpose`
+  hunter subagents whose findings I re-verify against ROM myself) surfaced **10
+  real ROM-parity divergences** the per-file audits had marked complete — the bug
+  lived in a skipped ROM accessor, a wrong message string, a rewritten formula, a
+  wrong dispatch key, or a wrong flag precedence, not the audited control flow.
+- **This session (v2.14.278 → v2.14.288, all committed LOCALLY on `master`, NOT
+  pushed):** 10 units, all real bug fixes, each failing-test-first + one
+  `fix(parity)` commit. See the summary for the full table.
+  - **SCORE-002** — `score` carry-weight ignored coin burden.
+  - **LOOK-015** — `look in` drink-container fill band diverged at the C
+    truncation boundary (rewritten percentage vs ROM's `value[0]/4` integer compares).
+  - **COMPARE-002** — wrong "missing second item" message.
+  - **INTERP-035** — sleeping "snore" social exception keyed on the typed string,
+    not the resolved social (so `snor` was wrongly blocked while asleep).
+  - **EQUIP-002 / INVEN-001** — `equipment` and `inventory` dropped ROM
+    `format_obj_to_char` status tags `(Glowing)/(Invis)/(Magical)/aura`; inventory
+    also mis-deduped a glowing item with a plain identical one.
+  - **RECALL-003** — `recall` command NPC gate returned "" silently and keyed on
+    `master` instead of the `ACT_PET` flag.
+  - **WEAR-013** — two-hands wield-block punctuation (`!` → `.`).
+  - **WEAR-014** — alignment "zap" now drops the item to the floor (was left
+    carried), with a `$p`-named TO_CHAR + TO_ROOM message per ROM `equip_char`.
+  - **WEAR-015** — armor wear-flags now precede HOLD in dispatch order.
 - **Pointer to latest summary**:
-  [SESSION_SUMMARY_2026-07-09_AUTONOMOUS_LOOP_RENDER_DIVERGENCES.md](SESSION_SUMMARY_2026-07-09_AUTONOMOUS_LOOP_RENDER_DIVERGENCES.md)
+  [SESSION_SUMMARY_2026-07-09_AUTONOMOUS_LOOP_BATCH_2_RENDER_AND_WEAR.md](SESSION_SUMMARY_2026-07-09_AUTONOMOUS_LOOP_BATCH_2_RENDER_AND_WEAR.md)
 
 ## Project Status (snapshot)
 
 | Metric | Value |
 |--------|-------|
-| Version | 2.14.278 |
-| Tests | **6125 passed, 4 skipped, 0 failed** (full parallel run excluding the 1 documented pre-existing flake, see below) |
+| Version | 2.14.288 |
+| Tests | **6134 passed, 4 skipped** (full serial run, excluding 1 documented pre-existing hang; 2 further failures are known cross-file RNG-leak order flakes that pass in isolation — see below) |
 | ROM C files audited | 43 / 43 |
 | Push status | **All local on `master`, UNPUSHED** — awaiting user review |
-| Active focus | Differential harness at unswept command surfaces (finding real bugs) |
+| Active focus | Source-read + hunter sweep of unswept command surfaces (still finding real bugs) |
 
-## Known pre-existing flake (NOT this session's work)
+## Known pre-existing flakes (NOT this session's work)
 
-`tests/integration/test_character_advancement.py::test_kill_mob_grants_xp_integration`
-**hangs** (→ `--timeout=120` fires): its fixture monkeypatches
-`mud.utils.rng_mm.number_bits → 19`, and `game_tick → mobile_update → spec_mayor
-→ spec_cast_mage → _select_spell` (`spec_funs.py:850`) loops forever on the
-never-valid roll. Documented on HEAD before this session; orthogonal to the
-render/where changes here (not in the call stack). It also masks itself in a
-parallel run behind the separate **xdist worker-crash** (`KeyError:
-<WorkerController gwN>` in `loadscope.py:_assign_work_unit`), which aborts the
-default `-n auto` full run and eats the failure summary — so the authoritative
-green check this session was a serial `-n0` run (minus the flaky file).
+1. `tests/integration/test_character_advancement.py::test_kill_mob_grants_xp_integration`
+   **hangs** (fixture monkeypatches `number_bits → 19` → `spec_cast_mage →
+   _select_spell` loops). Excluded from the authoritative serial run.
+2. Two order-dependent **RNG-leak flakes** surfaced only in the serial full run and
+   **pass in isolation**: `test_mobprog_triggers.py::test_event_hooks_fire_rom_triggers`
+   and `test_skills_combat.py::test_trip_knocks_target_wait_daze_and_improve`.
+   Cross-file RNG-state leak class (AGENTS.md "Parallel test execution & isolation");
+   not in any changed-file path this session; no batch-2 fix touches `rng_mm`.
+3. The xdist `sessionfinish` teardown flake persists (environmental, harmless).
+
+## Outstanding — verified latent edges filed for a future pass
+
+- **WEAR-016** — `wear_obj` WIELD dispatched by `item_type == WEAPON`, not the
+  `ITEM_WIELD` wear flag (act_obj.c:1616). Unconfirmed-reachable (stock weapons
+  carry both); riskier fix. See summary.
+- **WEAR-017** — STR wield-weight check reads `obj.prototype.weight`, not ROM's
+  `get_obj_weight(obj)` (act_obj.c:1624). Not a real divergence in Python's
+  prototype-weight model today; flagged for completeness.
 
 ## Next Intended Task
 
-1. **Review + push** the 2.14.274→278 commits (all local on `master`).
-2. **Keep mining the differential harness at unswept command surfaces** — it is
-   still finding real bugs. Candidates: `do_score`/`do_worth`, `do_socials`,
-   `look in` deep contents, object extra-descr, `do_wear`/`do_remove` message
-   cycle; sweep other ROM `buf[0]=UPPER`/`capitalize()` sites (LOOK-014 class).
-3. **Land the known xdist worker-crash fix** (session memory notes a root cause +
-   local plan) so the parallel full suite is reliable again.
-4. Optional: `describe_character` is now production-dead (auras render via
-   `_char_tags`); delete it + migrate its 2 remaining test callers, or keep as the
-   canonical name+aura helper — maintainer call.
+1. **Review + push** the v2.14.279→288 commits (all local on `master`).
+2. **Keep mining unswept surfaces** — candidates: door commands
+   (`do_open`/`do_close`/`do_lock`/`do_unlock`) message strings, spell messages,
+   and `fight.c` `dam_message` damage-verb thresholds (a LOOK-015-class boundary vein).
+3. Evaluate **WEAR-016/017** reachability against real area data; fix if reachable.
+4. Land the known **xdist worker-crash fix** so the parallel full suite is reliable.
