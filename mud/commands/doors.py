@@ -382,7 +382,10 @@ def do_lock(char: Character, args: str) -> str:
             # (only do_open/do_close do — MOVE-008). Its first guard is CONT_CLOSED.
             if not (values[1] & ContainerFlag.CLOSED):
                 return "It's not closed."
-            if values[2] <= 0:  # No key defined
+            # LOCK-002: ROM src/act_move.c:637 gates on `value[2] < 0`. Key vnum 0
+            # (a keyless container) falls through to has_key → "You lack the key.",
+            # matching the portal sibling arm above (which already uses `< 0`).
+            if values[2] < 0:
                 return "It can't be locked."
             if not _has_key(char, values[2]):
                 return "You lack the key."
@@ -487,7 +490,8 @@ def do_unlock(char: Character, args: str) -> str:
             # (only do_open/do_close do — MOVE-008). Its first guard is CONT_CLOSED.
             if not (values[1] & ContainerFlag.CLOSED):
                 return "It's not closed."
-            if values[2] <= 0:  # No key defined
+            # LOCK-002: ROM src/act_move.c:773 gates on `value[2] < 0` (see do_lock).
+            if values[2] < 0:
                 return "It can't be unlocked."
             if not _has_key(char, values[2]):
                 return "You lack the key."

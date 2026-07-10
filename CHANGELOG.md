@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **LOCK-002 — `lock`/`unlock` on a closed keyless container reported "It can't
+  be [un]locked." instead of ROM's "You lack the key."** ROM's container arms
+  (`src/act_move.c:637,773`) gate "can't be locked" on `value[2] < 0`; key vnum 0
+  (keyless) falls through to `has_key` → "You lack the key." The port used
+  `<= 0`, so 14 stock closed keyless containers gave the wrong message. The portal
+  sibling arm already uses `< 0`. (The unreachable door-branch twin is filed as
+  latent LOCK-003.)
 - **LOCK-001 — `lock`/`unlock` on an open non-closeable container reported "You
   can't do that." instead of ROM's "It's not closed."** ROM's `do_lock`/`do_unlock`
   container branches (`src/act_move.c:627-656,761-791`) have no `CONT_CLOSEABLE`
