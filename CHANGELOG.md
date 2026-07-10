@@ -37,6 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **LOCK-001 — `lock`/`unlock` on an open non-closeable container reported "You
+  can't do that." instead of ROM's "It's not closed."** ROM's `do_lock`/`do_unlock`
+  container branches (`src/act_move.c:627-656,761-791`) have no `CONT_CLOSEABLE`
+  check — their first guard is `CONT_CLOSED`. The port inserted a spurious
+  closeable check (unlike `do_open`/`do_close`, which correctly have one — MOVE-008),
+  so 98 stock open non-closeable containers (belt pouches, packs, key rings) gave
+  the wrong message. Removed the guard to restore ROM's `CLOSED → key → has_key →
+  LOCKED` order.
 - **WEAR-015 — wear-flag dispatch order: armor slots now take precedence over
   HOLD.** ROM `wear_obj` checks wear flags in bit order, so every armor/shield
   slot (all bits below HOLD's `1<<14`) is dispatched before the HOLD branch. An

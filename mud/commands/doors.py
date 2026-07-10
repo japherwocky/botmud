@@ -378,8 +378,8 @@ def do_lock(char: Character, args: str) -> str:
 
         # Container (ROM C lines 627-656)
         if item_type == ItemType.CONTAINER:
-            if not (values[1] & ContainerFlag.CLOSEABLE):
-                return "You can't do that."
+            # LOCK-001: ROM do_lock's container arm has NO CONT_CLOSEABLE check
+            # (only do_open/do_close do — MOVE-008). Its first guard is CONT_CLOSED.
             if not (values[1] & ContainerFlag.CLOSED):
                 return "It's not closed."
             if values[2] <= 0:  # No key defined
@@ -483,8 +483,8 @@ def do_unlock(char: Character, args: str) -> str:
 
         # Container (ROM C lines 761-791)
         if item_type == ItemType.CONTAINER:
-            if not (values[1] & ContainerFlag.CLOSEABLE):
-                return "You can't do that."
+            # LOCK-001: ROM do_unlock's container arm has NO CONT_CLOSEABLE check
+            # (only do_open/do_close do — MOVE-008). Its first guard is CONT_CLOSED.
             if not (values[1] & ContainerFlag.CLOSED):
                 return "It's not closed."
             if values[2] <= 0:  # No key defined
