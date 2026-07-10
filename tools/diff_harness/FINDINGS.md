@@ -8,6 +8,35 @@ goes clean). Resolving the root cause is separate from building the harness.
 
 ---
 
+## FINDING-041 — `look <direction>` reported every keyword'd door as "closed" (swapped EX_ bits) — ✅ RESOLVED
+
+**Status:** ✅ RESOLVED 2026-07-09 (v2.14.274). Fixed under **LOOK-012**
+(`docs/parity/ACT_INFO_C_AUDIT.md`).
+
+**Scenario:** `look_direction` — start at Cityguard HQ (3110), which has a
+keyword'd door east (Park Road, base `exit_info=1` = ISDOOR, **open**) and west
+(the `'KEEP OUT'` sign door, D-reset closed+locked). `look east` / `look west` /
+each cardinal, then unlock+open west and `look west` again.
+
+**Divergence:** C oracle rendered `look east` → `"You see Park Road." / "The
+door is open."`; Python rendered `"... / The door is closed."`. The base world
+state was correct in both (`room_registry[3110]` east `exit_info=1`), so the bug
+was in the render path.
+
+**Root cause:** `mud/world/look.py:_look_direction` hardcoded the door bits
+**swapped** — `EX_ISDOOR = 2`, `EX_CLOSED = 1` — versus ROM `src/merc.h:1300-1301`
+(`EX_ISDOOR = (A) = 1`, `EX_CLOSED = (B) = 2`). Since every door carries the
+ISDOOR bit (bit 0), the swapped `exit_info & EX_CLOSED(1)` was always truthy, so
+`look <dir>` at any keyword'd door always said "closed," open or not. The
+canonical constants in `mud/models/constants.py` were correct all along; only
+this local redefinition was wrong (the AGENTS.md "never hardcode bit values"
+anti-pattern, live). A repo sweep confirmed it was the only swapped site.
+
+**Fix:** import `EX_CLOSED`/`EX_ISDOOR` from `mud.models.constants`. The
+`look_direction` scenario golden was red before the fix and converges after.
+
+---
+
 ## FINDING-040 — death auto-loot/autogold emits summary text instead of ROM `do_get` lines — ✅ RESOLVED
 
 **Status:** ✅ RESOLVED 2026-06-22 (v2.14.208). Fixed under **FIGHT-080**

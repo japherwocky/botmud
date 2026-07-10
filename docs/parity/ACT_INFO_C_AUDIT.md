@@ -543,6 +543,24 @@ act_info.c is **100% complete** when:
      ROM order; Golden-vs-Red aura gated on alignment + observer detect). Verified
      red before fix, green after.
 
+   - **LOOK-012** ✅ FIXED (2.14.274): `look <direction>` door-status swapped bits.
+     ROM `do_look` (`src/act_info.c:1298-1309`) prints `"The $d is closed."` when
+     the keyword'd exit has `EX_CLOSED` and `"The $d is open."` when it has
+     `EX_ISDOOR` but not closed. Python `mud/world/look.py:_look_direction`
+     **hardcoded the two bits swapped** (`EX_ISDOOR = 2`, `EX_CLOSED = 1`) instead
+     of ROM's `EX_ISDOOR = (A) = 1`, `EX_CLOSED = (B) = 2` (`src/merc.h:1300-1301`).
+     Because every door carries the ISDOOR bit (bit 0), the swapped
+     `exit_info & EX_CLOSED(1)` was **always** truthy → `look <dir>` reported every
+     keyword'd door as `"closed"`, even open ones (e.g. the always-open Park Road
+     door east of Cityguard HQ 3110). **Fix:** import the canonical `EX_CLOSED`/
+     `EX_ISDOOR` from `mud.models.constants` (AGENTS.md flag-values rule — never
+     hardcode bit values). Surfaced 2026-07-09 by the new `look_direction`
+     diff_harness scenario (C oracle: east door open; Python: closed). Sweep
+     confirmed this was the only swapped site (`handlers.py:6583` hardcodes the
+     same three bits but with correct values). Test:
+     `tools/diff_harness/scenarios/look_direction.json` (C-oracle golden; Python
+     red before fix, converges after) + `FINDING-041`.
+
 **IMPORTANT Gaps** (P1 - SHOULD FIX):
 
 3. ✅ **FIXED** - **Prototype Extra Descriptions** (ROM C lines 1195-1205, 1229-1235):

@@ -7,7 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Differential-harness scenarios `position_transitions` and `look_direction`.**
+  `position_transitions` locks the no-object arms of do_stand/rest/sit/sleep/wake
+  (POS_* state machine + message strings) against the C oracle — converges first
+  pass. `look_direction` locks `look <dir>` exit-description + door open/closed
+  rendering; it surfaced LOOK-012 (below) as a real divergence and now guards it.
+
+### Changed
+
+- **Doc hygiene: reconciled stale OLC/JSON audit function-inventory rows.** The
+  Phase-1 summary tables in HEDIT / OLC_MPCODE / OLC_SAVE / JSON_LOADER audit
+  docs still marked ported functions `❌ MISSING` / `⚠️ PARTIAL`, contradicting
+  their own resolved detailed gap tables and the authoritative subsystem tracker.
+  Flipped to `✅ FIXED` / `N/A` after verifying each against the actual code and
+  ROM source (same stale-summary-header pattern fixed earlier for CONST/BAN/BIT).
+
 ### Fixed
+
+- **LOOK-012 — `look <direction>` reported every door as "closed".** ROM
+  `do_look` (`src/act_info.c:1298-1309`) says "The <door> is open." for an open
+  keyword'd exit and "... is closed." for a closed one. `mud/world/look.py:_look_direction`
+  hardcoded the `EX_ISDOOR`/`EX_CLOSED` bits **swapped** (`ISDOOR=2, CLOSED=1`
+  vs ROM's `ISDOOR=1, CLOSED=2`), and since every door carries the ISDOOR bit,
+  the check was always true — so `look <dir>` always said "closed," even for open
+  doors. Now imports the canonical constants (AGENTS.md never-hardcode-bit-values
+  rule). Surfaced by the new `look_direction` diff_harness scenario. (FINDING-041)
 
 - **FIGHT-093 — `damage()` 1200-point loophole cap + weapon-extract cheat
   penalty.** ROM `src/fight.c:697-713` clamps any physical hit (`dt >= TYPE_HIT`)

@@ -519,9 +519,11 @@ def _look_direction(char: Character, room, direction: int) -> str:
     keyword = getattr(exit_obj, "keyword", None)
     exit_info = getattr(exit_obj, "exit_info", 0)
 
-    # EX_CLOSED = 1, EX_ISDOOR = 2
-    EX_ISDOOR = 2
-    EX_CLOSED = 1
+    # ROM merc.h: EX_ISDOOR = (A) = 1, EX_CLOSED = (B) = 2. Never hardcode these
+    # (AGENTS.md flag-values rule) — the values below were previously swapped,
+    # so every keyword'd door (which always has the ISDOOR bit) rendered as
+    # "closed" even when open (LOOK-012).
+    from mud.models.constants import EX_CLOSED, EX_ISDOOR
 
     if keyword and keyword.strip():
         if exit_info & EX_CLOSED:
