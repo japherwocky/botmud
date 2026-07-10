@@ -627,7 +627,8 @@ class TestBashRomParity:
 
         captured: dict[str, object] = {}
 
-        def _apply_damage_stub(attacker, target, damage, dam_type, dt=None):
+        # BASH-001: ROM do_bash calls damage(..., FALSE); the port passes show=False.
+        def _apply_damage_stub(attacker, target, damage, dam_type, dt=None, show=True):
             captured["damage"] = damage
             captured["dam_type"] = dam_type
             captured["dt"] = dt
@@ -638,7 +639,10 @@ class TestBashRomParity:
             patch("mud.skills.handlers.rng_mm.number_range", return_value=7),
             patch("mud.skills.handlers.apply_damage", side_effect=_apply_damage_stub),
         ):
-            assert do_bash(char, "mob") == "ok"
+            # BASH-001: do_bash now returns the {5..{x TO_CHAR flavor line, not
+            # apply_damage's result (ROM suppresses the dam_message via show=FALSE).
+            result = do_bash(char, "mob")
+            assert result.startswith("{5You slam into") and result.endswith("{x"), result
 
         assert captured["damage"] == 7
         assert captured["dam_type"] == int(DamageType.BASH)
@@ -1066,7 +1070,8 @@ class TestKickRomParity:
 
         captured: dict[str, object] = {}
 
-        def _apply_damage_stub(attacker, target, damage, dam_type, dt=None):
+        # BASH-001: ROM do_bash calls damage(..., FALSE); the port passes show=False.
+        def _apply_damage_stub(attacker, target, damage, dam_type, dt=None, show=True):
             captured["damage"] = damage
             captured["dam_type"] = dam_type
             captured["dt"] = dt
@@ -1101,7 +1106,8 @@ class TestKickRomParity:
 
         captured: dict[str, object] = {}
 
-        def _apply_damage_stub(attacker, target, damage, dam_type, dt=None):
+        # BASH-001: ROM do_bash calls damage(..., FALSE); the port passes show=False.
+        def _apply_damage_stub(attacker, target, damage, dam_type, dt=None, show=True):
             captured["damage"] = damage
             captured["dam_type"] = dam_type
             captured["dt"] = dt

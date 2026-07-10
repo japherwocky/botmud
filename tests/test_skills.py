@@ -815,7 +815,9 @@ def test_bash_applies_wait_state(monkeypatch: pytest.MonkeyPatch) -> None:
 
     result = do_bash(attacker, "")
 
-    assert_attack_message(result, "Ogre")
+    # BASH-001: ROM do_bash returns the {5..{x TO_CHAR flavor line (damage() runs
+    # with show=FALSE, suppressing the dam_message), not a {2 dam_message.
+    assert result == "{5You slam into Ogre, and send it flying!{x", result
     assert attacker.wait == 24
     assert attacker.cooldowns.get("bash", None) == 0
     assert victim.position == Position.RESTING

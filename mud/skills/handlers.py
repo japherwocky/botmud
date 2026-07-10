@@ -1328,53 +1328,53 @@ def bash(
         raise ValueError("bash requires both caster and target")
 
     bash_type = int(DamageType.BASH)
-    caster_name = _character_name(caster)
-    target_name = _character_name(target)
     room = getattr(caster, "room", None)
 
+    # BASH-001: ROM do_bash (src/fight.c:2460-2482) calls damage(..., FALSE) on
+    # BOTH branches — show=FALSE suppresses the dam_message, so the three {5..{x
+    # flavor act() lines are the only output. The attacker's TO_CHAR flavor line
+    # is the command return; TO_VICT/TO_NOTVICT are pushed. apply_damage(show=False)
+    # pushes nothing, so returning the flavor line is single-delivery (no double).
     if not success:
-        # mirroring ROM src/fight.c:2478-2481 — failure broadcasts
+        # ROM src/fight.c:2477-2481 — damage() first, then TO_CHAR/TO_NOTVICT/TO_VICT.
+        apply_damage(caster, target, 0, bash_type, dt="bash", show=False)
         if room is not None:
-            caster_his = _possessive_pronoun(caster)
-            caster_him = _objective_pronoun(caster)
-            _notvict_broadcast(
-                room,
-                caster,
-                target,
-                f"{caster_name} falls flat on {caster_his} face.",
-            )
+            act_to_room(room, "{5$n falls flat on $s face.{x", caster, exclude=caster)
             _to_vict_send(
                 target,
-                f"You evade {caster_name}'s bash, causing {caster_him} to fall flat on {caster_his} face.",
+                act_format(
+                    "{5You evade $n's bash, causing $m to fall flat on $s face.{x",
+                    recipient=target,
+                    actor=caster,
+                    arg2=target,
+                ),
             )
-        return apply_damage(caster, target, 0, bash_type, dt="bash")
+        return act_format("{5You fall flat on your face!{x", recipient=caster, actor=caster, arg2=target)
 
     chance = int(chance or 0)
     size = max(0, int(getattr(caster, "size", 0) or 0))
     upper = 2 + 2 * size + c_div(chance, 20)
     damage = rng_mm.number_range(2, max(2, upper))
 
-    # mirroring ROM src/fight.c:2459-2465 — success broadcasts
+    # ROM src/fight.c:2460-2465 — success broadcasts ({5..{x, PERS-rendered).
     if room is not None:
         _to_vict_send(
             target,
-            f"{caster_name} sends you sprawling with a powerful bash!",
+            act_format("{5$n sends you sprawling with a powerful bash!{x", recipient=target, actor=caster, arg2=target),
         )
-        _notvict_broadcast(
-            room,
-            caster,
-            target,
-            f"{caster_name} sends {target_name} sprawling with a powerful bash.",
-        )
+        act_to_room(room, "{5$n sends $N sprawling with a powerful bash.{x", caster, arg2=target, exclude=target)
 
-    # DAZE_STATE in ROM applies 3 * PULSE_VIOLENCE to the victim.
+    # DAZE_STATE(victim, 3 * PULSE_VIOLENCE); ROM :2470-2472 position=RESTING then
+    # damage(show=FALSE) (dam_message suppressed).
     from mud.config import get_pulse_violence
 
     victim_daze = 3 * get_pulse_violence()
     target.daze = max(int(getattr(target, "daze", 0) or 0), victim_daze)
-    result = apply_damage(caster, target, damage, bash_type, dt="bash")
+    apply_damage(caster, target, damage, bash_type, dt="bash", show=False)
+    # ROM sets POS_RESTING before damage() (:2470); in Python apply_damage's
+    # set_fighting resets position, so RESTING is applied AFTER to make it stick.
     target.position = Position.RESTING
-    return result
+    return act_format("{5You slam into $N, and send $M flying!{x", recipient=caster, actor=caster, arg2=target)
 
 
 def berserk(

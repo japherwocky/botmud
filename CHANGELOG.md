@@ -37,6 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **BASH-001 — `bash` delivered no flavor line to the attacker and dropped
+  message color.** ROM `do_bash` (`src/fight.c:2460-2482`) calls `damage(…, FALSE)`
+  on both branches — the dam_message is suppressed and the three `{5…{x` flavor
+  `act()` lines are the only output. The port sent only uncolored TO_VICT/TO_NOTVICT
+  and returned the (wrongly-emitted) dam_message, so the basher never saw "You
+  slam into X, and send X flying!" / "You fall flat on your face!" and broadcasts
+  were uncolored. Now renders all three lines via `act_format` with color, returns
+  the TO_CHAR flavor line (single-delivery via `apply_damage(show=False)`).
 - **TRIP-001 — `trip` without the skill dropped a space.** ROM
   (`src/fight.c:2654`) sends "Tripping?  What's that?" with two spaces; the port
   had one.
