@@ -175,10 +175,10 @@ def do_kill(char: Character, args: str) -> str:
 
 
 def do_kick(char: Character, args: str) -> str:
-    opponent = getattr(char, "fighting", None)
-    if opponent is None:
-        return "You aren't fighting anyone."
-
+    # KICK-001: ROM do_kick (src/fight.c:3109-3124) checks the PC level gate and
+    # NPC OFF_KICK gate BEFORE the `fighting == NULL` check, so a sub-level PC who
+    # is not fighting sees "You better leave the martial arts to fighters.", not
+    # "You aren't fighting anyone." The `fighting is None` check is relocated below.
     try:
         skill = skill_registry.get("kick")
     except KeyError:
@@ -207,6 +207,12 @@ def do_kick(char: Character, args: str) -> str:
                 required_level = None
         if required_level is not None and getattr(char, "level", 0) < required_level:
             return "You better leave the martial arts to fighters."
+
+    # KICK-001: ROM src/fight.c:3121-3124 — `fighting == NULL` check comes AFTER
+    # the level/OFF_KICK gates.
+    opponent = getattr(char, "fighting", None)
+    if opponent is None:
+        return "You aren't fighting anyone."
 
     if skill is not None:
         if int(getattr(char, "wait", 0) or 0) > 0:

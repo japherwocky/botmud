@@ -568,6 +568,10 @@ def test_kick_command_requires_fighting() -> None:
         attacker, victim = setup_combat()
         attacker.position = int(Position.FIGHTING)
         attacker.skills["kick"] = 75
+        # KICK-001: ROM checks the kick LEVEL gate before the fighting==NULL gate,
+        # so the attacker must be at/above the class kick level (class 0 → 53) to
+        # reach the "You aren't fighting anyone." branch.
+        attacker.level = 60
         attacker.max_hit = attacker.hit = 100
         victim.max_hit = victim.hit = 100
 

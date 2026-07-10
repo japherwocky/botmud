@@ -917,6 +917,9 @@ class TestKickRomParity:
         """ROM L3120-3124: Requires current opponent (ch->fighting != NULL)."""
         char = movable_char_factory("warrior", 3001)
         char.skills["kick"] = 75
+        # KICK-001: ROM checks the kick level gate before the fighting==NULL gate,
+        # so the char must clear the class kick level to reach the fighting branch.
+        char.level = 60
         char.fighting = None
 
         result = do_kick(char, "")

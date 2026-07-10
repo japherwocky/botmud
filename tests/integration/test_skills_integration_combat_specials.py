@@ -219,6 +219,9 @@ class TestKickSkill:
     def test_kick_requires_fighting(self, skilled_character, movable_mob_factory):
         """Test: Kick requires being in combat."""
         char = skilled_character
+        # KICK-001: ROM checks the kick level gate before the fighting==NULL gate,
+        # so the char must clear the class kick level to exercise the combat check.
+        char.level = 60
         movable_mob_factory(3000, 3001)
 
         result = process_command(char, "kick")

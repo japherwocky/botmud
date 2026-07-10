@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **KICK-001 — `kick` guard order: level gate now precedes the "not fighting"
+  check.** ROM `do_kick` (`src/fight.c:3109-3124`) checks the PC class-level gate
+  before `fighting == NULL`, so a sub-level PC not in combat sees "You better
+  leave the martial arts to fighters."; the port checked "not fighting" first and
+  showed the wrong message.
 - **LOOK-017 — room list omitted a standing PC's title.** ROM
   `show_char_to_char_0` (`src/act_info.c:285-288`) appends `pcdata->title` after
   the name for a standing PC (when the observer isn't brief and isn't on
