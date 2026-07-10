@@ -810,6 +810,18 @@ def _show_inventory_list(objects: list[Object], char: Character, show_nothing: b
         else:
             return "Nothing.\n"
 
+    # INVEN-001: ROM show_list_to_char formats each object via
+    # format_obj_to_char(obj, ch, fShort) (src/act_info.c:166), which prepends
+    # the object status tags ((Invis)/(Red Aura)/(Blue Aura)/(Magical)/(Glowing)/
+    # (Humming)) before the short_descr. That prefixed string is ALSO the
+    # combine/dedup key (strcmp at :180), so a glowing item and a plain identical
+    # item render as two separate lines instead of coalescing. Bare short_descr
+    # dropped the prefixes AND keyed the dedup on the wrong (prefix-blind) string.
+    from mud.utils.act import format_obj_to_char
+
+    def _display_name(obj: Object) -> str:
+        return format_obj_to_char(obj, char, f_short=True) or obj.short_descr or obj.name or "something"
+
     # Format objects (ROM C lines 162-225)
     if combine_enabled:
         # Combine duplicate objects (ROM C lines 170-195)
@@ -817,8 +829,8 @@ def _show_inventory_list(objects: list[Object], char: Character, show_nothing: b
         object_order: list[str] = []
 
         for obj in visible_objects:
-            # Get object description (short description)
-            obj_desc = obj.short_descr or obj.name or "something"
+            # Get object description (prefix-inclusive, per ROM dedup key)
+            obj_desc = _display_name(obj)
 
             # ROM C lines 176-184: Look for duplicates (case sensitive)
             if obj_desc in object_counts:
@@ -844,8 +856,7 @@ def _show_inventory_list(objects: list[Object], char: Character, show_nothing: b
         # No combining: show each object on separate line (ROM C lines 222-223)
         lines = []
         for obj in visible_objects:
-            obj_desc = obj.short_descr or obj.name or "something"
-            lines.append(obj_desc)
+            lines.append(_display_name(obj))
 
         return "\n".join(lines) + "\n"
 

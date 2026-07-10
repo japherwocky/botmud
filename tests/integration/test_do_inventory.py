@@ -30,6 +30,52 @@ def test_inventory_header_separate_line(movable_char_factory, object_factory):
     assert not output.startswith("You are carrying: a wooden sword")
 
 
+def test_inventory_shows_object_status_prefix(movable_char_factory, object_factory):
+    """INVEN-001: carried items must render through ROM `format_obj_to_char`
+    (`src/act_info.c:166`), which prepends `(Invis)/(Red Aura)/(Blue Aura)/
+    (Magical)/(Glowing)/(Humming)` before the short description. The prior code
+    used bare `obj.short_descr`, so a glowing item lost its status tag.
+    """
+    from mud.models.constants import ExtraFlag
+
+    char = movable_char_factory("TestChar", 3001)
+    sword = object_factory(
+        {"vnum": 1, "name": "sword", "short_descr": "a wooden sword", "extra_flags": int(ExtraFlag.GLOW)}
+    )
+    char.add_object(sword)
+
+    from mud.commands.inventory import do_inventory
+
+    output = do_inventory(char, "")
+    assert "(Glowing) a wooden sword" in output, output
+
+
+def test_inventory_combine_keys_on_status_prefix(movable_char_factory, object_factory):
+    """INVEN-001: ROM's combine/dedup key is the full `format_obj_to_char` string
+    (`strcmp(prgpstrShow[iShow], pstrShow)`, `src/act_info.c:180`), i.e. it
+    includes the status prefix. So a glowing item and an otherwise-identical
+    plain item are NOT collapsed — they render as two separate lines. The prior
+    code keyed on bare short_descr and wrongly combined them into `( 2)`.
+    """
+    from mud.models.constants import CommFlag, ExtraFlag
+
+    char = movable_char_factory("TestChar", 3001)
+    char.comm = int(CommFlag.COMBINE)
+    char.add_object(object_factory({"vnum": 1, "name": "sword", "short_descr": "a wooden sword"}))
+    char.add_object(
+        object_factory(
+            {"vnum": 2, "name": "sword", "short_descr": "a wooden sword", "extra_flags": int(ExtraFlag.GLOW)}
+        )
+    )
+
+    from mud.commands.inventory import do_inventory
+
+    output = do_inventory(char, "")
+    # ROM: two distinct display strings → two separate single-item lines, no ( 2).
+    assert "(Glowing) a wooden sword" in output, output
+    assert "( 2)" not in output, output
+
+
 def test_inventory_object_combining_enabled(movable_char_factory, object_factory):
     """Test object combining with COMM_COMBINE flag enabled (ROM C lines 170-185)."""
     char = movable_char_factory("TestChar", 3001)

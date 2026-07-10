@@ -37,6 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **INVEN-001 — `inventory` now shows object status tags and dedups correctly.**
+  ROM `show_list_to_char` (`src/act_info.c:166`) formats each carried item via
+  `format_obj_to_char`, prepending `(Invis)/(Red Aura)/(Blue Aura)/(Magical)/
+  (Glowing)/(Humming)`, and uses that prefixed string as the combine/dedup key.
+  Python built the string from bare `obj.short_descr`, so status prefixes were
+  dropped and — worse — a glowing item and a plain identical item wrongly
+  collapsed into one `( 2)` line for NPC/`combine` viewers. Both display paths
+  now route through `format_obj_to_char`. Same root cause as EQUIP-002.
+
 - **EQUIP-002 — `equipment` now shows object status tags.** ROM `do_equipment`
   (`src/act_info.c:2279`) renders each worn item via `format_obj_to_char`, which
   prepends `(Invis)/(Red Aura)/(Blue Aura)/(Magical)/(Glowing)/(Humming)` before
