@@ -94,6 +94,19 @@ def _room_occupant_line(observer: Character, victim) -> str:
 
     base = prefix + pers(victim, observer)
     position = getattr(victim, "position", None)
+    # LOOK-017: ROM src/act_info.c:285-288 appends the victim's pcdata->title
+    # after PERS for a standing PC — gated on the OBSERVER's COMM_BRIEF and
+    # furniture (ch->comm / ch->on), a deliberate ROM quirk.
+    if (
+        not getattr(victim, "is_npc", False)
+        and not (int(getattr(observer, "comm", 0) or 0) & int(CommFlag.BRIEF))
+        and position == Position.STANDING
+        and getattr(observer, "on", None) is None
+    ):
+        _pcdata = getattr(victim, "pcdata", None)
+        _title = getattr(_pcdata, "title", None) if _pcdata is not None else None
+        if _title:
+            base += _title
     fighting = getattr(victim, "fighting", None)
     if position == Position.FIGHTING:
         # mirroring ROM src/act_info.c:404-417 show_char_to_char_0 POS_FIGHTING

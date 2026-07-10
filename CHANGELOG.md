@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **LOOK-017 — room list omitted a standing PC's title.** ROM
+  `show_char_to_char_0` (`src/act_info.c:285-288`) appends `pcdata->title` after
+  the name for a standing PC (when the observer isn't brief and isn't on
+  furniture), so a titled PC lists as "Bob the Great is here." The port showed
+  just "Bob is here."
 - **LOOK-016 — `look <character>` never showed the target's worn equipment.**
   The "X is using:" block was dead code: `_show_equipment` read a phantom
   `char.equipped` attribute where the real one is `char.equipment`, so it always

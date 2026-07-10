@@ -624,6 +624,18 @@ act_info.c is **100% complete** when:
      Surfaced 2026-07-10 by a give/drop/report/look-at-char hunter sweep, verified
      against ROM C. Test: `tests/integration/test_look016_char_equipment_block.py`
      (2).
+   - **LOOK-017** ✅ FIXED (2.14.294): room occupant list omitted a **standing
+     PC's title**. ROM `show_char_to_char_0` (`src/act_info.c:285-288`) appends
+     `victim->pcdata->title` after `PERS(victim, ch)` when `!IS_NPC(victim) &&
+     !IS_SET(ch->comm, COMM_BRIEF) && victim->position == POS_STANDING && ch->on
+     == NULL` — so a standing titled PC lists as "Bob the Great is here." Python
+     `mud/world/look.py:_room_occupant_line` built `pers(victim) + position_suffix`
+     with no title, so a titled PC showed just "Bob is here." Note the guard keys
+     on the **observer's** `comm`/`on` (ROM `ch`), a deliberate ROM quirk faithfully
+     replicated. Titles carry a ROM-set leading space, so no separator is added.
+     Surfaced 2026-07-10 by the same hunter sweep as LOOK-016, verified against
+     ROM C. Test: `tests/integration/test_look017_standing_pc_title.py` (3: title
+     shown; brief-observer suppresses; observer-on-furniture suppresses).
 
 **IMPORTANT Gaps** (P1 - SHOULD FIX):
 
