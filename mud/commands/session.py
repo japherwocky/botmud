@@ -342,15 +342,21 @@ def do_recall(ch: Character, args: str) -> str:
     ROM Reference: src/act_move.c lines 1563-1628 (do_recall)
     """
     from mud.combat.engine import stop_fighting
-    from mud.models.constants import ROOM_VNUM_TEMPLE, AffectFlag, RoomFlag
+
+    # RECALL-003: NPCs can't recall unless they carry ACT_PET (ROM
+    # src/act_move.c:1569-1573 — `IS_NPC(ch) && !IS_SET(ch->act, ACT_PET)`), and
+    # ROM `send_to_char("Only players can recall.")` then returns — it does NOT
+    # return silently, and it gates on the ACT_PET *flag*, not on `master` (a
+    # charmed non-pet mob is still blocked). The prior code returned "" and keyed
+    # on `master`, so a charmed non-pet mob would wrongly recall and no message
+    # was shown when an NPC path (e.g. a switched immortal) hit this.
+    from mud.models.constants import ROOM_VNUM_TEMPLE, ActFlag, AffectFlag, RoomFlag
     from mud.registry import room_registry
     from mud.utils.rng_mm import number_percent
 
-    # NPCs can't recall unless they're pets (ROM C lines 1569-1573).
-    # ROM uses IS_NPC + IS_AFFECTED(AFF_CHARM); the QuickMUD analogue is an NPC
-    # that has a master (i.e. it's been charmed/owned).
-    if ch.is_npc and getattr(ch, "master", None) is None:
-        return ""  # ROM returns silently (src/act_move.c:1569-1573)
+    act_flags = int(getattr(ch, "act", 0) or 0)
+    if ch.is_npc and not (act_flags & int(ActFlag.PET)):
+        return "Only players can recall."
 
     # Message to room FIRST (ROM C line 1575)
     if ch.room:

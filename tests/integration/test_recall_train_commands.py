@@ -206,7 +206,9 @@ def test_recall_npc_blocked(recall_test_setup):
     result = do_recall(char, "")
 
     assert char.room == initial_room, "NPC should not move"
-    assert result == "", "Should return empty string for NPCs"
+    # RECALL-003: ROM src/act_move.c:1571 send_to_char("Only players can recall.")
+    # — a non-pet NPC gets the message, NOT a silent empty return.
+    assert result == "Only players can recall.", "NPC should get the ROM block message"
 
 
 def test_train_hp_increases_stats(train_test_setup):

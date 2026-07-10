@@ -37,6 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **RECALL-003 — `recall` command NPC gate now emits ROM's message and keys on
+  ACT_PET.** ROM `do_recall` (`src/act_move.c:1569-1573`) sends "Only players can
+  recall." for a non-pet NPC and gates on the `ACT_PET` flag. The dispatched
+  `do_recall` command returned `""` silently (with a comment wrongly claiming
+  "ROM returns silently") and gated on `master`, so the block message never
+  showed and a charmed non-pet mob could wrongly recall. (The `recall` *spell*
+  handler was already correct; only the command diverged.) Now returns the ROM
+  message and checks `ActFlag.PET`.
+
 - **INVEN-001 — `inventory` now shows object status tags and dedups correctly.**
   ROM `show_list_to_char` (`src/act_info.c:166`) formats each carried item via
   `format_obj_to_char`, prepending `(Invis)/(Red Aura)/(Blue Aura)/(Magical)/

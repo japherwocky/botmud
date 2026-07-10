@@ -37,6 +37,27 @@ def test_recall_npc_without_pet_flag_blocked(movable_mob_factory):
     assert "only players can recall" in result.lower()
 
 
+def test_do_recall_command_blocks_non_pet_npc_with_message(movable_mob_factory):
+    """RECALL-003: the `recall` COMMAND (do_recall, mud/commands/session.py) must
+    emit ROM's "Only players can recall." for a non-pet NPC. ROM
+    (src/act_move.c:1569-1573) does `send_to_char("Only players can recall.")`
+    then returns — it does NOT return silently. The command must also gate on the
+    ACT_PET flag, not on `master`: a charmed non-pet mob (master set but no
+    ACT_PET) is still blocked in ROM.
+    """
+    from mud.commands.session import do_recall
+
+    initialize_world("area/area.lst")
+    mob = movable_mob_factory(TEST_MOB_VNUM, TEST_ROOM_VNUM)
+
+    # Non-pet NPC → ROM emits the message (Python previously returned "").
+    assert do_recall(mob, "") == "Only players can recall."
+
+    # Charmed mob: master set but still no ACT_PET → ROM still blocks it.
+    mob.master = object()
+    assert do_recall(mob, "") == "Only players can recall."
+
+
 def test_recall_sends_prayer_message_to_room(recalling_char):
     """ROM L1575: act('$n prays for transportation!', ch, 0, 0, TO_ROOM)"""
     recall(recalling_char)
