@@ -353,6 +353,10 @@ def _look_char(char: Character, victim: Character) -> str:
         condition = f"{short} is in awful condition."
     else:
         condition = f"{short} is bleeding to death."
+    # ROM src/act_info.c:480 — `buf[0] = UPPER(buf[0])` capitalizes the first
+    # char of the health line, so a mob's lowercase short_descr ("the beastly
+    # fido ...") renders "The beastly fido ..." (LOOK-014).
+    condition = condition[0].upper() + condition[1:] if condition else condition
     lines.append(condition)
 
     # Show equipment if visible

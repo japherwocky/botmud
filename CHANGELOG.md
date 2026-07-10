@@ -19,7 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `exits_listing` locks `do_exits`/autoexits closed-exit hiding + room-name
   rendering across an open/close cycle — converges first pass, no divergence.
   `where_command` locks `do_where` arg-search PERS + char_list-order match; it
-  surfaced FINDING-044 (wrong duplicate returned).
+  surfaced FINDING-044 (wrong duplicate returned). `drink_liquid_messages`
+  (act_obj.c) locks `do_drink` liquid-name rendering + thirst-quenched message —
+  converges. `emote_command` (act_comm.c) locks `do_emote` incl. the "Moron!"
+  non-alpha-first-char quirk — converges. `look_at_character` locks
+  `show_char_to_char_1` (description + health + self-look pronoun); it surfaced
+  FINDING-045 (uncapitalized health line).
 
 ### Changed
 
@@ -31,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ROM source (same stale-summary-header pattern fixed earlier for CONST/BAN/BIT).
 
 ### Fixed
+
+- **LOOK-014 — look-at-character health line now capitalized (FINDING-045).**
+  ROM `show_char_to_char_1` (`src/act_info.c:480`) does `buf[0] = UPPER(buf[0])`
+  on the health line, so `look <mob>` shows `"The beastly fido is in excellent
+  condition."`. Python `_look_char` didn't capitalize, rendering `"the beastly
+  fido ..."` (PCs unaffected — names are already capitalized). Now mirrors ROM.
+  Surfaced by the new `look_at_character` diff_harness scenario.
 
 - **`where <name>` now returns ROM's char_list-order match (FINDING-044).** ROM
   `do_where` (`src/act_info.c:2445`) walks `char_list` head-first (newest-first,

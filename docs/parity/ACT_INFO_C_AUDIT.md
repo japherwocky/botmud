@@ -575,6 +575,20 @@ act_info.c is **100% complete** when:
      `tests/integration/test_look_char_tags_show_char_to_char_0.py::test_fighting_target_uses_bare_pers_not_aura_tags`
      (red before, green after) + `FINDING-043`.
 
+   - **LOOK-014** ✅ FIXED (2.14.278): look-at-char health line not capitalized.
+     ROM `show_char_to_char_1` (`src/act_info.c:461-480`) builds the health line
+     as `PERS(victim) + " is in <cond> condition."` then does
+     `buf[0] = UPPER(buf[0])`, so a mob whose short_descr is lowercase ("the
+     beastly fido") renders `"The beastly fido is in excellent condition."`.
+     Python `mud/world/look.py:_look_char` appended the condition line without
+     capitalizing its first char, so `look <mob>` showed `"the beastly fido is in
+     excellent condition."` (PCs were unaffected — a name is already capitalized).
+     **Fix:** capitalize the first char of the condition line, mirroring ROM's
+     `buf[0] = UPPER`. Surfaced by the new `look_at_character` diff_harness
+     scenario (C: `"The beastly fido ..."`; Python: `"the ..."`). Test:
+     `tools/diff_harness/scenarios/look_at_character.json` (red before, converges
+     after) + `FINDING-045`.
+
 **IMPORTANT Gaps** (P1 - SHOULD FIX):
 
 3. ✅ **FIXED** - **Prototype Extra Descriptions** (ROM C lines 1195-1205, 1229-1235):

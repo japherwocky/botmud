@@ -8,6 +8,31 @@ goes clean). Resolving the root cause is separate from building the harness.
 
 ---
 
+## FINDING-045 — look-at-char health line not capitalized — ✅ RESOLVED
+
+**Status:** ✅ RESOLVED 2026-07-09 (v2.14.278). Fixed under **LOOK-014**
+(`docs/parity/ACT_INFO_C_AUDIT.md`).
+
+**Scenario:** `look_at_character` — `__mload` a beastly fido (3062) into the
+Temple of Mota, then `look fido`, `look Tester` (self), `look nonexistentmob`.
+
+**Divergence:** `look fido` health line — C: `"The beastly fido is in excellent
+condition."`; Python: `"the beastly fido is in excellent condition."` (lowercase
+first char). Self-look and the not-found branch converged.
+
+**Root cause:** ROM `show_char_to_char_1` (`src/act_info.c:461-480`) assembles the
+health line from `PERS(victim, ch)` + condition string and finishes with
+`buf[0] = UPPER(buf[0])`. Python `mud/world/look.py:_look_char` appended the
+condition line without that first-char capitalization, so a mob's lowercase
+short_descr stayed lowercase. PCs were unaffected (name already capitalized).
+
+**Fix:** capitalize the condition line's first char, mirroring ROM's `buf[0] =
+UPPER`. The scenario also incidentally locks the LOOK-009 self-look pronoun
+(`"You see nothing special about it."`) and the not-found branch. Golden red
+before, converges after.
+
+---
+
 ## FINDING-044 — `where <name>` returned the wrong duplicate (char_list order) — ✅ RESOLVED
 
 **Status:** ✅ RESOLVED 2026-07-09 (v2.14.277). Fixed in `mud/commands/info.py::do_where`.
