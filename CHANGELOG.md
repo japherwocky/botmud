@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **PASSWORD-002 — `password` command message byte-fidelity.** The syntax line
+  dropped ROM's trailing period (`src/act_info.c:2889` → "Syntax: password <old>
+  <new>.") and the wrong-password penalty line had one space where ROM has two
+  (`src/act_info.c:2896` → "Wrong password.  Wait 10 seconds.").
 - **LOCK-002 — `lock`/`unlock` on a closed keyless container reported "It can't
   be [un]locked." instead of ROM's "You lack the key."** ROM's container arms
   (`src/act_move.c:637,773`) gate "can't be locked" on `value[2] < 0`; key vnum 0

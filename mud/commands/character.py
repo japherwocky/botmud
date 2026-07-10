@@ -38,7 +38,8 @@ def do_password(ch: Character, args: str) -> str:
     parts = args.split(None, 1)
 
     if len(parts) < 2:
-        return "Syntax: password <old> <new>"
+        # PASSWORD-002: ROM src/act_info.c:2889 — trailing period.
+        return "Syntax: password <old> <new>."
 
     old_password = parts[0]
     new_password = parts[1]
@@ -57,7 +58,8 @@ def do_password(ch: Character, args: str) -> str:
         # The macro is UMAX(ch->wait, 40); a plain `= 40` would lower a higher
         # existing wait. Use the canonical UMAX helper.
         apply_wait_state(ch, 40)
-        return "Wrong password. Wait 10 seconds."
+        # PASSWORD-002: ROM src/act_info.c:2896 — TWO spaces after "password.".
+        return "Wrong password.  Wait 10 seconds."
 
     # Gap 1 (P1): Check minimum length (ROM src/act_info.c:2897-2904)
     if len(new_password) < 5:
