@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **HEALER-007 — `heal` price-list header not first-letter-capitalized.** ROM
+  prints the header via `act("$N says 'I offer the following spells:'", ...)`,
+  and `act_new` capitalizes the rendered first letter (`src/healer.c:67`,
+  `src/comm.c:2379`). A healer with a lowercase-initial short_descr rendered
+  "a healer says ..." instead of ROM's "A healer says ...". Wrapped the header in
+  `capitalize_act_line`, matching the sibling "not enough gold" branch.
 - **PASSWORD-002 — `password` command message byte-fidelity.** The syntax line
   dropped ROM's trailing period (`src/act_info.c:2889` → "Syntax: password <old>
   <new>.") and the wrong-password penalty line had one space where ROM has two

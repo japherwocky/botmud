@@ -240,7 +240,12 @@ def do_heal(char: Character, args: str = "") -> str:
 
     arg = (args or "").strip().lower()
     if not arg:
-        lines = [f"{_healer_name(healer)} says 'I offer the following spells:'"]
+        # HEALER-007: ROM src/healer.c:67 — act("$N says 'I offer the following
+        # spells:'", ...); act_new (src/comm.c:2379) capitalizes buf[0], so a
+        # lowercase-initial short_descr renders "A healer says ...". Match the
+        # sibling "not enough gold" branch (capitalize_act_line, INV-029/ACT-CAP).
+        header = capitalize_act_line(f"{_healer_name(healer)} says 'I offer the following spells:'")
+        lines = [header]
         lines.extend(service.display_line for service in _SERVICES)
         lines.append(" Type heal <type> to be healed.")
         return "\n".join(lines)
