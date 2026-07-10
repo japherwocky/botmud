@@ -38,11 +38,15 @@
 - **~~BASH-001~~ ✅ FIXED (2.14.297)** — `do_bash` flavor TO_CHAR line + `{5…{x`
   color. ROM's `damage(…, FALSE)` suppresses the dam_message so the flavor line
   replaces it; rendered via `act_format`, single-delivery via `show=False`.
-- **do_trip double-delivery** (NEW, unverified) — `do_trip`'s failure path calls
-  `apply_damage(…,0)` with default `show=True` (pushes the attacker line at
-  `engine.py:231`) then returns the same rendered line — a possible double-delivery
-  to the attacker. Filed in the BASH-001 audit note; verify separately. Good next
-  target.
+- **TRIP-002** (CONFIRMED REAL, DEFERRED — filed in `FIGHT_C_AUDIT`) — `do_trip`
+  failure double-delivers the miss dam_message (push at `engine.py:231` + command
+  return; empirically count==2). The fix is one line (`return ""`) but it breaks
+  `TestTripRomParity::test_trip_chance_{size,level}_...`, which are themselves
+  mis-specified (expected chances ignore the dex modifier). Rewriting those as
+  differentials surfaced a **second unverified suspicion**: the trip size modifier
+  shifts chance by ~7 where ROM's `*10` predicts 20 — needs its own probe. Deferred
+  to a dedicated pass (fix + 3 chance-test rewrites + size-delta probe) rather than
+  force it through a red/questionable suite.
 - **STEAL-001** (minor) — `do_steal` never calls `check_improve`.
 - **RESCUE-002** (low) — `skill_handlers.rescue` name vs ROM `$N`/PERS (NPC edge).
 - **is_number/atoi class** — DROP-001 + WIMPY-002 want one shared
