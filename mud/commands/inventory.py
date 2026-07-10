@@ -912,8 +912,14 @@ def do_equipment(char: Character, args: str = "") -> str:
 
         # ROM C line 2277: if (can_see_obj (ch, obj))
         if can_see_object(char, obj):
-            # ROM C line 2279: format_obj_to_char (obj, ch, TRUE)
-            obj_name = obj.short_descr or obj.name or "object"
+            # EQUIP-002: ROM C line 2279 renders worn items via
+            # format_obj_to_char(obj, ch, TRUE), which prepends the object
+            # status tags ((Invis)/(Red Aura)/(Blue Aura)/(Magical)/(Glowing)/
+            # (Humming)) before the short_descr. The bare short_descr dropped
+            # every status prefix from `equipment` output.
+            from mud.utils.act import format_obj_to_char
+
+            obj_name = format_obj_to_char(obj, char, f_short=True) or obj.short_descr or obj.name or "object"
         else:
             # ROM C line 2283: send_to_char ("something.\n\r", ch);
             obj_name = "something."

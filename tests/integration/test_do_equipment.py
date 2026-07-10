@@ -67,6 +67,36 @@ def test_equipment_visible_shows_object_name(movable_char_factory, object_factor
     assert "a steel sword" in output
 
 
+def test_equipment_visible_item_shows_status_prefix(movable_char_factory, object_factory):
+    """EQUIP-002: worn items must render through ROM `format_obj_to_char`
+    (src/act_info.c:2279), which prepends object status tags —
+    `(Glowing)`/`(Humming)`/`(Invis)`/aura/`(Magical)` — before the short
+    description. The prior code used the bare short_descr, so a glowing weapon
+    showed `<wielded>           a sword` instead of ROM's
+    `<wielded>           (Glowing) a sword`.
+    """
+    from mud.models.constants import ExtraFlag, WearLocation
+
+    char = movable_char_factory("TestChar", 3001)
+
+    sword = object_factory(
+        {
+            "vnum": 1,
+            "name": "sword",
+            "short_descr": "a steel sword",
+            "extra_flags": int(ExtraFlag.GLOW),
+        }
+    )
+    sword.wear_loc = int(WearLocation.WIELD)
+    char.equipment = {int(WearLocation.WIELD): sword}
+
+    from mud.commands.inventory import do_equipment
+
+    output = do_equipment(char, "")
+
+    assert "(Glowing) a steel sword" in output, output
+
+
 def test_equipment_invisible_shows_something(movable_char_factory, object_factory):
     """Test that invisible equipment shows 'something.' (ROM C line 2283)."""
     from mud.models.constants import ExtraFlag, WearLocation

@@ -37,6 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **EQUIP-002 — `equipment` now shows object status tags.** ROM `do_equipment`
+  (`src/act_info.c:2279`) renders each worn item via `format_obj_to_char`, which
+  prepends `(Invis)/(Red Aura)/(Blue Aura)/(Magical)/(Glowing)/(Humming)` before
+  the short description. Python built the name from bare `obj.short_descr`, so a
+  glowing/humming/invisible-to-a-detecting-viewer worn item lost its status
+  prefix. A faithful `format_obj_to_char` already existed (`mud/utils/act.py`)
+  but wasn't wired in; `do_equipment` now routes through it.
+
 - **INTERP-035 — sleeping "snore" social exception now keys on the resolved
   social.** ROM `check_social` (`src/interp.c:623`) allows a social while
   sleeping via `!str_cmp(social_table[cmd].name, "snore")` — comparing the
