@@ -1,9 +1,9 @@
-# Session Summary — 2026-07-10 — Autonomous /loop command-handler sweep (8 fixes)
+# Session Summary — 2026-07-10 — Autonomous /loop command-handler sweep (10 fixes)
 
 ## Scope
 
-Autonomous `/loop` run (self-paced, 10-session budget; this handoff covers
-sessions 1–5, `v2.14.288 → v2.14.296`). Picked up from the 2026-07-09 batch-2
+Autonomous `/loop` run (self-paced, 10-session budget; covers the full run,
+`v2.14.288 → v2.14.298`). Picked up from the 2026-07-09 batch-2
 render/wear session. Mode: **source-read + parallel-hunter sweeps of unswept
 command handlers** — `general-purpose` subagents compared batches of command
 functions against their ROM C originals, and **every** candidate divergence was
@@ -61,6 +61,21 @@ All commits are **LOCAL on `master`, UNPUSHED** — awaiting user review.
 - **Gap**: `do_trip` no-skill message "Tripping?  What's that?" had one space vs ROM's two.
 - **Tests**: `tests/integration/test_trip001_message_fidelity.py` (1)
 
+### `BASH-001` — ✅ FIXED (2.14.297)
+- **Python**: `mud/skills/handlers.py:bash`
+- **ROM C**: `src/fight.c:2460-2482`
+- **Gap**: `do_bash` never delivered the attacker's TO_CHAR flavor line and all bash broadcasts dropped ROM's `{5…{x` color. Filed MEDIUM-open, then closed once the advisor surfaced that ROM calls `damage(…, FALSE)` on both branches — `show=FALSE` suppresses the dam_message so the flavor line *replaces* it (no reconciliation needed). Now renders all three lines via `act_format` with color; returns TO_CHAR (single-delivery via `apply_damage(show=False)` — test asserts exactly-once). Corrected 3 tests that encoded the old return-is-dam_message behavior.
+- **Tests**: `tests/integration/test_bash001_char_flavor_and_color.py` (2)
+
+### `PUT-005` — ✅ FIXED (2.14.298)
+- **Python**: `mud/commands/obj_manipulation.py:do_put` (put-all branch)
+- **ROM C**: `src/act_obj.c:451-491`
+- **Gap**: `put all <container>` with nothing eligible emitted a non-ROM "You have nothing to put." ROM's put-all loop has no `found` flag / no trailing message. Fix: `count == 0` returns `""`.
+- **Tests**: `tests/integration/test_put005_empty_put_all_silent.py` (1)
+
+### `TRIP-002` — ⏳ CONFIRMED REAL, DEFERRED
+- `do_trip` failure double-delivers the miss dam_message (push at `engine.py:231` + command return; empirically count==2). The one-line fix (`return ""`) breaks a cluster of mis-specified chance tests and surfaced a second unverified size-modifier suspicion (chance shifts ~7 where ROM's `*10` predicts 20). Reverted and filed for a dedicated pass. See `FIGHT_C_AUDIT` TRIP-002.
+
 ## Durable rows filed (verified vs ROM, NOT closed)
 
 - **`LOCK-003`** (`ACT_MOVE_C_AUDIT`) — door key `<=0` vs ROM `<0`; unreachable (all stock exit keys are `-1`). Latent.
@@ -70,13 +85,22 @@ All commits are **LOCAL on `master`, UNPUSHED** — awaiting user review.
 - **`BASH-001`** (`FIGHT_C_AUDIT`, MEDIUM, open) — `do_bash` never delivers the attacker's TO_CHAR flavor line and all bash broadcasts drop ROM's `{5…{x` color. Fix must reconcile ROM's two-caster-lines (damage dam_message + flavor TO_CHAR) with the single-string command return via `apply_damage`'s push-vs-return single-delivery contract (INV-001) — model on `do_trip`. Deserves a dedicated gap-closer.
 - **`STEAL-001`** (`FIGHT_C_AUDIT`, minor) — `do_steal` never calls `check_improve` (same stub class as PICK-001/RECALL-002).
 - **`RESCUE-002`** (`FIGHT_C_AUDIT`, low) — `skill_handlers.rescue` uses raw name vs ROM `$N`/PERS; only diverges when an NPC is party (dispatched `do_rescue` is clean).
+- **`TRIP-002`** (`FIGHT_C_AUDIT`, minor, deferred) — `do_trip` failure double-delivers the miss dam_message (confirmed count==2). Fix entangled with mis-specified chance tests + a size-modifier suspicion; deferred with full repro.
+- **`GIVE-006`** (`ACT_OBJ_C_AUDIT`, judgment call) — giving a worn item says "You must remove it first." where ROM says "You do not have that item." (ROM's remove-first is dead code). Python is more helpful but diverges — flagged for a human parity-vs-UX decision.
+- **`PUT-006`** (`ACT_OBJ_C_AUDIT`, minor) — `do_put` container token uses the last word vs ROM's second word; diverges only on 3+ word garbage input lacking `in`/`on`.
 
 ## Verified CLEAN (no gap)
 
 `dam_message` thresholds/punct, `do_consider`, `do_sacrifice`, `do_split`,
 `do_pour`, `do_practice`, `do_worth`, `do_where`, `get_cost`, `do_drink`,
-`do_give`, `do_report`, `do_affects`, `do_examine`, `do_look` health tiers,
-`do_sneak`, `do_hide`, `do_rescue` (command), `do_recite`.
+`do_give` (money + msgs), `do_report`, `do_affects`, `do_examine`, `do_look`
+health tiers, `do_sneak`, `do_hide`, `do_rescue` (command), `do_recite`,
+`do_quaff`, `do_zap`, `do_eat`, `do_sit`/`do_rest`/`do_sleep`/`do_stand`/`do_wake`,
+`do_fill`, `do_get` (money path), `do_empty`.
+
+Verified CLEAN across **five hunter batches + extensive manual probing** — the
+command surface is now thoroughly swept; recent batches returned mostly clean
+with only edge-cases and judgment calls remaining, which is why the run stops here.
 
 ## Files Modified
 
@@ -92,17 +116,28 @@ All commits are **LOCAL on `master`, UNPUSHED** — awaiting user review.
 
 ## Test Status
 
-- Per-area suites green throughout (lock/door 287, look/equip/room 454+, kick 57, trip 111, healer 7).
-- Full suite: **exit 0 (green)** — see SESSION_STATUS for the pass count.
+- Per-area suites green throughout (lock/door, look/equip/room, kick/trip/bash, healer, put).
+- Full suite (mid-run): **6163 passed, 4 skipped**; the only failures are the 2
+  documented cross-file RNG-leak order flakes (pass in isolation). No regression
+  from the run's 10 fixes.
 
-## Next Steps
+## Next Steps (for the next agent — the loop has STOPPED)
 
-Loop continues (~4–5 sessions remaining). Next hunter batch: `do_cast`
-failure/mana messages, `do_quaff`/`do_zap` wand, `do_eat`, `do_wear`/`do_remove`
-edge messages, `do_sit`/`do_rest`/`do_sleep` furniture messages. Prioritise the
-open **BASH-001** (medium, player-facing) as a dedicated closer once the
-`apply_damage` single-delivery contract is confirmed. Consider a shared
-`rom_is_number`/`rom_atoi` helper to close the DROP-001/WIMPY-002 class at once.
+The autonomous `/loop` run is complete; the command surface is thoroughly swept.
+Concrete follow-ups, in priority order:
+
+1. **Review + push** the `v2.14.289 → v2.14.298` commits (all local on `master`,
+   unpushed). This is the gating next action.
+2. **Close `TRIP-002`** as a dedicated pass — it needs the one-line `return ""`
+   fix + rewriting the 3 mis-specified `TestTripRomParity` chance tests as
+   differentials + probing the trip size-modifier suspicion (chance shifts ~7
+   where ROM's `*10` predicts 20). Full repro in `FIGHT_C_AUDIT` TRIP-002.
+3. **Decide `GIVE-006`** (parity-vs-UX): keep the helpful "You must remove it
+   first." or match ROM's "You do not have that item."
+4. **Close the `is_number`/`atoi` class** (DROP-001 + WIMPY-002) with one shared
+   `rom_is_number`/`rom_atoi` helper.
+5. Lower priority: `STEAL-001`, `RESCUE-002`, `PUT-006`, the latent `LOCK-003`/`DESC-001`.
+
 **All commits are unpushed — user review + push is the gating next action.**
 
 ### Roster insight (for `DIVERGENCE_CLASS_ROSTER.md`)

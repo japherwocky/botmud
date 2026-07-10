@@ -1,4 +1,4 @@
-# Session Status — 2026-07-10 — Autonomous /loop command-handler sweep (8 fixes, LOCAL/UNPUSHED)
+# Session Status — 2026-07-10 — Autonomous /loop command-handler sweep COMPLETE (10 fixes, LOCAL/UNPUSHED)
 
 ## Current State
 
@@ -8,9 +8,9 @@
   hand before closing. This run closed **8 real parity divergences** the per-file
   audits had marked complete (spurious inserted guard, wrong key threshold, wrong
   guard order, dropped message bytes, a phantom-attribute dead-code block).
-- **This run (v2.14.288 → v2.14.296, all committed LOCALLY on `master`, NOT
-  pushed):** 8 `fix(parity)` commits + 2 `docs(parity)` filing commits. See the
-  summary for the full table.
+- **This run (v2.14.288 → v2.14.298, all committed LOCALLY on `master`, NOT
+  pushed) — the loop is now COMPLETE and STOPPED:** 10 `fix(parity)` commits +
+  several `docs(parity)` filing commits. See the summary for the full table.
   - **LOCK-001 / LOCK-002** — container lock/unlock guard sequence (spurious
     `CLOSEABLE` check; `<=0` vs `<0` key threshold).
   - **PASSWORD-002** — `do_password` syntax period + wrong-password double-space.
@@ -20,6 +20,10 @@
   - **LOOK-017** — room list omitted a standing PC's title.
   - **KICK-001** — `do_kick` level gate must precede the `fighting==NULL` check.
   - **TRIP-001** — `do_trip` no-skill message double-space.
+  - **BASH-001** — `do_bash` attacker flavor TO_CHAR line + `{5…{x` color
+    (ROM `damage(…,FALSE)` suppresses the dam_message; flavor replaces it).
+  - **PUT-005** — `put all <container>` with nothing eligible now silent (ROM has
+    no message).
 - **Pointer to latest summary**:
   [SESSION_SUMMARY_2026-07-10_AUTONOMOUS_LOOP_COMMAND_SWEEP.md](SESSION_SUMMARY_2026-07-10_AUTONOMOUS_LOOP_COMMAND_SWEEP.md)
 
@@ -27,7 +31,7 @@
 
 | Metric | Value |
 |--------|-------|
-| Version | 2.14.297 |
+| Version | 2.14.298 |
 | Tests | **6163 passed, 4 skipped** (full parallel run). One run exited 0; a second showed the 2 documented cross-file RNG-leak order flakes (`test_mobprog_triggers::test_event_hooks_fire_rom_triggers`, `test_skills_combat::test_trip_knocks_target_wait_daze_and_improve`) — both **pass in isolation** (`-n0`), confirmed, plus the harmless xdist `sessionfinish` teardown error. No regression from this run's 8 fixes. |
 | ROM C files audited | 43 / 43 |
 | Push status | **All local on `master`, UNPUSHED** — awaiting user review |
@@ -56,11 +60,17 @@
 
 ## Next Intended Task
 
-1. **Review + push** the v2.14.289→296 commits (all local on `master`).
-2. **Continue the hunter sweep** — next batch: `do_cast` failure/mana messages,
-   `do_quaff`/`do_zap` wand, `do_eat`, `do_wear`/`do_remove` edge messages,
-   `do_sit`/`do_rest`/`do_sleep` furniture messages.
-3. **Close BASH-001** as a dedicated gap-closer (confirm the single-delivery
-   contract first).
-4. Consider a shared `rom_is_number`/`rom_atoi` helper to close DROP-001 +
-   WIMPY-002 together.
+The autonomous `/loop` run is **complete and stopped** — five hunter batches plus
+extensive manual probing have thoroughly swept the command surface (recent
+batches mostly clean; only edge-cases and judgment calls remain).
+
+1. **Review + push** the `v2.14.289 → v2.14.298` commits (all local on `master`).
+   This is the gating next action.
+2. **Close TRIP-002** (dedicated pass): one-line `return ""` fix + rewrite the 3
+   mis-specified `TestTripRomParity` chance tests as differentials + probe the
+   trip size-modifier suspicion (chance shifts ~7 where ROM's `*10` predicts 20).
+3. **Decide GIVE-006** (parity-vs-UX): keep the helpful "You must remove it
+   first." or match ROM's "You do not have that item."
+4. **Close the `is_number`/`atoi` class** (DROP-001 + WIMPY-002) with one shared
+   `rom_is_number`/`rom_atoi` helper.
+5. Lower priority: STEAL-001, RESCUE-002, PUT-006; latent LOCK-003, DESC-001.
