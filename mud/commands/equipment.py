@@ -141,6 +141,35 @@ def _can_wear_alignment(ch: Character, obj: Object) -> tuple[bool, str | None]:
     return True, None
 
 
+def _zap_align(ch: Character, obj: Object) -> str:
+    """ROM `equip_char` alignment zap — WEAR-014 (src/handler.c:1765-1777).
+
+    When an evil PC dons an ITEM_ANTI_EVIL object (or good+ANTI_GOOD /
+    neutral+ANTI_NEUTRAL), ROM does NOT keep the item in inventory. `equip_char`
+    emits a TO_CHAR + TO_ROOM message using `$p` (the object's short_descr) and
+    drops the item to the floor (`obj_from_char` + `obj_to_room`). The prior
+    Python returned a generic "the item" message, emitted no room line, and left
+    the item CARRIED — a state divergence a player could observe (the item stays
+    in inventory instead of lying on the ground).
+
+    Residual: ROM prints the "You wear $p ..." line *before* the zap (the zap
+    lives in equip_char, called after the wear message). Python checks alignment
+    up-front, so it emits only the zap line — a minor cosmetic ordering residual;
+    the observable state (item on the floor) now matches ROM.
+    """
+    from mud.commands.obj_manipulation import _obj_from_char
+
+    obj_name = getattr(obj, "short_descr", None) or getattr(obj, "name", None) or "it"
+    room = getattr(ch, "room", None)
+    _obj_from_char(ch, obj)  # ROM obj_from_char (src/handler.c:1771)
+    if room is not None:
+        room.add_object(obj)  # ROM obj_to_room (src/handler.c:1772)
+        # ROM src/handler.c:1770 — act("$n is zapped by $p and drops it.", TO_ROOM)
+        act_to_room(room, "$n is zapped by $p and drops it.", ch, arg1=obj, exclude=ch)
+    # ROM src/handler.c:1769 — act("You are zapped by $p and drop it.", TO_CHAR)
+    return f"You are zapped by {obj_name} and drop it."
+
+
 def do_wear(ch: Character, args: str) -> str:
     """
     Wear equipment (armor, clothing, jewelry).
@@ -232,9 +261,9 @@ def _wear_obj(ch: Character, obj: Object, fReplace: bool = True) -> str:
                 return f"You can't remove {existing_name}."
 
         # Alignment zap (mirrors the HOLD/wear paths' _can_wear_alignment block).
-        can_wear, error_msg = _can_wear_alignment(ch, obj)
+        can_wear, _ = _can_wear_alignment(ch, obj)
         if not can_wear:
-            return error_msg or "You cannot hold that item."
+            return _zap_align(ch, obj)  # WEAR-014: drop to room per ROM equip_char
 
         if not equipment:
             ch.equipment = {}
@@ -274,9 +303,9 @@ def _wear_obj(ch: Character, obj: Object, fReplace: bool = True) -> str:
                 return f"You can't remove {existing_name}."
 
         # Check alignment restrictions
-        can_hold, error_msg = _can_wear_alignment(ch, obj)
+        can_hold, _ = _can_wear_alignment(ch, obj)
         if not can_hold:
-            return error_msg or "You cannot hold that item."
+            return _zap_align(ch, obj)  # WEAR-014: drop to room per ROM equip_char
 
         # Hold the item
         if not equipment:
@@ -348,11 +377,11 @@ def _wear_obj(ch: Character, obj: Object, fReplace: bool = True) -> str:
                     return "Your hands are tied up with your weapon!"
 
     # Check alignment restrictions (ROM src/handler.c:1765-1777)
-    can_wear, error_msg = _can_wear_alignment(ch, obj)
+    can_wear, _ = _can_wear_alignment(ch, obj)
     if not can_wear:
-        # In ROM, the zap happens in equip_char and item drops to room
-        # For now, just prevent wearing with error message
-        return error_msg or "You cannot wear that item."
+        # WEAR-014: ROM's zap (equip_char) drops the item to the room and emits
+        # a $p-substituted TO_CHAR + TO_ROOM message — not a generic in-inventory error.
+        return _zap_align(ch, obj)
 
     # Wear the item
     if not equipment:
@@ -423,9 +452,9 @@ def _dispatch_wield(ch: Character, obj: Object, fReplace: bool = True) -> str:
         if weight > _str_wield_max(str_stat):
             return "It is too heavy for you to wield."
 
-    can_wield, error_msg = _can_wear_alignment(ch, obj)
+    can_wield, _ = _can_wear_alignment(ch, obj)
     if not can_wield:
-        return error_msg or "You cannot wield that weapon."
+        return _zap_align(ch, obj)  # WEAR-014: drop to room per ROM equip_char
 
     # ROM src/act_obj.c:1631-1636 — two-hand vs shield check skipped for NPCs
     # and for characters of SIZE_LARGE or greater.

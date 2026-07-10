@@ -37,6 +37,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **WEAR-014 — alignment "zap" now drops the item to the room (ROM equip_char).**
+  When an evil PC wears an ITEM_ANTI_EVIL object (or good+ANTI_GOOD /
+  neutral+ANTI_NEUTRAL), ROM (`src/handler.c:1765-1777`) emits a `$p`-named
+  TO_CHAR + TO_ROOM message and drops the item to the floor. Python returned a
+  generic "the item" message, emitted no room broadcast, and left the item in
+  inventory — an observable state divergence. Now the item is dropped to the
+  room with the object's short_descr and a room message. (Minor residual: ROM
+  prints the "You wear ..." line before the zap; Python emits only the zap line
+  — the item's resting state now matches.)
+
 - **WEAR-013 — two-handed-weapon wield block message punctuation.** ROM
   `wear_obj` (`src/act_obj.c:1635`) ends the "shield worn, can't wield a
   two-hander" message with a period: `"You need two hands free for that

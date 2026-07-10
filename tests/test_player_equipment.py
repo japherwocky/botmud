@@ -498,6 +498,42 @@ class TestAlignmentRestrictionsAndCursedItems:
         assert "zapped" in result.lower()
         assert WearLocation.BODY not in player.equipment or player.equipment[WearLocation.BODY] != armor
 
+    def test_alignment_zap_drops_item_to_room_with_object_name(self):
+        """WEAR-014: ROM's alignment zap lives in equip_char (src/handler.c:1765-1777):
+        it uses `$p` (the object's short_descr), fires a TO_ROOM message, and
+        drops the item to the floor (obj_from_char + obj_to_room). The prior
+        Python returned a generic "the item" message, emitted no room line, and
+        left the item CARRIED.
+        """
+        player = create_test_character("EvilZap", 3001)
+        player.alignment = -400  # evil (<= -350)
+
+        proto = ObjIndex(
+            vnum=99987,
+            name="holy armor",
+            short_descr="a suit of holy armor",
+            description="Holy armor",
+            item_type=int(ItemType.ARMOR),
+            wear_flags=int(WearFlag.TAKE | WearFlag.WEAR_BODY),
+            extra_flags=int(ExtraFlag.ANTI_EVIL),
+            weight=50,
+            value=[10, 0, 0, 0, 0],
+        )
+        armor = Object(instance_id=None, prototype=proto)
+        armor.item_type = str(ItemType.ARMOR)
+        armor.wear_flags = proto.wear_flags
+        armor.extra_flags = proto.extra_flags
+        player.inventory = [armor]
+        room = player.room
+
+        result = do_wear(player, "holy")
+
+        # ROM src/handler.c:1769 — "$p" is the object short_descr, not "the item".
+        assert result == "You are zapped by a suit of holy armor and drop it.", result
+        # ROM obj_from_char + obj_to_room: the item leaves inventory and lands in the room.
+        assert armor not in player.inventory
+        assert armor in room.contents
+
     def test_neutral_character_cannot_wear_anti_neutral_items(self):
         """Neutral characters (-350 < alignment < 350) should be blocked from ANTI_NEUTRAL items."""
         player = create_test_character("NeutralTest", 3001)
