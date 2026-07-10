@@ -149,15 +149,18 @@ def do_score(ch: Character, args: str) -> str:
         lines.append(f"You have {practice} practices and {train} training sessions.")
 
     # Carrying - ROM src/act_info.c:1514-1518 (immediately after practices)
-    carry_weight = getattr(ch, "carry_weight", 0)
     carry_number = getattr(ch, "carry_number", 0)
-    from mud.world.movement import can_carry_n, can_carry_w
+    from mud.world.movement import can_carry_n, can_carry_w, get_carry_weight
 
+    # SCORE-002: ROM src/act_info.c:1517 prints `get_carry_weight (ch) / 10`,
+    # which adds coin weight (`silver/10 + gold*2/5`, src/merc.h:2118) to the
+    # raw item weight. Using bare `ch.carry_weight` dropped coin burden from the
+    # score sheet. get_carry_weight is non-negative, so `// 10` == C truncation.
     max_carry_number = can_carry_n(ch)
     max_carry_weight = can_carry_w(ch) // 10  # ROM divides by 10 for display
     lines.append(
         f"You are carrying {carry_number}/{max_carry_number} items "
-        f"with weight {carry_weight // 10}/{max_carry_weight} pounds."
+        f"with weight {get_carry_weight(ch) // 10}/{max_carry_weight} pounds."
     )
 
     # Stats - ROM src/act_info.c:1520-1531 (perm(current) per stat).

@@ -37,6 +37,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SCORE-002 — `score` carry-weight line now includes coin burden.** ROM
+  `do_score` (`src/act_info.c:1517`) prints `get_carry_weight (ch) / 10`, and
+  `get_carry_weight` (`src/merc.h:2118`) adds coin weight
+  (`silver/10 + gold*2/5`) to the raw item weight — so a player carrying coins
+  shows a non-zero pounds figure. Python computed the pounds from bare
+  `ch.carry_weight`, so coins were invisible on the score sheet even though the
+  codebase already had two faithful `get_carry_weight` helpers. `do_score` now
+  calls `get_carry_weight(ch)`. Found by source-reading the `do_score` render
+  against ROM (same "audited function, field-render skipped the ROM accessor"
+  shape as LOOK-012/013/014).
+
 - **LOOK-014 — look-at-character health line now capitalized (FINDING-045).**
   ROM `show_char_to_char_1` (`src/act_info.c:480`) does `buf[0] = UPPER(buf[0])`
   on the health line, so `look <mob>` shows `"The beastly fido is in excellent

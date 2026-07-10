@@ -117,6 +117,28 @@ class TestScoreCommand:
         # ROM order: alignment description (1690) is last — after the AC block.
         assert idx("defenseless against magic") < idx("You are neutral."), output
 
+    def test_score_carry_weight_includes_coin_burden(self):
+        """SCORE-002: the score "carrying ... with weight N pounds" line must use
+        ROM `get_carry_weight(ch) / 10`, which adds coin weight
+        (`silver/10 + gold*2/5`, src/merc.h:2118), NOT the raw `carry_weight`.
+
+        ROM src/act_info.c:1517 prints `get_carry_weight (ch) / 10`. A player
+        carrying only coins (no items) still shows a non-zero pounds figure.
+        The prior Python used raw `ch.carry_weight // 10`, so coins were invisible
+        on the score sheet.
+        """
+        player = create_test_character("Coinpurse", 3001)
+        player.carry_weight = 0  # no item weight
+        player.gold = 100  # 100 * 2 / 5 = 40 tenths-of-pounds
+        player.silver = 50  # 50 / 10       =  5 tenths-of-pounds
+        # ROM: get_carry_weight = 0 + 5 + 40 = 45; displayed as 45 / 10 = 4.
+
+        output = do_score(player, "")
+
+        m = re.search(r"with weight (\d+)/\d+ pounds", output)
+        assert m is not None, f"carrying line not found:\n{output}"
+        assert int(m.group(1)) == 4, output
+
     def test_score_shows_hitroll_damroll(self):
         player = create_test_character("Fighter", 3001)
         # ROM C `do_score` only displays hitroll/damroll at level 15+

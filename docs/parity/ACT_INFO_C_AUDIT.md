@@ -750,6 +750,21 @@ later by the differential harness (a worked example of the AGENTS.md "re-verify
   gap), not order. Test:
   `tests/test_player_info_commands.py::TestScoreCommand::test_score_rom_line_order_and_wimpy_always_shown`.
 
+- **SCORE-002** ✅ FIXED (2026-07-09, 2.14.279): the score carrying line
+  (`You are carrying N/M items with weight W/X pounds.`) computed the pounds
+  numerator from the **raw** `ch.carry_weight`, dropping coin burden. ROM
+  `src/act_info.c:1517` prints `get_carry_weight (ch) / 10`, and
+  `get_carry_weight` (`src/merc.h:2118`) is
+  `carry_weight + silver/10 + gold*2/5` — so a player carrying only coins still
+  shows a non-zero weight. The codebase already had two faithful
+  `get_carry_weight` implementations (`mud/models/character.py:742`,
+  `mud/world/movement.py:218`), but `do_score` never called either. **Fix**:
+  `do_score` now uses `get_carry_weight(ch) // 10` (`mud/commands/session.py`).
+  Same "audited function passed but a field-render skipped the ROM accessor"
+  shape as the render-layer divergences (LOOK-012/013/014, FINDING-042/044).
+  Test:
+  `tests/test_player_info_commands.py::TestScoreCommand::test_score_carry_weight_includes_coin_burden`.
+
 **Status (historical)**: ✅ **100% COMPLETE!** - All 6 optional gaps FIXED! (January 6, 2026) 🎉
 
 **All Gaps Fixed** (6/6 optional):
