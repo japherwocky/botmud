@@ -435,7 +435,9 @@ def _dispatch_wield(ch: Character, obj: Object, fReplace: bool = True) -> str:
         if weapon_flags[4] & WeaponFlag.TWO_HANDS:
             shield_loc = int(WearLocation.SHIELD)
             if shield_loc in equipment and equipment[shield_loc] is not None:
-                return "You need two hands free for that weapon!"
+                # WEAR-013: ROM src/act_obj.c:1635 ends this with a PERIOD, not a
+                # "!" (unlike the shield-branch "...weapon!" at :1606).
+                return "You need two hands free for that weapon."
 
     if not equipment:
         ch.equipment = {}

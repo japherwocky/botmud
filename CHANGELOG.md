@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **WEAR-013 — two-handed-weapon wield block message punctuation.** ROM
+  `wear_obj` (`src/act_obj.c:1635`) ends the "shield worn, can't wield a
+  two-hander" message with a period: `"You need two hands free for that
+  weapon."`. Python ended it with `!`. Restored the period (the sibling
+  shield-branch `"...weapon!"` at :1606 correctly keeps its exclamation).
+
 - **RECALL-003 — `recall` command NPC gate now emits ROM's message and keys on
   ACT_PET.** ROM `do_recall` (`src/act_move.c:1569-1573`) sends "Only players can
   recall." for a non-pet NPC and gates on the `ACT_PET` flag. The dispatched

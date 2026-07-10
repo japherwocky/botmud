@@ -488,6 +488,51 @@ def test_two_handed_weapon_prevents_shield(test_character, object_factory):
     )
 
 
+def test_shield_worn_blocks_two_handed_wield_exact_message(test_character, object_factory):
+    """WEAR-013: wearing a shield first, then wielding a two-handed weapon, must
+    emit ROM's exact wield-branch message `"You need two hands free for that
+    weapon."` — ending with a PERIOD (`src/act_obj.c:1635`). Python previously
+    ended it with `!`. (This is the reverse order of the shield-branch check at
+    :1606, whose `"Your hands are tied up with your weapon!"` correctly keeps its
+    exclamation.)
+    """
+    from mud.commands.dispatcher import process_command
+    from mud.models.constants import ItemType, WeaponFlag, WearFlag
+
+    char = test_character
+
+    shield = object_factory(
+        {
+            "vnum": 9105,
+            "name": "shield wooden",
+            "short_descr": "a wooden shield",
+            "item_type": int(ItemType.ARMOR),
+            "wear_flags": int(WearFlag.WEAR_SHIELD),
+            "value": [5, 0, 0, 0],
+            "level": 5,
+        }
+    )
+    greatsword = object_factory(
+        {
+            "vnum": 9104,
+            "name": "greatsword huge",
+            "short_descr": "a huge greatsword",
+            "item_type": int(ItemType.WEAPON),
+            "wear_flags": int(WearFlag.WIELD),
+            "value": [0, 1, 6, 3, int(WeaponFlag.TWO_HANDS)],
+            "level": 10,
+            "weight": 100,
+        }
+    )
+    char.add_object(shield)
+    char.add_object(greatsword)
+
+    assert "wear" in process_command(char, "wear shield").lower()
+
+    wield_result = process_command(char, "wield greatsword")
+    assert wield_result == "You need two hands free for that weapon.", wield_result
+
+
 def test_dual_wield_requires_secondary_slot(test_character, object_factory):
     r"""
     Test: Dual wielding places second weapon in SECONDARY slot.
