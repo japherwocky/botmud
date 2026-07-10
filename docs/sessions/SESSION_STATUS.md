@@ -27,7 +27,7 @@
 
 | Metric | Value |
 |--------|-------|
-| Version | 2.14.296 |
+| Version | 2.14.297 |
 | Tests | **6163 passed, 4 skipped** (full parallel run). One run exited 0; a second showed the 2 documented cross-file RNG-leak order flakes (`test_mobprog_triggers::test_event_hooks_fire_rom_triggers`, `test_skills_combat::test_trip_knocks_target_wait_daze_and_improve`) — both **pass in isolation** (`-n0`), confirmed, plus the harmless xdist `sessionfinish` teardown error. No regression from this run's 8 fixes. |
 | ROM C files audited | 43 / 43 |
 | Push status | **All local on `master`, UNPUSHED** — awaiting user review |
@@ -35,10 +35,14 @@
 
 ## Outstanding — verified rows filed for a future pass
 
-- **BASH-001** (MEDIUM, open) — `do_bash` never delivers the attacker's TO_CHAR
-  flavor line and all bash broadcasts drop ROM's `{5…{x` color. Needs the
-  `apply_damage` push-vs-return single-delivery contract (INV-001) worked out;
-  model on `do_trip`. Highest-priority open item — player-facing.
+- **~~BASH-001~~ ✅ FIXED (2.14.297)** — `do_bash` flavor TO_CHAR line + `{5…{x`
+  color. ROM's `damage(…, FALSE)` suppresses the dam_message so the flavor line
+  replaces it; rendered via `act_format`, single-delivery via `show=False`.
+- **do_trip double-delivery** (NEW, unverified) — `do_trip`'s failure path calls
+  `apply_damage(…,0)` with default `show=True` (pushes the attacker line at
+  `engine.py:231`) then returns the same rendered line — a possible double-delivery
+  to the attacker. Filed in the BASH-001 audit note; verify separately. Good next
+  target.
 - **STEAL-001** (minor) — `do_steal` never calls `check_improve`.
 - **RESCUE-002** (low) — `skill_handlers.rescue` name vs ROM `$N`/PERS (NPC edge).
 - **is_number/atoi class** — DROP-001 + WIMPY-002 want one shared
