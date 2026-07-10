@@ -1224,7 +1224,8 @@ def do_trip(char: Character, args: str, *, victim: Character | None = None) -> s
     else:
         skill_level = _character_skill_percent(char, "trip")
         if skill_level == 0:
-            return "Tripping? What's that?"
+            # TRIP-001: ROM src/fight.c:2654 — TWO spaces after "Tripping?".
+            return "Tripping?  What's that?"
 
     # Find target (skip when an explicit victim is supplied via delegation).
     if victim is not None:

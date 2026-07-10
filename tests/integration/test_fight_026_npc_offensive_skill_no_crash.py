@@ -50,7 +50,8 @@ def test_do_trip_on_npc_with_off_trip_does_not_crash():
     result = do_trip(mob, "")
     assert isinstance(result, str)
     # It must have proceeded past the NPC skill gate (not the "Tripping?" PC path).
-    assert result != "Tripping? What's that?"
+    # TRIP-001: ROM's no-skill message has two spaces ("Tripping?  What's that?").
+    assert result != "Tripping?  What's that?"
 
 
 def test_do_dirt_and_do_disarm_on_npc_do_not_crash():

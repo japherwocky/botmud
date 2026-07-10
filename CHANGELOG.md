@@ -37,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **TRIP-001 — `trip` without the skill dropped a space.** ROM
+  (`src/fight.c:2654`) sends "Tripping?  What's that?" with two spaces; the port
+  had one.
 - **KICK-001 — `kick` guard order: level gate now precedes the "not fighting"
   check.** ROM `do_kick` (`src/fight.c:3109-3124`) checks the PC class-level gate
   before `fighting == NULL`, so a sub-level PC not in combat sees "You better
