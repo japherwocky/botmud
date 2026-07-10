@@ -716,3 +716,37 @@ class TestAlignmentRestrictionsAndCursedItems:
 
         assert "zapped" in result.lower()
         assert WearLocation.HOLD not in player.equipment or player.equipment[WearLocation.HOLD] != light
+
+
+def test_hold_flag_yields_to_armor_slot_per_rom_flag_order():
+    """WEAR-015: ROM `wear_obj` dispatches wear flags in bit order — every
+    armor/shield slot (WEAR_FINGER..WEAR_WRIST, WEAR_SHIELD) is checked BEFORE
+    the HOLD branch (`src/act_obj.c`: HOLD is at :1670, second-to-last before
+    FLOAT). So an object flagged both WEAR_BODY and HOLD is worn on the body, not
+    held. Python's `_wear_obj` checked the HOLD flag first, so such an item was
+    wrongly held. Unreachable in stock data (no stock object combines the flags)
+    but the engine loads arbitrary custom areas, so the dispatch order must match
+    ROM.
+    """
+    player = create_test_character("FlagOrder", 3001)
+
+    proto = ObjIndex(
+        vnum=99970,
+        name="orb amulet",
+        short_descr="a glowing orb",
+        description="A glowing orb.",
+        item_type=int(ItemType.ARMOR),
+        wear_flags=int(WearFlag.TAKE | WearFlag.WEAR_BODY | WearFlag.HOLD),
+        weight=5,
+        value=[0, 0, 0, 0, 0],
+    )
+    orb = Object(instance_id=None, prototype=proto)
+    orb.item_type = str(ItemType.ARMOR)
+    orb.wear_flags = proto.wear_flags
+    player.inventory = [orb]
+
+    do_wear(player, "orb")
+
+    # ROM checks WEAR_BODY (bit 3) before HOLD (bit 14): worn on body, not held.
+    assert player.equipment.get(int(WearLocation.BODY)) is orb
+    assert player.equipment.get(int(WearLocation.HOLD)) is not orb

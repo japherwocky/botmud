@@ -18,6 +18,25 @@ if TYPE_CHECKING:
     from mud.models.object import Object
 
 
+# WEAR-015: wear-location flags checked BEFORE the HOLD branch in ROM `wear_obj`
+# (every bit below HOLD's 1<<14 except WIELD, which Python dispatches by
+# item_type). An object carrying any of these takes the armor/shield slot, not HOLD.
+_PRE_HOLD_WEAR_MASK = (
+    WearFlag.WEAR_FINGER
+    | WearFlag.WEAR_NECK
+    | WearFlag.WEAR_BODY
+    | WearFlag.WEAR_HEAD
+    | WearFlag.WEAR_LEGS
+    | WearFlag.WEAR_FEET
+    | WearFlag.WEAR_HANDS
+    | WearFlag.WEAR_ARMS
+    | WearFlag.WEAR_SHIELD
+    | WearFlag.WEAR_ABOUT
+    | WearFlag.WEAR_WAIST
+    | WearFlag.WEAR_WRIST
+)
+
+
 # ROM str_app wield column for STR 0..25.
 # Source: src/const.c:728 str_app[26], fourth field (wield).
 # Max wieldable weight = _STR_WIELD[STR] * 10 (ROM src/act_obj.c:1624-1625).
@@ -287,8 +306,14 @@ def _wear_obj(ch: Character, obj: Object, fReplace: bool = True) -> str:
     # then performs the two-hand-weapon check. Implemented below after the
     # generic slot-remove (search "WEAR-009 SHIELD post-check").
 
-    # Check if item has HOLD flag - if so, use hold logic (ROM lines 1670-1677)
-    if wear_flags & WearFlag.HOLD:
+    # Check if item has HOLD flag - if so, use hold logic (ROM lines 1670-1677).
+    # WEAR-015: ROM `wear_obj` dispatches wear flags in bit order, so every
+    # armor/shield slot (WEAR_FINGER..WEAR_WRIST, WEAR_SHIELD — all bits below
+    # HOLD's 1<<14) is checked BEFORE the HOLD branch. Only fall to HOLD when the
+    # object has NO earlier wear-location flag; otherwise let `_get_wear_location`
+    # place it in the armor slot (matching ROM's precedence). WIELD (1<<13) is
+    # item_type-dispatched separately above, so it's excluded from this mask.
+    if (wear_flags & WearFlag.HOLD) and not (wear_flags & _PRE_HOLD_WEAR_MASK):
         # Check if hold slot is occupied
         equipment = getattr(ch, "equipment", {})
         hold_loc = int(WearLocation.HOLD)

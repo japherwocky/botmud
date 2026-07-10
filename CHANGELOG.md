@@ -37,6 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **WEAR-015 — wear-flag dispatch order: armor slots now take precedence over
+  HOLD.** ROM `wear_obj` checks wear flags in bit order, so every armor/shield
+  slot (all bits below HOLD's `1<<14`) is dispatched before the HOLD branch. An
+  object flagged both an armor slot and HOLD is worn on the armor slot, not held.
+  Python checked the HOLD flag first and wrongly held such items. Guarded the
+  HOLD branch with a precedence mask. Unreachable in stock data (no stock object
+  combines the flags) but required for parity with custom areas the engine can
+  load.
+
 - **WEAR-014 — alignment "zap" now drops the item to the room (ROM equip_char).**
   When an evil PC wears an ITEM_ANTI_EVIL object (or good+ANTI_GOOD /
   neutral+ANTI_NEUTRAL), ROM (`src/handler.c:1765-1777`) emits a `$p`-named
