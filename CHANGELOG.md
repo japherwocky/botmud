@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **LOOK-016 — `look <character>` never showed the target's worn equipment.**
+  The "X is using:" block was dead code: `_show_equipment` read a phantom
+  `char.equipped` attribute where the real one is `char.equipment`, so it always
+  saw an empty dict. Now mirrors ROM `show_char_to_char_1` (`src/act_info.c:483-499`):
+  ascending wear-slot order, visibility-gated, with `where_name` markers and
+  `format_obj_to_char` status tags (Glowing/Humming/aura). Equipment-key
+  convention bug (AGENTS.md school-light class) via a wrong attribute name.
 - **HEALER-007 — `heal` price-list header not first-letter-capitalized.** ROM
   prints the header via `act("$N says 'I offer the following spells:'", ...)`,
   and `act_new` capitalizes the rendered first letter (`src/healer.c:67`,

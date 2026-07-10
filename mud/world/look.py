@@ -359,18 +359,33 @@ def _look_char(char: Character, victim: Character) -> str:
     condition = condition[0].upper() + condition[1:] if condition else condition
     lines.append(condition)
 
-    # Show equipment if visible
-    equipment = _show_equipment(victim)
+    # Show equipment if visible — ROM src/act_info.c:483-499 (LOOK-016).
+    equipment = _show_equipment(victim, char)
     if equipment:
-        lines.append(f"\n{short} is using:")
+        # ROM act("$N is using:", ...) capitalizes the rendered first char.
+        header = f"{short} is using:"
+        header = header[0].upper() + header[1:]
+        lines.append(f"\n{header}")
         lines.append(equipment)
 
     return "\n".join(lines)
 
 
-def _show_equipment(char: Character) -> str:
-    """Show equipped items - ROM show_char_to_char_1"""
-    from mud.models.constants import WearLocation
+def _show_equipment(victim: Character, observer: Character) -> str:
+    """Show *victim*'s equipped items to *observer* — ROM show_char_to_char_1.
+
+    LOOK-016: mirrors ROM ``src/act_info.c:483-499`` — loop wear slots in
+    ascending order, gate each on ``can_see_obj(observer, obj)``, and render
+    ``where_name[iWear] + format_obj_to_char(obj, observer, TRUE)`` (no indent,
+    with aura/status tags). The prior code read a **phantom** ``equipped``
+    attribute (via ``getattr``) where the real one is ``char.equipment``
+    (int-keyed by WearLocation), so the whole block was dead — the equipment-key
+    convention class via a wrong attribute NAME, invisible to the string-key
+    grep-guard.
+    """
+    from mud.models.constants import WearLocation  # noqa: F401  (enum keys hash-equal to int)
+    from mud.utils.act import format_obj_to_char
+    from mud.world.vision import can_see_object
 
     wear_names = {
         WearLocation.LIGHT: "<used as light>     ",
@@ -395,13 +410,15 @@ def _show_equipment(char: Character) -> str:
     }
 
     lines = []
-    equipped = getattr(char, "equipped", {})
-    if isinstance(equipped, dict):
-        for loc, obj in equipped.items():
-            if obj:
-                loc_name = wear_names.get(loc, "<unknown>           ")
-                obj_name = getattr(obj, "short_descr", None) or getattr(obj, "name", "something")
-                lines.append(f"  {loc_name}{obj_name}")
+    equipment = getattr(victim, "equipment", {})
+    if isinstance(equipment, dict):
+        # ROM iterates iWear 0..MAX_WEAR ascending; equipment is int-keyed.
+        for slot in sorted(equipment.keys()):
+            obj = equipment[slot]
+            if obj is None or not can_see_object(observer, obj):
+                continue
+            loc_name = wear_names.get(slot, "<unknown>           ")
+            lines.append(f"{loc_name}{format_obj_to_char(obj, observer, True)}")
 
     return "\n".join(lines)
 

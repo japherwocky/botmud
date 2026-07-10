@@ -604,6 +604,26 @@ act_info.c is **100% complete** when:
      "simplified formula diverges at the truncation boundary" shape as prior
      c_div/c_mod parity gaps. Test:
      `tests/integration/test_do_look_command.py::test_look_in_drink_container_fill_band_matches_rom_truncation`.
+   - **LOOK-016** ✅ FIXED (2.14.293): `look <char>` **never showed the victim's
+     worn equipment** — the entire "X is using:" block was dead code. ROM
+     `show_char_to_char_1` (`src/act_info.c:483-499`) loops `iWear` 0..MAX_WEAR
+     and for each `get_eq_char(victim, iWear)` the observer `can_see_obj` prints
+     `where_name[iWear] + format_obj_to_char(obj, ch, TRUE)`. Python
+     `mud/world/look.py:_show_equipment` read `getattr(char, "equipped", {})` —
+     but the attribute is `char.equipment` (int-keyed by `WearLocation`; there is
+     **no** `equipped` attribute), so `getattr(..., {})` always returned `{}` and
+     `_show_equipment` always returned `""`. This is the equipment-key convention
+     class (AGENTS.md school-light/combat-shield bug) via a **phantom attribute
+     NAME** — a `getattr(...,default)` typo the string-key grep-guard
+     (`test_equipment_key_convention.py`) cannot see (it forbids string slot keys
+     like `.get("shield")`, not wrong attribute names). Also fixed the rendering
+     to ROM: ascending slot order (was dict-insertion order), `can_see_object`
+     gate (was none), `where_name + format_obj_to_char` with aura/status tags (was
+     a bare `short_descr` with a non-ROM 2-space indent), and a capitalized
+     header. **Fix:** `_show_equipment(victim, observer)` reads `victim.equipment`.
+     Surfaced 2026-07-10 by a give/drop/report/look-at-char hunter sweep, verified
+     against ROM C. Test: `tests/integration/test_look016_char_equipment_block.py`
+     (2).
 
 **IMPORTANT Gaps** (P1 - SHOULD FIX):
 
