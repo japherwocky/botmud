@@ -126,6 +126,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+<<<<<<< HEAD
 - **JSON loader defers D (door) resets until all areas are loaded.** Previously
   door resets were applied immediately while parsing each area file, so a
   cross-area reset (e.g. graveyard referencing midgaard room 3124) failed when
@@ -139,6 +140,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lifespan bootstrap is the only one. This eliminates the triple
   "Invalid D reset room 3124" warning and avoids redundant migrations/world
   loads.
+=======
+- **`MobInstance.add_affect` now applies hitroll/damroll/saving_throw modifiers
+  (GL-032 follow-up).** ROM `affect_modify` (`src/handler.c:1018-1164`) is uniform
+  for PCs and NPCs, and `Character.add_affect` applies these kwargs — but
+  `MobInstance.add_affect` was a `**kwargs` stub that silently dropped them, so a
+  mob buffed via the convenience path diverged from the PC path. Made the two
+  signatures symmetric, closing the last asymmetry GL-032 left in the
+  Character/MobInstance affect surface. (Latent — no shipped caller passed
+  modifiers to a mob, but the silent-drop was a footgun.)
+- **EFFECTS-006 — acid/fire dumping a nested container now spills contents to the
+  parent container (`src/effects.c:172,418`).** When a container that is itself
+  inside another container is destroyed by acid_effect/fire_effect, ROM moves its
+  contents to the parent container (`obj_to_obj(t_obj, obj->in_obj)`). Python had
+  stubbed that branch to `extract_obj`, destroying the contents instead — a bag
+  inside a chest hit by a fireball lost its contents to the void rather than
+  spilling them into the chest. Now routes through `_obj_to_obj` (head-insert,
+  INV-039).
+- **LOOK-018 — room occupant list now renders the furniture branch of the
+  position suffix (`src/act_info.c:304-401`).** A character sitting/resting/
+  sleeping/standing on a furniture object now lists as "Bob is sitting on a wooden
+  chair." (verb + at/on/in preposition from the furniture's `value[2]` bits +
+  short_descr) instead of the generic "Bob is sitting here." The runtime already
+  tracked `char.on`; only `show_char_to_char_0`'s display omitted the branch.
+- **GL-049 — `advance_level` mana/move gains now use ROM's stat-scaled
+  `number_range` rolls (`src/update.c:81-95`), not a static `LEVEL_BONUS` dict.**
+  ROM rolls `add_mana = number_range(2, (2*INT + WIS)/5)` (halved for non-mana
+  classes), `add_move = number_range(1, (CON + DEX)/6)`, each `*9/10` with floors
+  `UMAX(2, mana)` / `UMAX(6, move)`. Two divergences fixed: wrong per-level values
+  (a high-INT mage / high-CON warrior was mis-paid mana/move every level), and an
+  RNG desync — ROM draws `number_range` three times per level-up (hp, mana, move)
+  while the port drew only once (hp), shifting the shared Mitchell-Moore stream by
+  two draws for every downstream consumer whenever a PC leveled mid-combat tick
+  (the GL-026/GL-045/GL-046 hazard class, on the advancement path). The HP path was
+  already ROM-faithful (CONST-005). Tests: `test_advance_level_rolls_mana_and_move_like_rom`
+  (locks the 3-draw order + rolled values) and `test_advance_level_non_fmana_class_halves_mana`.
+- **Test isolation — `test_new_character_persists_true_sex` is now self-contained.**
+  It sets `char.room`/`was_in_room`, saves, reloads, and asserts `reloaded.room`
+  resolves — which requires `room_registry` populated. The test never called
+  `initialize_world()`, so it passed only when a sibling test loaded the world
+  first (cross-file dependency; failed under `-n0` or `-k` selection). Added the
+  `initialize_world("area/area.lst")` call to its setup per the AGENTS.md
+  parallel-safety rule ("a test must pass when run alone").
+- **DB-002 — pet-affect load dedup now matches ROM `check_pet_affected`.** ROM
+  `check_pet_affected` (`src/db.c:3938`, from `fread_pet` `src/save.c:1567`)
+  drops a loaded pet affect iff `where == TO_AFFECTS` **and** one of its
+  `bitvector` bits is already inherent on the pet **prototype**'s `affected_by`
+  (the JR-2002 fix — otherwise re-adding then wearing off a prototype-inherent
+  bit strips the inherent flag). The Python port deduped on a `(type, location,
+  modifier)` match against the prototype's affect *list*, ignoring `where`/
+  `bitvector`, so the real dedup never fired. `_deserialize_pet` now captures the
+  prototype's inherent `affected_by` after spawn and applies ROM's exact
+  criterion. Test: `tests/integration/test_db002_check_pet_affected.py`.
+- **AURA-001 — `inventory`/`equipment` no longer crash with "Sorry, there was an
+  error processing that command."** The object aura tags (`(Red Aura)`/`(Blue
+  Aura)`/`(Magical)`) went through a helper (`_char_affected`) that imported a
+  non-existent `skill_lookup` from `mud.skills.registry`, raising `ImportError`
+  for any player carrying a string-typed affect. Latent until INVEN-001/EQUIP-002
+  wired `format_obj_to_char` into those displays. Rewrote the helper to be ROM's
+  `IS_AFFECTED(ch, AFF_DETECT_*)` bitfield test (`src/act_info.c`) — the
+  ROM-faithful contract — instead of a non-ROM affect-list walk.
+- **GIVE-006 — giving a worn item now reports ROM's "You do not have that item."**
+  (was the more-helpful-but-non-ROM "You must remove it first."). ROM
+  `get_obj_carry` excludes worn items, so `do_give` returns NULL for them
+  (`src/act_obj.c:783`); the "remove it first" branch is ROM dead code. Resolved to
+  strict parity per the ROM-FAITHFUL rule; revertible if a UX exception is wanted.
+- **LOCK-003 — door lock/unlock key guard now uses ROM's `key < 0`.** A door with
+  key vnum 0 is not "It can't be [un]locked." — ROM falls through to `has_key`, so
+  a keyless actor gets "You lack the key." (`src/act_move.c:669,805`). Latent in
+  stock data (all exit keys are −1); corrected for source-faithfulness. Also fixed
+  a mis-specified test that asserted a non-ROM exit EX_NOLOCK block.
+- **PUT-006 — `put <item> <container> <junk>` now targets the container, not the
+  trailing word.** ROM reads the container from the second token (`arg2`,
+  `src/act_obj.c:354-362`); the port used the last word, so trailing garbage
+  hijacked the target. Parse rewritten to the faithful ROM `arg1`/`arg2` form.
+- **TRIP-002 — a missed `trip` no longer double-delivers the miss message.**
+  ROM `do_trip` is void; `damage(…, TRUE)` sends the miss line once
+  (`src/fight.c:2749`). The port returned `apply_damage`'s already-pushed line,
+  so a connected attacker saw `Your trip misses X.` twice. The failure branch now
+  returns `""`. Also verified the trip size modifier is `(ch->size − victim->size)
+  * 10` (a prior "shift ~7" reading was a `check_improve` skill-drift artifact in
+  the test, not an engine bug).
+- **RESCUE-002 — NPC parties to a rescue now render via ROM PERS.** `rescue`
+  built its three lines from raw `name`, so an NPC rescuer leaked its keyword
+  name (`fido dog rescues you!`) instead of ROM's `short_descr`
+  (`A scruffy dog rescues you!`). Now uses `act_format` (= ROM `act()`/`$n`/`$N`
+  PERS), matching `src/fight.c:3089-3091`. PC-rescues-PC is unchanged.
+- **STEAL-001 — the `steal` skill now improves through use.** ROM calls
+  `check_improve(ch, gsn_steal, …)` on the caught (`FALSE,2`), coin-steal
+  (`TRUE,2`), and item-steal (`TRUE,2`) paths (`src/act_obj.c:2249,2295,2328`);
+  the port omitted all three, so the skill never advanced.
+- **WIMPY-002 — `wimpy 12x` now sets 12, matching ROM `atoi`.** ROM parses a
+  leading numeric prefix (`src/act_info.c:2811`); Python's `int()` raised on the
+  trailing `x` and fell back to 0. `do_wimpy` now uses the shared `rom_atoi`
+  helper (same `is_number`/`atoi` class as DROP-001).
+- **DROP-001 — `drop -5 coins` now matches ROM.** The coin-drop branch gated on
+  `str.isdigit()` where ROM gates on `is_number` (`src/act_obj.c:511`,
+  `src/interp.c:696`), which accepts a leading sign. A signed amount now enters
+  the coin branch (→ "Sorry, you can't do that." on `amount <= 0`) instead of
+  falling through to the item path. Closes the `is_number`/`atoi` parity class
+  with shared `rom_is_number`/`rom_atoi` helpers in `mud/math/c_compat.py`.
+>>>>>>> e0e09a51 (fix(parity): MobInstance.add_affect applies stat modifiers (GL-032 follow-up))
 - **PUT-005 — `put all <container>` with nothing eligible now silent (was a
   non-ROM "You have nothing to put.").** ROM's put-all loop
   (`src/act_obj.c:451-491`) has no such message.
