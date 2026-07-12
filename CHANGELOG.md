@@ -52,6 +52,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **JSON loader defers D (door) resets until all areas are loaded.** Previously
+  door resets were applied immediately while parsing each area file, so a
+  cross-area reset (e.g. graveyard referencing midgaard room 3124) failed when
+  filesystem order differed from `area.lst`. D resets are now appended to
+  `area.resets` and processed by `apply_resets()` after `link_exits()`, making
+  the boot order independent and removing the spurious "Invalid D reset room
+  3124" warning.
 - **Multi-server no longer bootstraps the world three times.** `telnet_server`
   and `ssh_server` moved world initialization out of `create_server()` and into
   their standalone `start_server()` entry points, so `mud multiserver`'s single

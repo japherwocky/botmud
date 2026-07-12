@@ -17,9 +17,6 @@ from ..mobprog import register_program_code, resolve_trigger_flag
 from ..models.area import Area
 from ..models.clans import lookup_clan_id
 from ..models.constants import (
-    EX_CLOSED,
-    EX_ISDOOR,
-    EX_LOCKED,
     FormFlag,
     ImmFlag,
     OffFlag,
@@ -219,35 +216,6 @@ def _resolve_room_target(command: str, reset: ResetJson, current_room: int | Non
     return room_vnum, new_current
 
 
-def _apply_door_reset(reset: ResetJson) -> None:
-    """Apply a boot-time D reset and discard it like ROM ``load_resets``."""
-
-    room = room_registry.get(int(reset.arg1 or 0))
-    if room is None:
-        logger.warning("Invalid D reset room %s", reset.arg1)
-        return
-
-    door = int(reset.arg2 or 0)
-    if door < 0 or door >= len(room.exits):
-        logger.warning("Invalid D reset direction %s in room %s", door, reset.arg1)
-        return
-
-    exit_obj = room.exits[door]
-    if exit_obj is None or not (int(getattr(exit_obj, "rs_flags", 0) or 0) & EX_ISDOOR):
-        logger.warning("Invalid D reset non-door exit %s in room %s", door, reset.arg1)
-        return
-
-    # mirroring ROM src/db.c:1058-1104 — D resets set boot door state, then free the reset.
-    state = int(reset.arg3 or 0)
-    if state == 1:
-        exit_obj.rs_flags |= EX_CLOSED
-        exit_obj.exit_info |= EX_CLOSED
-    elif state == 2:
-        exit_obj.rs_flags |= EX_CLOSED | EX_LOCKED
-        exit_obj.exit_info |= EX_CLOSED | EX_LOCKED
-    elif state != 0:
-        logger.warning("Invalid D reset lock state %s in room %s", state, reset.arg1)
-
 
 def load_area_from_json(json_file_path: str) -> Area:
     """Load a complete area from JSON file with all ROM fields."""
@@ -363,10 +331,11 @@ def load_area_from_json(json_file_path: str) -> Area:
         reset = ResetJson(command=command, arg1=arg1, arg2=arg2, arg3=arg3, arg4=arg4)
         room_vnum, last_room_vnum = _resolve_room_target(command, reset, last_room_vnum)
 
-        if command == "D":
-            _apply_door_reset(reset)
-            continue
-
+        # D/R door resets are boot-time state. They are appended to area.resets
+        # like other resets so that apply_resets() runs them after *all* areas
+        # have been loaded and linked. Applying them immediately here made
+        # cross-area D resets (e.g. graveyard referencing midgaard room 3124)
+        # fail when areas loaded in a different order than area.lst.
         area.resets.append(reset)
         if room_vnum is not None:
             room = room_registry.get(room_vnum)
