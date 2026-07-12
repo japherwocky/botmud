@@ -43,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   machines (e.g. 24 workers on WSL) `xdist` auto-spawn triggered execnet worker
   segfaults / crashes. Five workers keep the suite fast without destabilizing
   typical dev boxes.
+- **Removed custom agent instruction files and agent-orchestration tooling.**
+  Deleted `AGENTS.md`, `AGENT.md`, `AGENT.EXECUTOR.md`, `CLAUDE.md`, the
+  `.claude/` and `.codex/` skill/config directories, Codacy agent config, and
+  the associated autonomous-coding shell scripts. This fork is no longer
+  targeting ROM parity, so the agent workflow overhead is just noise.
 - **Doc hygiene: reconciled stale OLC/JSON audit function-inventory rows.** The
   Phase-1 summary tables in HEDIT / OLC_MPCODE / OLC_SAVE / JSON_LOADER audit
   docs still marked ported functions `❌ MISSING` / `⚠️ PARTIAL`, contradicting

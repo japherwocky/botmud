@@ -396,7 +396,7 @@ For developers interested in extending QuickMUD beyond ROM 2.4b:
 
 ### 📚 For Contributors
 
-See [ROM_PARITY_FEATURE_TRACKER.md](docs/parity/ROM_PARITY_FEATURE_TRACKER.md) for detailed feature status and [AGENTS.md](AGENTS.md) for AI-assisted development workflows.
+See [ROM_PARITY_FEATURE_TRACKER.md](docs/parity/ROM_PARITY_FEATURE_TRACKER.md) for detailed feature status.
 
 **Development Guidelines**:
 
