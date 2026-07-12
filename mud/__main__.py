@@ -3,6 +3,7 @@ import asyncio
 import typer
 
 from mud.db.migrations import run_migrations
+from mud.multi_server import run as start_multi_server
 from mud.net.telnet_server import start_server as start_telnet
 from mud.network.websocket_server import run as start_websocket
 from mud.server import run_game_loop
@@ -52,6 +53,30 @@ def sshserver(host: str = "0.0.0.0", port: int = 2222):
     from mud.net.ssh_server import start_server as start_ssh
 
     asyncio.run(start_ssh(host=host, port=port))
+
+
+@cli.command()
+def multiserver(
+    host: str = "0.0.0.0",
+    port: int = 8000,
+    telnet_host: str = "0.0.0.0",
+    telnet_port: int = 5001,
+    ssh_host: str = "0.0.0.0",
+    ssh_port: int = 2222,
+):
+    """Start WebSocket, Telnet, and SSH servers in one process.
+
+    Uvicorn owns the event loop; telnet and SSH listeners are started as
+    background tasks during the WebSocket server's lifespan.
+    """
+    start_multi_server(
+        host=host,
+        port=port,
+        telnet_host=telnet_host,
+        telnet_port=telnet_port,
+        ssh_host=ssh_host,
+        ssh_port=ssh_port,
+    )
 
 
 if __name__ == "__main__":
