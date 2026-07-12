@@ -7,12 +7,10 @@ import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
-from mud.config import CORS_ORIGINS, HOST, PORT, load_qmconfig
-from mud.db.migrations import run_migrations
+from mud.config import CORS_ORIGINS, HOST, PORT
 from mud.game_loop import async_game_loop
 from mud.net.connection import handle_connection_with_stream
-from mud.security import bans
-from mud.world.world_state import initialize_world
+from mud.server_bootstrap import bootstrap_server
 
 from .websocket_stream import WebSocketStream
 
@@ -21,10 +19,7 @@ _game_task = None
 
 async def startup() -> None:
     global _game_task
-    load_qmconfig()
-    run_migrations()
-    initialize_world("area/area.lst")
-    bans.load_bans_file()
+    bootstrap_server("area/area.lst")
     # Start game loop as background task
     _game_task = asyncio.create_task(async_game_loop())
     print("🎮 Game loop started for WebSocket server")

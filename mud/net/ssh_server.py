@@ -14,11 +14,9 @@ from typing import TYPE_CHECKING
 
 import asyncssh
 
-from mud.config import get_qmconfig, load_qmconfig
-from mud.db.migrations import run_migrations
+from mud.config import get_qmconfig
 from mud.game_tick_scheduler import start_game_tick_scheduler
-from mud.security import bans
-from mud.world.world_state import initialize_world
+from mud.server_bootstrap import bootstrap_server
 
 if TYPE_CHECKING:
     pass
@@ -274,12 +272,9 @@ async def create_server(
     host_key_path: Path | str | None = None,
 ) -> asyncssh.SSHAcceptor:
     """Create and return an SSH server without blocking."""
-    # Initialize database and world
-    load_qmconfig()
+    # Initialize database, world data, and persistent state.
+    bootstrap_server(area_list)
     qmconfig = get_qmconfig()
-    run_migrations()
-    initialize_world(area_list)
-    bans.load_bans_file()
 
     # Ensure host key exists
     key_path = _ensure_host_key(Path(host_key_path) if host_key_path else None)
