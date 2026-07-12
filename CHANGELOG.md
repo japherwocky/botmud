@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Development Makefile with common tasks (`install`, `test`, `lint`,
+  `format`, `server`, `websocket`, `ssh`, `clean`).** `make install` creates
+  `.venv`, upgrades pip, and installs the pinned `requirements-dev.txt` lockfile.
+  Windows/Unix venv paths are auto-detected, and the default interpreter is
+  `python3` on Unix-like systems.
 - **Differential-harness scenarios `position_transitions`, `look_direction`,
   `scan_directions`.** `position_transitions` locks the no-object arms of
   do_stand/rest/sit/sleep/wake (POS_* state machine + message strings) against the
