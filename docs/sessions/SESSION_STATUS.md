@@ -14,7 +14,7 @@
 
 | Metric | Value |
 |--------|-------|
-| Version | 2.15.1 |
+| Version | 2.15.2 |
 | Tests | Previous baseline 6163 passed, 4 skipped; +1 new multiserver smoke test (not run in this agent shell) |
 | ROM C files audited | 43 / 43 |
 | Push status | ✅ Pushed to `origin/master` |

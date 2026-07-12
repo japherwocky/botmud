@@ -11,9 +11,12 @@ from .connection import handle_connection
 async def create_server(
     host: str = "0.0.0.0", port: int = 4000, area_list: str = "area/area.lst"
 ) -> asyncio.AbstractServer:
-    """Return a started telnet server without blocking the loop."""
-    # Initialize database, world data, and persistent state.
-    bootstrap_server(area_list)
+    """Return a started telnet server without blocking the loop.
+
+    Caller is responsible for initializing the world (see
+    `mud.server_bootstrap.bootstrap_server`). The combined multi-server calls
+    this after a shared bootstrap; the standalone `start_server` calls it here.
+    """
     qmconfig = get_qmconfig()
     configured_host = (qmconfig.ip_address or "").strip()
     bind_host = host.strip() if isinstance(host, str) else ""
@@ -25,6 +28,8 @@ async def create_server(
 async def start_server(host: str = "0.0.0.0", port: int = 4000, area_list: str = "area/area.lst") -> None:
     from mud.game_loop import async_game_loop
 
+    # Initialize database, world data, and persistent state.
+    bootstrap_server(area_list)
     server = await create_server(host, port, area_list)
     sockets = getattr(server, "sockets", None)
     if sockets:

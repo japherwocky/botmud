@@ -52,6 +52,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Multi-server no longer bootstraps the world three times.** `telnet_server`
+  and `ssh_server` moved world initialization out of `create_server()` and into
+  their standalone `start_server()` entry points, so `mud multiserver`'s single
+  lifespan bootstrap is the only one. This eliminates the triple
+  "Invalid D reset room 3124" warning and avoids redundant migrations/world
+  loads.
 - **PUT-005 — `put all <container>` with nothing eligible now silent (was a
   non-ROM "You have nothing to put.").** ROM's put-all loop
   (`src/act_obj.c:451-491`) has no such message.

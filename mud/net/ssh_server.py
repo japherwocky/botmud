@@ -271,9 +271,12 @@ async def create_server(
     area_list: str = "area/area.lst",
     host_key_path: Path | str | None = None,
 ) -> asyncssh.SSHAcceptor:
-    """Create and return an SSH server without blocking."""
-    # Initialize database, world data, and persistent state.
-    bootstrap_server(area_list)
+    """Create and return an SSH server without blocking.
+
+    Caller is responsible for initializing the world (see
+    `mud.server_bootstrap.bootstrap_server`). The combined multi-server calls
+    this after a shared bootstrap; the standalone `start_server` calls it here.
+    """
     qmconfig = get_qmconfig()
 
     # Ensure host key exists
@@ -304,6 +307,8 @@ async def start_server(
     host_key_path: Path | str | None = None,
 ) -> None:
     """Start the SSH server and run forever."""
+    # Initialize database, world data, and persistent state.
+    bootstrap_server(area_list)
     server = await create_server(host, port, area_list, host_key_path)
 
     # Get listening address
