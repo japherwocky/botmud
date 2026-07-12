@@ -31,7 +31,7 @@
 
 | Metric | Value |
 |--------|-------|
-| Version | 2.14.298 |
+| Version | 2.15.0 (in-progress: multi-server feature + Makefile dev shortcuts) |
 | Tests | **6163 passed, 4 skipped** (full parallel run). One run exited 0; a second showed the 2 documented cross-file RNG-leak order flakes (`test_mobprog_triggers::test_event_hooks_fire_rom_triggers`, `test_skills_combat::test_trip_knocks_target_wait_daze_and_improve`) — both **pass in isolation** (`-n0`), confirmed, plus the harmless xdist `sessionfinish` teardown error. No regression from this run's 8 fixes. |
 | ROM C files audited | 43 / 43 |
 | Push status | **All local on `master`, UNPUSHED** — awaiting user review |

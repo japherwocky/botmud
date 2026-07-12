@@ -1,6 +1,6 @@
 # QuickMUD - A Modern ROM 2.4 Python Port
 
-[![Version](https://img.shields.io/badge/version-2.14.268-blue.svg)](https://github.com/Nostoi/rom24-quickmud-python)
+[![Version](https://img.shields.io/badge/version-2.15.0-blue.svg)](https://github.com/Nostoi/rom24-quickmud-python)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://img.shields.io/badge/tests-6127%20passing-brightgreen.svg)](https://github.com/Nostoi/rom24-quickmud-python)
@@ -69,6 +69,15 @@ mud websocketserver
 python3 -m mud sshserver
 # or
 mud sshserver
+```
+
+**All Three in One Process (WebSocket port 8000, telnet 5001, SSH 2222):**
+```bash
+python3 -m mud multiserver
+# or
+mud multiserver
+# or, if you set up the Makefile:
+make multi
 ```
 
 All servers provide:
@@ -169,7 +178,7 @@ python -m mud  # Start development server
 **Stage: parity beta** — feature-complete and playable; parity fidelity is being
 systematically hardened toward ROM-exact behavioral equivalence.
 
-- **Version**: 2.14.268
+- **Version**: 2.15.0
 - **Playability**: ✅ All 255 ROM commands implemented. Combat, spells, skills,
   movement, shops, mob programs, OLC building, and admin tools work and pass their
   tests. You can run a server and play today.

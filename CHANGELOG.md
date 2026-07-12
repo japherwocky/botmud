@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Combined `multiserver` command runs WebSocket, telnet, and SSH from one
+  process.** Uvicorn owns the asyncio event loop; the FastAPI lifespan in
+  `mud/multi_server.py` bootstraps the world once, starts a single
+  `async_game_loop`, and starts telnet/SSH listeners as background tasks. CLI:
+  `python -m mud multiserver` (or `make multi`). The standalone
+  `socketserver`, `websocketserver`, and `sshserver` commands remain unchanged.
 - **Development Makefile with common tasks (`install`, `test`, `lint`,
   `format`, `server`, `websocket`, `ssh`, `clean`).** `make install` creates
   `.venv`, upgrades pip, and installs the pinned `requirements-dev.txt` lockfile.
