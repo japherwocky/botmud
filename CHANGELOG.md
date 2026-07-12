@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Default pytest parallelism reduced from `-n auto` to `-n 5`.** On high-core
+  machines (e.g. 24 workers on WSL) `xdist` auto-spawn triggered execnet worker
+  segfaults / crashes. Five workers keep the suite fast without destabilizing
+  typical dev boxes.
 - **Doc hygiene: reconciled stale OLC/JSON audit function-inventory rows.** The
   Phase-1 summary tables in HEDIT / OLC_MPCODE / OLC_SAVE / JSON_LOADER audit
   docs still marked ported functions `❌ MISSING` / `⚠️ PARTIAL`, contradicting

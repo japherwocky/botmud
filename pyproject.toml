@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rom24-quickmud-python"
-version = "2.15.0"
+version = "2.15.1"
 description = "A modern Python port of the ROM 2.4b6 MUD engine with full telnet server and JSON world loading"
 readme = "README.md"
 license = "MIT"
@@ -81,7 +81,10 @@ where = ["."]
 include = ["mud*"]
 
 [tool.pytest.ini_options]
-# Run in parallel across all cores by default (~5.5x faster: ~517s -> ~94s).
+# Run in parallel with a bounded worker pool by default. `-n auto` can spawn
+# too many xdist workers on high-core machines (e.g. 24 on WSL), which trips
+# execnet segfaults / worker crashes. Five workers still gives a large speedup
+# over serial (~5.5x) while staying stable on typical dev boxes.
 # `--dist loadscope` keeps each module/class on one worker so module-scoped
 # fixtures and per-file global state behave as in serial runs. Disable for
 # single-test debugging with `-n0` (e.g. `pytest -n0 tests/foo.py::bar`).
@@ -96,7 +99,7 @@ include = ["mud*"]
 # very end of a full run) — that is environmental and harmless (all tests have
 # already run and reported). Override per-test with `@pytest.mark.timeout(n)`;
 # disable entirely with `--timeout=0`.
-addopts = "-n auto --dist loadscope --timeout=120 --timeout-method=thread"
+addopts = "-n 5 --dist loadscope --timeout=120 --timeout-method=thread"
 markers = [
   "integration: Integration tests spanning multiple gameplay systems",
   "p0: Highest-priority parity and regression tests",
