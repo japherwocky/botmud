@@ -216,7 +216,6 @@ def _resolve_room_target(command: str, reset: ResetJson, current_room: int | Non
     return room_vnum, new_current
 
 
-
 def load_area_from_json(json_file_path: str) -> Area:
     """Load a complete area from JSON file with all ROM fields."""
 

@@ -497,7 +497,9 @@ def do_time(char: Character, args: str) -> str:
 
     # Get current system time
     current_time = datetime.now()
-    time_str = f"{current_time.strftime('%a %b')} {_format_day(current_time.day)} {current_time.strftime('%H:%M:%S %Y')}"
+    time_str = (
+        f"{current_time.strftime('%a %b')} {_format_day(current_time.day)} {current_time.strftime('%H:%M:%S %Y')}"
+    )
     result += f"The system time is {time_str}.\n\r"
 
     return result

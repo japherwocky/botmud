@@ -38,6 +38,42 @@ def _init_db():
         Base.metadata.drop_all(engine)
 
 
+# ---------------------------------------------------------------------------
+# World setup / teardown
+# ---------------------------------------------------------------------------
+# Per-test world isolation. Replaces the duplicated `setup_world` autouse
+# fixture that lived in tests/test_player_*.py, tests/test_spec_fun_behaviors.py,
+# tests/test_mob_act_flags.py, and tests/test_mob_damage_modifiers.py.
+#
+# Function scope: every test starts with a freshly-initialized world and
+# ends with empty world registries, so tests can't leak mobs/objects/rooms
+# into each other. (The `character_registry` clear is belt-and-suspenders —
+# `initialize_world` already clears it at the top, but the explicit clear
+# here is the contract that lets the next test rely on a clean slate even
+# if the production code adds early returns to `initialize_world` later.)
+#
+# Tests that need extra cleanup (e.g. `global_registry.descriptor_list = []`
+# in tests/test_player_info_commands.py) keep a small local fixture that
+# runs alongside this one.
+@pytest.fixture(autouse=True)
+def _isolate_world():
+    from mud.models.character import character_registry
+    from mud.registry import (
+        area_registry,
+        mob_registry,
+        obj_registry,
+        room_registry,
+    )
+    from mud.world import initialize_world
+
+    initialize_world("area/area.lst")
+    yield
+    area_registry.clear()
+    mob_registry.clear()
+    obj_registry.clear()
+    room_registry.clear()
+    character_registry.clear()
+
 
 # ---------------------------------------------------------------------------
 # ROM parity test gating
@@ -79,7 +115,6 @@ def pytest_ignore_collect(collection_path: object, config: pytest.Config) -> boo
     return None
 
 
-
 # Session-scoped fixture to make sure the help greeting text is loaded once.
 # Several test files (e.g. tests/test_account_auth.py) spin up the real
 # telnet server and expect _send_help_greeting() to emit the ROM welcome
@@ -92,7 +127,6 @@ def _load_help_greeting():
 
     load_help_file("data/help.json")
     yield
-
 
 
 @pytest.fixture(autouse=True)

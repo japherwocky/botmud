@@ -1557,7 +1557,7 @@ def test_help_greeting_respects_ansi_choice():
             # asserting that the user-disabled ANSI mode is honoured.
             banner_start = greeting_off.find(b"THIS IS A MUD")
             assert banner_start >= 0
-            greeting_body = greeting_off[banner_start:greeting_off.rfind(b"Name: ")]
+            greeting_body = greeting_off[banner_start : greeting_off.rfind(b"Name: ")]
             assert b"\x1b[" not in greeting_body
             assert b"{" not in greeting_body
             assert b"THIS IS A MUD" in greeting_off.upper()
@@ -1609,7 +1609,7 @@ def test_ansi_preference_persists_between_sessions():
             # asserting that the user-disabled ANSI mode is honoured.
             banner_start = greeting_off.find(b"THIS IS A MUD")
             assert banner_start >= 0
-            greeting_body = greeting_off[banner_start:greeting_off.rfind(b"Name: ")]
+            greeting_body = greeting_off[banner_start : greeting_off.rfind(b"Name: ")]
             assert b"\x1b[" not in greeting_body
 
             writer.write(b"Ansi\r\n")

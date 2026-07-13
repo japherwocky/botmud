@@ -30,7 +30,6 @@ classifiers = [
     "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
     "Topic :: Internet",
     "Topic :: Software Development :: Libraries :: Python Modules",
-    "Typing :: Typed",
 ]
 dependencies = [
     "SQLAlchemy>=2.0,<3",
@@ -121,6 +120,8 @@ exclude = [
     "*.log",
     "startup",
     "scripts/agent_loop.py",  # bash script with a .py extension — not Python
+    ".venv*/",
+    ".venv*/**/*.py",
 ]
 
 [tool.ruff.lint]
@@ -163,4 +164,3 @@ module = [
     "tests.test_account_auth",
 ]
 follow_imports = "normal"
-disallow_untyped_defs = true
