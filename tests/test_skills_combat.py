@@ -16,10 +16,13 @@ from mud.skills import handlers as skill_handlers
 def _load_trip_skill() -> None:
     # FIGHT-090: skill_handlers.trip now delegates to do_trip, which reads
     # skill_registry.get("trip").beats — load the registry so that lookup works.
+    # The registry is a module-level singleton; reset before each test so
+    # monkeypatched handlers / leftover state from a prior test don't leak in.
     from pathlib import Path
 
     from mud.skills.registry import skill_registry
 
+    skill_registry.reset()
     skill_registry.load(Path("data/skills.json"))
 
 

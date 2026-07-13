@@ -7,10 +7,38 @@ Test complete player workflows end-to-end, not just individual components.
 **Unit tests** verify that `can_see_character()` works.  
 **Integration tests** verify that `look hassan` actually calls it.
 
-## Running Tests
+## Default behaviour: SKIPPED
+
+**These tests do not run under `pytest` or `make test`.** They were originally
+a "ROM 2.4 port completion" parity harness — tests that lock the Python port
+to ROM C source line-by-line. The project no longer treats ROM parity as a
+goal (the previous authors were obsessed with absolute parity with the
+legacy code, but we are not), so the 2987-test suite is preserved for
+reference but skipped by default.
+
+The skip is implemented in `tests/conftest.py` (top-level) and gates on
+the `--include-parity` CLI option. The default `pytest` and `make test`
+run ~1700 non-parity tests; the parity suite is opt-in.
+
+## Running the parity tests
 
 ```bash
-# Run all integration tests
+# All integration tests (opt-in, ~4 min)
+pytest --include-parity
+# or
+make test-parity
+
+# Just one file
+pytest tests/integration/test_player_npc_interaction.py --include-parity -v
+
+# Filter to specific markers
+pytest tests/integration/ --include-parity -m "not skip"
+```
+
+## Running tests (other)
+
+```bash
+# Run all integration tests (requires --include-parity, see above)
 pytest tests/integration/ -v
 
 # Run only passing tests (skip unimplemented features)

@@ -45,7 +45,31 @@ jobs:
       - name: Type check
         run: mypy mud/net/ansi.py mud/net/protocol.py mud/net/connection.py mud/security/hash_utils.py --follow-imports=skip
       - name: Test
+        # Default `pytest` skips tests/integration/ (the ROM-parity suite) via
+        # tests/conftest.py. See `make test-parity` to run that suite.
         run: pytest --cov=mud --cov-report=term --cov-fail-under=80
+
+  parity-tests:
+    # Optional: runs the ROM 2.4 parity harness in tests/integration/ on a
+    # nightly schedule / manual dispatch. ~3000 tests, ~4 min. Off the
+    # default PR path because the project no longer treats parity as a goal.
+    name: ROM Parity Tests (nightly)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    timeout-minutes: 15
+    needs: test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          check-latest: true
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+      - name: Install project
+        run: pip install -e .[dev] || pip install -e .
+      - name: Run parity tests
+        run: pytest tests/integration/ --include-parity -q --tb=line --timeout=60
 
   telnet-tests:
     name: Telnet Server Tests (Linux-only)

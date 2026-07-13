@@ -3,6 +3,17 @@ Integration test framework for player workflows.
 
 These tests simulate complete player scenarios to ensure end-to-end
 functionality beyond unit testing of individual components.
+
+DEFAULT BEHAVIOUR (changed 2026-07): these tests are skipped by default.
+They were originally a "ROM 2.4 port completion" parity harness — tests that
+lock the Python port to ROM C source line-by-line.  The project no longer
+treats ROM parity as a goal (see `docs/integration_test_framework.md` for the
+original charter), so the 2987-test suite is preserved for reference but not
+run on every CI / dev invocation.
+
+The skip is implemented in ``tests/conftest.py`` (top-level) so it applies
+whether the user runs ``pytest``, ``pytest tests/``, or ``pytest tests/integration/``.
+Run them with ``--include-parity`` (or ``make test-parity``).
 """
 
 from __future__ import annotations

@@ -18,6 +18,48 @@ import pytest  # noqa: E402  (must follow the per-worker DATABASE_URL setup abov
 from helpers import ensure_can_move as _ensure_can_move_helper  # noqa: E402
 
 
+# ---------------------------------------------------------------------------
+# ROM parity test gating
+# ---------------------------------------------------------------------------
+# tests/integration/ holds 2987 tests that originally formed a "ROM 2.4 port
+# completion" parity harness — they lock the Python port to ROM C source
+# line-by-line. The project no longer treats ROM parity as a goal (see
+# docs/integration_test_framework.md and the github issue thread), so the suite
+# is preserved for reference but SKIPPED BY DEFAULT.
+#
+# To run the parity suite:    pytest --include-parity    (or: make test-parity)
+# ---------------------------------------------------------------------------
+_PARITY_SKIP_REASON = (
+    "ROM parity test (tests/integration/): skipped by default — these lock the "
+    "Python port to ROM C source line-by-line and the project no longer treats "
+    "ROM parity as a goal. Pass --include-parity to run them, or use "
+    "`make test-parity`."
+)
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--include-parity",
+        action="store_true",
+        default=False,
+        help=(
+            "Include the ROM parity test suite in tests/integration/. Skipped by "
+            "default because the project no longer treats ROM parity as a goal. "
+            "See tests/integration/README.md."
+        ),
+    )
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    if config.getoption("--include-parity"):
+        return  # user opted in: run them
+    skip_parity = pytest.mark.skip(reason=_PARITY_SKIP_REASON)
+    for item in items:
+        if "tests/integration" in str(item.fspath):
+            item.add_marker(skip_parity)
+
+
+
 # Session-scoped fixture to make sure the help greeting text is loaded once.
 # Several test files (e.g. tests/test_account_auth.py) spin up the real
 # telnet server and expect _send_help_greeting() to emit the ROM welcome

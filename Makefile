@@ -21,17 +21,22 @@ else
     VENV_PIP := $(VENV_DIR)/bin/pip
 endif
 
-.PHONY: help install install-dev test test-integration test-coverage lint format format-check typecheck server websocket ssh clean
+.PHONY: help install install-dev test test-parallel test-integration test-parity test-coverage lint format format-check typecheck server websocket ssh clean
 
 help:
 	@echo "QuickMUD development tasks"
 	@echo ""
 	@echo "  make install          Create .venv and install pinned dev dependencies"
 	@echo "  make install-dev      Alias for install"
-	@echo "  make test             Run the full pytest suite (serial, stable)"
-	@echo "  make test-parallel    Run the full suite with 5 xdist workers"
-	@echo "  make test-integration Run integration tests only"
-	@echo "  make test-coverage    Run tests with coverage report"
+	@echo "  make test             Run the default pytest suite (excludes the 2987"
+	@echo "                        ROM-parity tests in tests/integration/, which"
+	@echo "                        are skipped by default — see test-parity)"
+	@echo "  make test-parallel    Run the default suite with 5 xdist workers"
+	@echo "  make test-integration Alias for test-parity (runs tests/integration/)"
+	@echo "  make test-parity      Run the ROM-parity integration tests (~3000 tests,"
+	@echo "                        ~4 min). Off by default since the project no"
+	@echo "                        longer treats ROM parity as a goal."
+	@echo "  make test-coverage    Run tests with coverage report (default suite)"
 	@echo "  make lint             Run ruff linter"
 	@echo "  make format           Auto-format code with ruff"
 	@echo "  make format-check     Check formatting without changing files"
@@ -66,8 +71,14 @@ test:
 test-parallel:
 	$(VENV_PYTHON) -m pytest -n 5 --dist loadscope
 
-test-integration:
-	$(VENV_PYTHON) -m pytest tests/integration/ -v
+# tests/integration/ holds the ROM 2.4 parity harness. The default pytest
+# run SKIPS it (see tests/conftest.py:_PARITY_SKIP_REASON) because the
+# project no longer treats ROM parity as a goal. Pass --include-parity to
+# actually run it. test-integration is kept as an alias for muscle memory.
+test-integration: test-parity
+
+test-parity:
+	$(VENV_PYTHON) -m pytest tests/integration/ --include-parity -v
 
 test-coverage:
 	$(VENV_PYTHON) -m pytest --cov=mud --cov-report=term --cov-fail-under=80

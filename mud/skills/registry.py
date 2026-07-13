@@ -39,6 +39,17 @@ class SkillRegistry:
         self.skills: dict[str, Skill] = {}
         self.handlers: dict[str, Callable] = {}
 
+    def reset(self) -> None:
+        """Clear all loaded skills and handlers.
+
+        Intended for test isolation: the module-level ``skill_registry`` is a
+        global singleton, so prior tests that monkeypatched handlers or
+        otherwise mutated ``skills``/``handlers`` would otherwise leak into
+        later tests. Call before ``load()`` in a fixture.
+        """
+        self.skills.clear()
+        self.handlers.clear()
+
     def load(self, path: Path) -> None:
         """Load skill definitions from a JSON file."""
         with path.open() as fp:
@@ -383,6 +394,16 @@ class SkillRegistry:
 
 
 skill_registry = SkillRegistry()
+
+
+def reset_skill_registry() -> None:
+    """Reset the module-level skill registry singleton.
+
+    Convenience wrapper for test fixtures. Production code should not need
+    to call this — skills are loaded once at boot and held for the process
+    lifetime.
+    """
+    skill_registry.reset()
 
 
 def load_skills(path: Path) -> None:
