@@ -39,10 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Default pytest parallelism reduced from `-n auto` to `-n 5`.** On high-core
-  machines (e.g. 24 workers on WSL) `xdist` auto-spawn triggered execnet worker
-  segfaults / crashes. Five workers keep the suite fast without destabilizing
-  typical dev boxes.
+- **Default pytest execution changed to serial (`-n0`).** Even with `-n 5`, xdist
+  triggers execnet/greenlet worker crashes on WSL with high-core hosts. Serial
+  runs are stable and make failure output readable; `make test-parallel` runs
+  with 5 workers for environments that handle xdist reliably.
 - **Removed custom agent instruction files and agent-orchestration tooling.**
   Deleted `AGENTS.md`, `AGENT.md`, `AGENT.EXECUTOR.md`, `CLAUDE.md`, the
   `.claude/` and `.codex/` skill/config directories, Codacy agent config, and

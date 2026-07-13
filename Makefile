@@ -28,7 +28,8 @@ help:
 	@echo ""
 	@echo "  make install          Create .venv and install pinned dev dependencies"
 	@echo "  make install-dev      Alias for install"
-	@echo "  make test             Run the full pytest suite"
+	@echo "  make test             Run the full pytest suite (serial, stable)"
+	@echo "  make test-parallel    Run the full suite with 5 xdist workers"
 	@echo "  make test-integration Run integration tests only"
 	@echo "  make test-coverage    Run tests with coverage report"
 	@echo "  make lint             Run ruff linter"
@@ -61,6 +62,9 @@ $(VENV_PYTHON):
 
 test:
 	$(VENV_PYTHON) -m pytest
+
+test-parallel:
+	$(VENV_PYTHON) -m pytest -n 5 --dist loadscope
 
 test-integration:
 	$(VENV_PYTHON) -m pytest tests/integration/ -v
