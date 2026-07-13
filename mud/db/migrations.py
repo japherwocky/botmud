@@ -126,4 +126,4 @@ def run_migrations() -> None:
         _ensure_perm_stat_columns(conn)
         _ensure_password_hash_column(conn)
         _ensure_character_schema_columns(conn)
-    print("✅ Migrations complete.")
+    print("Migrations complete.")

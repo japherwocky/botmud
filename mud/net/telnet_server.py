@@ -13,10 +13,12 @@ async def create_server(
 ) -> asyncio.AbstractServer:
     """Return a started telnet server without blocking the loop.
 
-    Caller is responsible for initializing the world (see
-    `mud.server_bootstrap.bootstrap_server`). The combined multi-server calls
-    this after a shared bootstrap; the standalone `start_server` calls it here.
+    Initializes the world via `bootstrap_server` (idempotent — safe to call
+    before the multi-server's lifespan bootstrap). The combined multi-server
+    and any caller that has already bootstrapped can simply call this; the
+    bootstrap will be a no-op-equivalent the second time around.
     """
+    bootstrap_server(area_list)
     qmconfig = get_qmconfig()
     configured_host = (qmconfig.ip_address or "").strip()
     bind_host = host.strip() if isinstance(host, str) else ""

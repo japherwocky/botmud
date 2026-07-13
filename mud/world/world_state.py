@@ -179,7 +179,7 @@ def initialize_world(area_list_path: str | None = "area/area.lst", use_json: boo
     if skills_path.exists():
         try:
             global_skill_registry.load(skills_path)
-            print(f"✅ Loaded {len(global_skill_registry.skills)} skills from {skills_path}")
+            print(f"Loaded {len(global_skill_registry.skills)} skills from {skills_path}")
         except Exception as e:
             print(f"Warning: Failed to load skills from {skills_path}: {e}")
 
@@ -225,7 +225,7 @@ def initialize_world(area_list_path: str | None = "area/area.lst", use_json: boo
                 _mob_proto = _mob_reg.get(shop_data["keeper"])
                 if _mob_proto is not None:
                     _mob_proto.pShop = shop
-            print(f"✅ Loaded {len(shop_registry)} shops from {shops_path}")
+            print(f"Loaded {len(shop_registry)} shops from {shops_path}")
         except Exception as e:
             print(f"Warning: Failed to load shops from {shops_path}: {e}")
 
@@ -237,7 +237,7 @@ def initialize_world(area_list_path: str | None = "area/area.lst", use_json: boo
             load_socials(str(socials_path))
             from mud.models.social import social_registry
 
-            print(f"✅ Loaded {len(social_registry)} socials from {socials_path}")
+            print(f"Loaded {len(social_registry)} socials from {socials_path}")
         except Exception as e:
             print(f"Warning: Failed to load socials from {socials_path}: {e}")
 

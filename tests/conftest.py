@@ -78,6 +78,22 @@ def _reset_tick_prompt_state():
 
 
 @pytest.fixture(autouse=True)
+def _reset_bootstrap():
+    """Reset `bootstrap_server`'s idempotency guard between tests.
+
+    `mud.server_bootstrap.bootstrap_server` is idempotent at runtime (so
+    telnet/SSH/WebSocket can each call it safely in the multi-server
+    lifespan), but the test suite wants every test to start with a clean
+    world. Reset the guard before each test so a fresh `bootstrap_server`
+    call will re-run migrations and `initialize_world` for the test.
+    """
+    from mud.server_bootstrap import reset_bootstrap
+
+    reset_bootstrap()
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _reset_descriptor_list():
     """Prevent `registry.descriptor_list` leaking across tests.
 

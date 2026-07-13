@@ -87,6 +87,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   though the production code correctly sent the greeting and `Name: ` in
   plain text. Scope the assertions to the actual greeting body so they
   pass while still asserting the user-disabled ANSI mode is honoured.
+- **Reinstated `bootstrap_server` in `create_server` and made it idempotent.**
+  The earlier bootstrap extraction moved the world init out of
+  `create_server()` and into the standalone `start_server()` entry point,
+  but several tests still call `create_server` directly and expect the
+  bootstrap to happen. Restored the bootstrap call in `create_server()`
+  and added an idempotency guard (`_BOOTSTRAPPED` module-level flag) plus
+  a `reset_bootstrap()` helper for tests, so the multi-server lifespan
+  plus the per-transport `create_server()` calls don't double-bootstrap
+  while tests can still get a fresh world.
+- **Removed `print("✅ ...")` from server startup paths.** The U+2705
+  (CHECK MARK) emoji in `print` calls crashed on Windows consoles using
+  cp1252 encoding with `UnicodeEncodeError`, killing `run_migrations()`
+  and `initialize_world()` mid-bootstrap. The bans weren't reloaded as
+  a result, so `test_permanent_ban_survives_restart` failed. Replaced
+  four startup-banner prints with plain text.
 - **Doc hygiene: reconciled stale OLC/JSON audit function-inventory rows.** The
   Phase-1 summary tables in HEDIT / OLC_MPCODE / OLC_SAVE / JSON_LOADER audit
   docs still marked ported functions `❌ MISSING` / `⚠️ PARTIAL`, contradicting
