@@ -1,21 +1,42 @@
 import os
-import tempfile
 
-# xdist isolation: give each worker its own SQLite DB file. `mud/db/session.py`
-# builds a module-level `engine` from `DATABASE_URL` (default `sqlite:///mud.db`)
-# at import time, and several tests call `Base.metadata.drop_all/create_all` on
-# it — under `-n auto` concurrent workers sharing one file wipe each other's
-# tables. xdist sets `PYTEST_XDIST_WORKER` in each worker subprocess before any
-# conftest/test module is imported, so setting the env here (before
-# `mud.db.session` is ever imported) binds the engine to a per-worker file.
-# Serial runs (`PYTEST_XDIST_WORKER` unset) keep the default and are unaffected.
-_xdist_worker = os.environ.get("PYTEST_XDIST_WORKER")
-if _xdist_worker and "DATABASE_URL" not in os.environ:
-    _worker_db = os.path.join(tempfile.gettempdir(), f"quickmud_test_{_xdist_worker}.db")
-    os.environ["DATABASE_URL"] = f"sqlite:///{_worker_db}"
+# Bind every test run to a private in-memory SQLite database. Done BEFORE
+# `mud.db.session` is imported because that module creates the engine at
+# import time from $DATABASE_URL. `setdefault` (not `environ =`) lets an
+# explicit `DATABASE_URL=sqlite:///some/path.db pytest ...` invocation
+# still target a file DB (handy for poking at a real DB after a failure).
+#
+# xdist isolation: each xdist worker is a separate subprocess, so its
+# :memory: DB is naturally isolated — no per-worker file logic needed.
+# `mud/db/session.py` pairs :memory: with StaticPool so the engine holds a
+# single shared connection; otherwise each new SQLAlchemy connection would
+# see a fresh empty DB and tests would race the schema.
+os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 
-import pytest  # noqa: E402  (must follow the per-worker DATABASE_URL setup above)
+import pytest  # noqa: E402  (must follow the DATABASE_URL setup above)
 from helpers import ensure_can_move as _ensure_can_move_helper  # noqa: E402
+
+
+# ---------------------------------------------------------------------------
+# Database setup
+# ---------------------------------------------------------------------------
+# `mud.db.session.engine` is module-level and built at import time from
+# $DATABASE_URL. By the time this conftest runs, the engine already points
+# at sqlite:///:memory: with StaticPool (a single shared connection). We
+# create the schema once per pytest session here so every test sees the
+# same tables; individual tests that need a clean slate still call
+# drop_all/create_all themselves — that's now near-instant on :memory:.
+@pytest.fixture(scope="session", autouse=True)
+def _init_db():
+    from mud.db.models import Base
+    from mud.db.session import engine
+
+    Base.metadata.create_all(engine)
+    try:
+        yield
+    finally:
+        Base.metadata.drop_all(engine)
+
 
 
 # ---------------------------------------------------------------------------
