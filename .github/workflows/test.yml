@@ -41,9 +41,6 @@ jobs:
       - name: mypy
         run: mypy mud/net/ansi.py mud/net/protocol.py mud/net/connection.py mud/security/hash_utils.py || true
         continue-on-error: true
-        uses: nick-fields/warnings-action@v2
-        with:
-          severity: warning
 
   # Full suite on the version the pinned lock is built + proven green against
   # (local .venv is 3.12.3). Installing requirements.txt gives the exact
