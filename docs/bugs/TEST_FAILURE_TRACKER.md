@@ -145,3 +145,28 @@ offending tests, or skip the affected files.
 (`async def test_...`) instead of `asyncio.run()` inside the test body,
 so that pytest-asyncio owns the loop lifecycle and teardown is clean.
 
+
+---
+
+## AUTH-002 - Ban list not reloaded when telnet server starts
+
+**Status:** [FIXED] in commit 99f848de
+
+`test_permanent_ban_survives_restart` adds a ban host, saves the ban
+file, clears in-memory bans, starts a new telnet server (which should
+re-load bans via `bootstrap_server`), then asserts
+`bans.is_host_banned("203.0.113.9")` - which returned `False`.
+
+**Root cause:** the earlier bootstrap extraction had moved the
+`bootstrap_server()` call out of `create_server()` and into
+`start_server()` only, so the test that called `create_server()`
+directly never bootstrapped. Additionally, `print("✅ ...")` in
+`run_migrations()` and `initialize_world()` raised
+`UnicodeEncodeError` on Windows cp1252 consoles, killing the
+bootstrap mid-flight and leaving the ban list unloaded.
+
+**Fix:** reinstate `bootstrap_server()` in `create_server()` with an
+idempotency guard (`_BOOTSTRAPPED` module-level flag plus a
+`reset_bootstrap()` helper for tests), and remove the emoji from the
+startup prints.
+
