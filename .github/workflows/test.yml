@@ -39,11 +39,11 @@ jobs:
       - name: ruff (format check)
         run: ruff format --check .
       - name: mypy
-        # Scoped to the network + security modules. Results are advisory —
-        # type errors are logged but do not fail the lint gate. Set
-        # continue-on-error so the job stays yellow (not red) on mypy issues.
+        run: mypy mud/net/ansi.py mud/net/protocol.py mud/net/connection.py mud/security/hash_utils.py || true
         continue-on-error: true
-        run: mypy mud/net/ansi.py mud/net/protocol.py mud/net/connection.py mud/security/hash_utils.py
+        uses: nick-fields/warnings-action@v2
+        with:
+          severity: warning
 
   # Full suite on the version the pinned lock is built + proven green against
   # (local .venv is 3.12.3). Installing requirements.txt gives the exact
