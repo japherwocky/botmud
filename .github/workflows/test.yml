@@ -8,6 +8,57 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Cheap always-on gate: lint, typecheck, and a couple of repo-specific
+  # static checks. Runs on every push and PR. Fails fast so a broken master
+  # never gets to the expensive jobs below.
+  lint:
+    name: Lint + typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Help data drift check
+        # Regenerates data/help.json from area/help.are and fails if the
+        # tracked file is out of date. The regen happens in the workspace
+        # (never pushed back) — a non-zero exit means a human needs to run
+        # `python -m mud.scripts.convert_help_are_to_json area/help.are data/help.json`
+        # locally and commit the result.
+        run: |
+          python -m mud.scripts.convert_help_are_to_json area/help.are data/help.json
+          if ! git diff --exit-code -- data/help.json; then
+            echo "data/help.json is out of date with area/help.are. Run: python -m mud.scripts.convert_help_are_to_json area/help.are data/help.json" >&2
+            exit 1
+          fi
+      - name: Test fixtures lint
+        # Fails if tests bypass the standard spawn_object/object_loader
+        # fixtures (e.g. direct ObjIndex imports). See scripts/lint_test_fixtures.py.
+        run: python3 scripts/lint_test_fixtures.py
+      - name: Enforce rng_mm usage (no random in combat/affects)
+        # The combat and affects modules must use mud.utils.rng_mm, not
+        # the stdlib random module — see INV-053 for the determinism contract.
+        run: |
+          if grep -R -n "\\brandom\\." mud/combat mud/affects; then
+            echo "Forbidden Python random.* usage found in combat/affects." >&2
+            exit 1
+          else
+            echo "OK: no random.* usage in combat/affects"
+          fi
+      - name: ruff (lint)
+        run: ruff check .
+      - name: ruff (format check)
+        run: ruff format --check .
+      - name: mypy
+        # Scoped to the network + security modules — they're the only ones
+        # with strict type discipline today (see [tool.mypy] in pyproject.toml).
+        run: mypy mud/net/ansi.py mud/net/protocol.py mud/net/connection.py mud/security/hash_utils.py
+
   # Full suite on the version the pinned lock is built + proven green against
   # (local .venv is 3.12.3). Installing requirements.txt gives the exact
   # known-good stack (pytest 8.x etc.) — the unpinned `.[dev,test]` floors
@@ -16,36 +67,34 @@ jobs:
   # INTERNALERROR. See CHANGELOG 2.14.267.
   #
   # Cost: this run is ~32 CI-min. It is therefore gated to pull_request +
-  # manual dispatch only — direct pushes to master run just the cheap smokes
-  # below (the dev validates the full suite locally via .venv). See 2.14.268.
+  # manual dispatch only — direct pushes to master run just the cheap jobs
+  # above. The dev validates the full suite locally via .venv. See 2.14.268.
   test:
     name: Full suite (Python 3.12, pinned)
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    needs: lint
     steps:
       - uses: actions/checkout@v7
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Install pinned dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Lint with ruff
-        run: ruff check .
-        continue-on-error: true
       - name: Test with pytest
-        # Inherits addopts (-n auto --dist loadscope --timeout=120) from pyproject.
+        # Inherits addopts (--timeout=120) from pyproject.toml. The xdist
+        # addopt is -n0, so this run is serial and stable on every runner.
         run: pytest --tb=short
 
   # Cheap floor/ceiling guard: import + collect every test module on the other
   # supported Pythons so version-specific breakage (e.g. `datetime.UTC`, a 3.11+
-  # API, on 3.10) is caught for pennies without running the full suite. Uses the
-  # unpinned extras deliberately — collection can't trigger the xdist worker
-  # crash (no tests execute), and testing against latest deps here is a free
-  # early-warning. addopts is cleared so no xdist/-n is involved.
+  # API, on 3.10) is caught for pennies without running the full suite. Uses
+  # the unpinned extras deliberately — collection can't trigger the xdist
+  # worker crash (no tests execute), and testing against latest deps here is
+  # a free early-warning. addopts is cleared so no xdist/-n is involved.
   collect-smoke:
     name: Collect-only (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
@@ -53,11 +102,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11"]
+        python-version: ["3.10", "3.11", "3.13"]
     steps:
       - uses: actions/checkout@v7
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
@@ -66,3 +114,48 @@ jobs:
           pip install -e .[dev,test]
       - name: Collect-only (guards imports on this Python)
         run: pytest --collect-only -q -o addopts=""
+
+  # Optional: runs the ROM 2.4 parity harness in tests/integration/ on push
+  # to main. ~3000 tests, ~4 min. Off the default PR path because the
+  # project no longer treats parity as a goal. See make test-parity to run
+  # locally.
+  parity-tests:
+    name: ROM Parity Tests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: lint
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run parity tests
+        run: pytest tests/integration/ --include-parity -q --tb=line --timeout=60
+
+  # Linux-only — opens real sockets. Kept on a separate job so it doesn't
+  # slow down the main suite on Windows/macOS runners.
+  telnet-tests:
+    name: Telnet Server Tests
+    if: runner.os == 'Linux'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: lint
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run telnet tests
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: |
+          pytest -q -m telnet
