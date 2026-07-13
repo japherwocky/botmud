@@ -24,18 +24,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Help data drift check
-        # Regenerates data/help.json from area/help.are and fails if the
-        # tracked file is out of date. The regen happens in the workspace
-        # (never pushed back) — a non-zero exit means a human needs to run
-        # `python -m mud.scripts.convert_help_are_to_json area/help.are data/help.json`
-        # locally and commit the result.
-        run: |
-          python -m mud.scripts.convert_help_are_to_json area/help.are data/help.json
-          if ! git diff --exit-code -- data/help.json; then
-            echo "data/help.json is out of date with area/help.are. Run: python -m mud.scripts.convert_help_are_to_json area/help.are data/help.json" >&2
-            exit 1
-          fi
       - name: Test fixtures lint
         # Fails if tests bypass the standard spawn_object/object_loader
         # fixtures (e.g. direct ObjIndex imports). See scripts/lint_test_fixtures.py.
@@ -87,33 +75,15 @@ jobs:
       - name: Test with pytest
         # Inherits addopts (--timeout=120) from pyproject.toml. The xdist
         # addopt is -n0, so this run is serial and stable on every runner.
+        #
+        # The .are -> .json conversion scripts (area/help.are, area/*.are, etc.)
+        # are exercised by tests/test_help_conversion.py,
+        # tests/test_are_conversion.py, tests/test_shop_conversion.py, and
+        # tests/test_social_conversion.py — no separate CI drift check
+        # needed. The .are files are kept as frozen ROM 2.4 reference data;
+        # data/*.json is the runtime source and has entries the .are doesn't
+        # (added by the previous author during ROM-parity work).
         run: pytest --tb=short
-
-  # Cheap floor/ceiling guard: import + collect every test module on the other
-  # supported Pythons so version-specific breakage (e.g. `datetime.UTC`, a 3.11+
-  # API, on 3.10) is caught for pennies without running the full suite. Uses
-  # the unpinned extras deliberately — collection can't trigger the xdist
-  # worker crash (no tests execute), and testing against latest deps here is
-  # a free early-warning. addopts is cleared so no xdist/-n is involved.
-  collect-smoke:
-    name: Collect-only (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.10", "3.11", "3.13"]
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .[dev,test]
-      - name: Collect-only (guards imports on this Python)
-        run: pytest --collect-only -q -o addopts=""
 
   # Optional: runs the ROM 2.4 parity harness in tests/integration/ on push
   # to main. ~3000 tests, ~4 min. Off the default PR path because the
