@@ -55,6 +55,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `diagnostic_test.py` / `test_all_commands.py` scratch scripts. The test
   suite dropped from ~6,180 items to ~4,500 and is now scoped to gameplay
   behavior (account, combat, shops, equipment, world load, multi-server).
+- **Dropped unused dev dependencies.** `hypothesis`, `flake8`, and `httpx` had
+  no callers after the parity-prune (hypothesis was the diff-harness
+  property-tests backend, flake8 was shadowed by ruff, httpx was an
+  internal-test HTTP client for the harness). Removed from
+  `requirements-dev.in` / `requirements-dev.txt` along with their transitive
+  deps (certifi, httpcore, mccabe, pycodestyle, pyflakes, sortedcontainers).
+  Also removed three test files that imported the deleted `tools/diff_harness/`
+  module and broke collection.
+- **Restored `httpx` dev dependency.** The diff-harness tests were its only
+  direct consumer, but `fastapi.testclient` (used by the multi-server,
+  nanny, and websocket-server tests) imports `httpx` transitively, so the
+  removal broke 4 test modules at collection. Re-added `httpx>=0.27` along
+  with its transitive deps `certifi` and `httpcore`.
 - **Doc hygiene: reconciled stale OLC/JSON audit function-inventory rows.** The
   Phase-1 summary tables in HEDIT / OLC_MPCODE / OLC_SAVE / JSON_LOADER audit
   docs still marked ported functions `❌ MISSING` / `⚠️ PARTIAL`, contradicting
