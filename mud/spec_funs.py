@@ -846,11 +846,15 @@ def _cast_spell(caster: Any, target: Any, spell_name: str) -> bool:
 
 def _select_spell(mob: Any, table: dict[int, tuple[int, str]], default: tuple[int, str]) -> str:
     level = int(getattr(mob, "level", 0) or 0)
-    while True:
+    # Bound the roll count so a forced-RNG test (or a misconfigured table) cannot
+    # hang the game loop. Fall back to the default spell if no level-eligible
+    # match is found within one pass through the table.
+    for _ in range(len(table) + 1):
         roll = rng_mm.number_bits(4)
         min_level, spell = table.get(roll, default)
         if level >= min_level:
             return spell
+    return default[1]
 
 
 def _equipped_items(mob: Any) -> list[Any]:
