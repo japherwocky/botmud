@@ -24,39 +24,38 @@ from helpers import ensure_can_move as _ensure_can_move_helper  # noqa: E402
 # tests/integration/ holds 2987 tests that originally formed a "ROM 2.4 port
 # completion" parity harness — they lock the Python port to ROM C source
 # line-by-line. The project no longer treats ROM parity as a goal (see
-# docs/integration_test_framework.md and the github issue thread), so the suite
-# is preserved for reference but SKIPPED BY DEFAULT.
+# docs/integration_test_framework.md and the github issue thread), so the
+# suite is preserved for reference but EXCLUDED FROM COLLECTION BY DEFAULT
+# (so the test session doesn't print 3000 skipped tests).
 #
 # To run the parity suite:    pytest --include-parity    (or: make test-parity)
 # ---------------------------------------------------------------------------
-_PARITY_SKIP_REASON = (
-    "ROM parity test (tests/integration/): skipped by default — these lock the "
-    "Python port to ROM C source line-by-line and the project no longer treats "
-    "ROM parity as a goal. Pass --include-parity to run them, or use "
-    "`make test-parity`."
-)
-
-
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
         "--include-parity",
         action="store_true",
         default=False,
         help=(
-            "Include the ROM parity test suite in tests/integration/. Skipped by "
-            "default because the project no longer treats ROM parity as a goal. "
-            "See tests/integration/README.md."
+            "Include the ROM parity test suite in tests/integration/. Excluded "
+            "from collection by default because the project no longer treats "
+            "ROM parity as a goal. See tests/integration/README.md."
         ),
     )
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+def pytest_ignore_collect(collection_path: object, config: pytest.Config) -> bool | None:
+    """Skip walking into tests/integration/ unless --include-parity is set.
+
+    We return True (not None) so pytest not only doesn't run these tests — it
+    doesn't even COLLECT them. The 3000-test progress display in
+    `pytest -q`/`make test` then shows only the ~1700 active tests, with no
+    noise from parity skips.
+    """
     if config.getoption("--include-parity"):
-        return  # user opted in: run them
-    skip_parity = pytest.mark.skip(reason=_PARITY_SKIP_REASON)
-    for item in items:
-        if "tests/integration" in str(item.fspath):
-            item.add_marker(skip_parity)
+        return None  # user opted in: collect everything
+    if "tests/integration" in str(collection_path):
+        return True
+    return None
 
 
 

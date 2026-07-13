@@ -311,6 +311,9 @@ def test_telnet_server_prompts_for_name_without_account_branch(qmconfig_snapshot
 def test_telnetga_command_toggles_go_ahead():
     async def run():
         stream, transport, protocol = await _make_telnet_stream()
+        # disable ANSI so send_prompt's plain-prompt wrapping doesn't pollute
+        # the buffer assertion — these tests verify the IAC GA bytes, not ANSI.
+        stream.set_ansi(False)
         char = Character(name="Tester", is_npc=False)
         session = Session(
             name="Tester",
@@ -357,6 +360,9 @@ def test_qmconfig_telnetga_default_applied(qmconfig_snapshot):
     async def run():
         stream, transport, protocol = await _make_telnet_stream()
         try:
+            # disable ANSI so the bare-prompt assertion is the literal buffer
+            # content (not the ANSI-wrapped variant).
+            stream.set_ansi(False)
             char = Character(name="Newbie", level=1, played=0)
             session = Session(
                 name="Newbie",
