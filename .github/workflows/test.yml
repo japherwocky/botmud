@@ -9,7 +9,7 @@ on:
 
 jobs:
   # Full suite on the version the pinned lock is built + proven green against
-  # (local .venv is 3.12.3). Installing requirements-dev.txt gives the exact
+  # (local .venv is 3.12.3). Installing requirements.txt gives the exact
   # known-good stack (pytest 8.x etc.) — the unpinned `.[dev,test]` floors
   # resolve to bleeding-edge pytest 9 / xdist 3.8, which crash xdist workers
   # ("node down: Not properly terminated") and abort the run with an
@@ -32,7 +32,7 @@ jobs:
       - name: Install pinned dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          pip install -r requirements.txt
       - name: Lint with ruff
         run: ruff check .
         continue-on-error: true

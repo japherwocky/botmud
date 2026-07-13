@@ -50,7 +50,7 @@ help:
 	@echo "Override Python interpreter: make install PYTHON=python3.12"
 
 install: $(VENV_PYTHON)
-	$(VENV_PIP) install -r requirements-dev.txt
+	$(VENV_PIP) install -r requirements.txt
 	@echo ""
 	@echo "Setup complete. Activate the virtualenv:"
 ifeq ($(OS),Windows_NT)
