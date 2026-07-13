@@ -48,29 +48,19 @@ that loads `data/help.json` once per test session.
 
 ## TELNET-002 - `test_ansi_preference_persists_between_sessions` has a too-strict byte assertion
 
-**Status:** [OPEN]
+**Status:** [FIXED] in commit 2813df66
 
 The test reads bytes between the ANSI preference prompt and the `Name: `
 prompt, then asserts `b"\x1b[" not in greeting_off`. But the ANSI
 prompt itself ends with `\x1b[0m\xff\xf9` (the `reset` colour and the
 IAC GA byte), and `readuntil(b"Name: ")` consumes those trailing bytes
 into the returned `greeting` variable. The assertion therefore fires
-even though the production code is correct: it sends the ANSI prompt
-in colour (ANSI is on by default at that point), the user replies `n`,
-and the *subsequent* greeting + `Name: ` are sent in plain text
-(verified by trace).
+even though the production code is correct.
 
-**The test is wrong**, not the production code. Two options:
-
-1. Delete the test - its core concern (preference persists to disk) is
-   covered by the second half of the same test, which already passes.
-2. Loosen the assertion to scope it to the actual greeting text rather
-   than the captured buffer.
-
-**Tests affected:**
-- `tests/test_account_auth.py::test_ansi_preference_persists_between_sessions`
-- `tests/test_account_auth.py::test_help_greeting_respects_ansi_choice`
-  (same root cause, second branch)
+**Fix:** scope the assertions to the actual greeting body
+(`greeting_off[banner_start:greeting_off.rfind(b"Name: ")]`) so the
+test still asserts the user-disabled ANSI mode is honoured, but
+doesn't false-positive on the ANSI prompt's own colour tail.
 
 ---
 
