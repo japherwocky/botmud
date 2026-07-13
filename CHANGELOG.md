@@ -48,6 +48,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.claude/` and `.codex/` skill/config directories, Codacy agent config, and
   the associated autonomous-coding shell scripts. This fork is no longer
   targeting ROM parity, so the agent workflow overhead is just noise.
+- **Pruned ROM-parity test, doc, and tooling surface.** Deleted 55
+  `tests/*_parity.py` / `*_rom_parity.py` files, 30 `tests/integration/*_parity`
+  files, the entire `tools/diff_harness/` directory, `tests/data/golden/`, the
+  full `docs/parity/` and `docs/sessions/` directories, and the root-level
+  `diagnostic_test.py` / `test_all_commands.py` scratch scripts. The test
+  suite dropped from ~6,180 items to ~4,500 and is now scoped to gameplay
+  behavior (account, combat, shops, equipment, world load, multi-server).
 - **Doc hygiene: reconciled stale OLC/JSON audit function-inventory rows.** The
   Phase-1 summary tables in HEDIT / OLC_MPCODE / OLC_SAVE / JSON_LOADER audit
   docs still marked ported functions `❌ MISSING` / `⚠️ PARTIAL`, contradicting
