@@ -102,6 +102,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `initialize_world()` mid-bootstrap. The bans weren't reloaded as
   a result, so `test_permanent_ban_survives_restart` failed. Replaced
   four startup-banner prints with plain text.
+- **Fixed `do_time` boot/system time format crash on Windows.** The
+  `%-d` strftime spec is POSIX-only and raised `ValueError: Invalid
+  format string` on Windows. Replaced with a cross-platform
+  `_format_day()` helper that formats the day as a plain integer to
+  match ROM C `ctime()` output.
+- **Made convention tests read source files as UTF-8.** The five
+  convention tests (`test_attribute_convention`,
+  `test_message_delivery_convention`,
+  `test_phantom_registry_convention`,
+  `test_equipment_key_convention`, `test_flag_hex_convention`) call
+  `path.read_text()` without an explicit encoding, which uses the
+  system default (cp1252 on Windows). Production source contains
+  non-ASCII characters (e.g. ⚠️ in `mud/agent/agent_protocol.py`),
+  which crashed the read with `UnicodeDecodeError`. Pass
+  `encoding="utf-8"` explicitly so the tests work on all platforms.
 - **Doc hygiene: reconciled stale OLC/JSON audit function-inventory rows.** The
   Phase-1 summary tables in HEDIT / OLC_MPCODE / OLC_SAVE / JSON_LOADER audit
   docs still marked ported functions `❌ MISSING` / `⚠️ PARTIAL`, contradicting

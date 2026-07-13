@@ -43,7 +43,7 @@ _SCAN_DIR = "mud"
 def test_no_string_keyed_equipment_access_in_production() -> None:
     offenders: list[str] = []
     for path in sorted(Path(_SCAN_DIR).rglob("*.py")):
-        for lineno, line in enumerate(path.read_text().splitlines(), start=1):
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             code = line.split("#", 1)[0]  # ignore comments that cite the anti-pattern
             if _EQUIPMENT_PATTERN.search(code) or _SLOT_NAME_PATTERN.search(code):
                 offenders.append(f"{path}:{lineno}: {line.strip()}")

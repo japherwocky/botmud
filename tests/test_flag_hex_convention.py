@@ -81,7 +81,7 @@ def test_no_hardcoded_flag_hex_in_production() -> None:
     for path in sorted(Path(_SCAN_DIR).rglob("*.py")):
         if path in _ALLOWLIST:
             continue
-        for lineno, line in enumerate(path.read_text().splitlines(), start=1):
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             code = line.split("#", 1)[0]  # ignore comments that cite the anti-pattern
             if _PATTERN.search(code):
                 offenders.append(f"{path}:{lineno}: {line.strip()}")

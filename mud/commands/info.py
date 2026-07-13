@@ -403,6 +403,17 @@ def do_where(char: Character, args: str) -> str:
             return act_format("You didn't find any $T.", recipient=char, actor=char, arg1=None, arg2=arg) + ROM_NEWLINE
 
 
+def _format_day(day: int) -> str:
+    """Format a 1-31 day-of-month as a zero-stripped decimal string.
+
+    Mirrors the ROM C `ctime()` output ("Wed Jun 30 21:49:08 1993") by
+    avoiding the leading zero on single-digit days. The POSIX `%-d`
+    strftime spec doesn't exist on Windows, so format the day as a plain
+    integer instead.
+    """
+    return f"{int(day)}"
+
+
 def do_time(char: Character, args: str) -> str:
     """
     Display game time.
@@ -478,13 +489,15 @@ def do_time(char: Character, args: str) -> str:
     boot_time_obj = getattr(mud.game_loop, "boot_time", None)
     if boot_time_obj:
         # Format like ROM C ctime(): "Wed Jun 30 21:49:08 1993"
-        # Use %-d to avoid zero-padding for single-digit days (matching ctime)
-        boot_str = boot_time_obj.strftime("%a %b %-d %H:%M:%S %Y")
+        # Strip leading zero on single-digit days (matching ctime). Use
+        # the cross-platform `_format_day` helper since the POSIX `%-d`
+        # spec doesn't exist on Windows strftime.
+        boot_str = f"{boot_time_obj.strftime('%a %b')} {_format_day(boot_time_obj.day)} {boot_time_obj.strftime('%H:%M:%S %Y')}"
         result += f"ROM started up at {boot_str}\n\r"
 
     # Get current system time
     current_time = datetime.now()
-    time_str = current_time.strftime("%a %b %-d %H:%M:%S %Y")
+    time_str = f"{current_time.strftime('%a %b')} {_format_day(current_time.day)} {current_time.strftime('%H:%M:%S %Y')}"
     result += f"The system time is {time_str}.\n\r"
 
     return result

@@ -90,7 +90,7 @@ def test_no_phantom_registry_attributes() -> None:
         for path in sorted(Path(scan_dir).rglob("*.py")):
             if path == _SELF:
                 continue
-            for lineno, line in enumerate(path.read_text().splitlines(), start=1):
+            for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
                 code = line.split("#", 1)[0]  # ignore comments that cite the anti-pattern
                 if _ATTR_PATTERN.search(code) or _GETATTR_PATTERN.search(code):
                     offenders.append(f"{path}:{lineno}: {line.strip()}")

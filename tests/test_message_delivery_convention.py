@@ -98,7 +98,7 @@ def _scan() -> list[tuple[str, int, str]]:
     hits: list[tuple[str, int, str]] = []
     for path in sorted(Path(_SCAN_DIR).rglob("*.py")):
         rel = path.as_posix()
-        for lineno, line in enumerate(path.read_text().splitlines(), start=1):
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             code = line.split("#", 1)[0]  # ignore comments citing the anti-pattern
             if _APPEND_PATTERN.search(code):
                 hits.append((rel, lineno, line.strip()))
