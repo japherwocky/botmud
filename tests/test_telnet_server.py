@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from mud.account import clear_active_accounts, login
+from mud.account import clear_active_accounts
 from mud.commands.admin_commands import cmd_telnetga
 from mud.config import (
     get_qmconfig,

@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
-from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, WebSocket
