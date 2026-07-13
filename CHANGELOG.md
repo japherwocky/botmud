@@ -78,6 +78,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   real telnet server and rely on `_send_help_greeting()` emitting the
   welcome banner (e.g. `tests/test_account_auth.py`) get a non-empty
   `help_greeting` regardless of test execution order.
+- **Fixed overly-strict ANSI-off byte assertions in account-auth tests.**
+  `test_ansi_preference_persists_between_sessions` and
+  `test_help_greeting_respects_ansi_choice` read bytes between the ANSI
+  prompt and the `Name: ` prompt, then asserted the buffer contained no
+  `\x1b[`. The buffer actually includes the ANSI prompt's tail (sent
+  in colour *before* the user replied `n`), so the assertion fired even
+  though the production code correctly sent the greeting and `Name: ` in
+  plain text. Scope the assertions to the actual greeting body so they
+  pass while still asserting the user-disabled ANSI mode is honoured.
 - **Doc hygiene: reconciled stale OLC/JSON audit function-inventory rows.** The
   Phase-1 summary tables in HEDIT / OLC_MPCODE / OLC_SAVE / JSON_LOADER audit
   docs still marked ported functions `❌ MISSING` / `⚠️ PARTIAL`, contradicting
