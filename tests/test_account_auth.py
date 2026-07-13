@@ -1140,8 +1140,15 @@ def test_new_character_persists_true_sex():
 
     pcdata.true_sex = int(Sex.MALE)
     char.sex = int(Sex.MALE)
-    char.room = Room(vnum=ROOM_VNUM_LIMBO, name="Limbo", description="")
-    char.was_in_room = Room(vnum=ROOM_VNUM_SCHOOL, name="The School", description="")
+    # Use the registered Limbo/School rooms so save/load can resolve the
+    # vnum back to the same instance via room_registry. Creating fresh
+    # Room() objects that aren't in the registry would persist the vnum
+    # but the load path would return None for the room.
+    from mud.registry import room_registry
+
+    initialize_world("area/area.lst")
+    char.room = room_registry[ROOM_VNUM_LIMBO]
+    char.was_in_room = room_registry[ROOM_VNUM_SCHOOL]
     save_player_character(char)
 
     # INV-008: the hybrid shim writes to JSON pfile, not the DB gameplay columns.
