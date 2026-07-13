@@ -70,6 +70,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install -e .
       - name: Test with pytest
         # Inherits addopts (--timeout=120) from pyproject.toml. The xdist
         # addopt is -n0, so this run is serial and stable on every runner.
@@ -102,6 +103,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install -e .
       - name: Run parity tests
         run: pytest tests/integration/ --include-parity -q --tb=line --timeout=60
 
@@ -122,6 +124,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install -e .
       - name: Run telnet tests
         env:
           PYTHONUNBUFFERED: "1"
