@@ -117,3 +117,31 @@ make test-parallel       # opt-in 5-worker parallel
 
 The full suite is ~4,720 items. On a modern box it takes ~5-15 minutes
 serially; parallel can crash on WSL.
+
+---
+
+## ASYNC-001 - Some asyncio-based tests hang in serial runs
+
+**Status:** [OPEN]
+
+`test_ansi_preference_persists_between_sessions` (account auth) and
+`test_telnet_server_handles_look_command` (telnet server) hang past
+the per-test timeout when run as part of the full suite. They pass when
+run individually.
+
+The likely cause: these tests use `asyncio.run()` at module scope, which
+creates a new event loop and tears it down. The teardown may not be
+cleaning up TCP listeners, sockets, or other resources, which then leaks
+into the next test and eventually wedges the suite.
+
+**Workaround:** run with `--timeout=15` and `--deselect` of the
+offending tests, or skip the affected files.
+
+**Files to investigate:**
+- `tests/test_account_auth.py::test_ansi_preference_persists_between_sessions`
+- `tests/test_telnet_server.py::test_telnet_server_handles_look_command`
+
+**Suggested fix:** make these tests use a pytest-asyncio fixture
+(`async def test_...`) instead of `asyncio.run()` inside the test body,
+so that pytest-asyncio owns the loop lifecycle and teardown is clean.
+
