@@ -18,6 +18,21 @@ import pytest  # noqa: E402  (must follow the per-worker DATABASE_URL setup abov
 from helpers import ensure_can_move as _ensure_can_move_helper  # noqa: E402
 
 
+# Session-scoped fixture to make sure the help greeting text is loaded once.
+# Several test files (e.g. tests/test_account_auth.py) spin up the real
+# telnet server and expect _send_help_greeting() to emit the ROM welcome
+# banner; that function reads from the module-level `help_greeting` global
+# populated by `load_help_file`. Without this fixture the global is empty
+# and the banner is never sent.
+@pytest.fixture(autouse=True, scope="session")
+def _load_help_greeting():
+    from mud.loaders.help_loader import load_help_file
+
+    load_help_file("data/help.json")
+    yield
+
+
+
 @pytest.fixture(autouse=True)
 def _enable_world_invariant_checks(request):
     """Opt-in: assert steady-state ROM world invariants after every game_tick.

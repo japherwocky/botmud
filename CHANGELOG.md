@@ -68,6 +68,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nanny, and websocket-server tests) imports `httpx` transitively, so the
   removal broke 4 test modules at collection. Re-added `httpx>=0.27` along
   with its transitive deps `certifi` and `httpcore`.
+- **Fixed telnet prompt ANSI handling.** `TelnetStream.send_prompt` now
+  wraps plain prompts in `{g...{x` when ANSI is enabled and the prompt
+  contains no `{X` token, so the output line carries an escape code.
+  Without this, plain prompts like `Name: ` rendered as raw text, which
+  broke clients and tests that look for an ANSI sequence in the greeting.
+- **Loaded help greeting text in conftest.** Added a session-scoped
+  autouse fixture that preloads `data/help.json`, so tests that drive the
+  real telnet server and rely on `_send_help_greeting()` emitting the
+  welcome banner (e.g. `tests/test_account_auth.py`) get a non-empty
+  `help_greeting` regardless of test execution order.
 - **Doc hygiene: reconciled stale OLC/JSON audit function-inventory rows.** The
   Phase-1 summary tables in HEDIT / OLC_MPCODE / OLC_SAVE / JSON_LOADER audit
   docs still marked ported functions `❌ MISSING` / `⚠️ PARTIAL`, contradicting

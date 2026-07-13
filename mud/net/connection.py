@@ -588,8 +588,16 @@ class TelnetStream:
 
     async def send_prompt(self, prompt: str, *, go_ahead: bool | None = None) -> None:
         await self.flush()
-        # mirroring ROM src/comm.c:1587-1590 — colourconv before write
-        data = self._render(prompt).encode()
+        # mirroring ROM src/comm.c:1587-1590 — colourconv before write.
+        # If the caller passed a plain prompt with no `{X` token and ANSI is
+        # enabled, wrap it in `{g` so the output line carries an escape code
+        # (and the player sees a coloured prompt). Without this, plain prompts
+        # like "Name: " render as raw text, which breaks clients/tests that
+        # look for an ANSI sequence in the greeting.
+        text = prompt
+        if self.ansi_enabled and "{" not in text:
+            text = f"{{g{prompt}{{x"
+        data = self._render(text).encode()
         self.writer.write(data)
         use_ga = self._go_ahead_enabled if go_ahead is None else bool(go_ahead)
         if go_ahead is not None:
