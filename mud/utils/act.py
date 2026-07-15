@@ -345,9 +345,15 @@ def _char_affected(char: Any, name: str) -> bool:
             return True
         sn = getattr(aff, "type", None)
         if sn is not None:
-            from mud.skills.registry import skill_lookup
+            if isinstance(sn, str):
+                from mud.skills.registry import skill_registry
 
-            sk = skill_lookup(sn) if isinstance(sn, str) else None
+                try:
+                    sk = skill_registry.get(sn)
+                except KeyError:
+                    sk = None
+            else:
+                sk = None
             if sk and getattr(sk, "name", None) == name:
                 return True
     aff_flags = getattr(char, "affected_by", 0)
