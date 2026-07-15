@@ -1,5 +1,6 @@
 from mud.models.character import Character
 from mud.models.constants import (
+    ItemType,
     LEVEL_HERO,
     LEVEL_IMMORTAL,
     AffectFlag,
@@ -7,6 +8,7 @@ from mud.models.constants import (
     Position,
     RoomFlag,
     Sector,
+    WearLocation,
 )
 from mud.models.room import Exit, Room
 from mud.world.movement import move_character
@@ -31,6 +33,28 @@ def test_blind_player_blocked_by_dark_exit() -> None:
 
     assert result == "Alas, it's too dark to go that way."
     assert player.room is start
+
+
+def test_player_with_lit_torch_can_enter_dark_room() -> None:
+    start, target = _build_rooms()
+    target.room_flags = int(RoomFlag.ROOM_DARK)
+
+    class _Proto:
+        item_type = int(ItemType.LIGHT)
+        value = [0, 0, 100, 0, 0]
+
+    class _LightObj:
+        prototype = _Proto()
+        value = [0, 0, 100, 0, 0]
+
+    player = Character(name="Torchbearer", is_npc=False, move=20)
+    player.equipment = {int(WearLocation.LIGHT): _LightObj()}
+    start.add_character(player)
+
+    result = move_character(player, "north")
+
+    assert player.room is target
+    assert result
 
 
 def test_follower_requires_visibility() -> None:

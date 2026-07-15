@@ -14,7 +14,7 @@ from mud.models.constants import (
     Sector,
     Stat,
 )
-from mud.models.room import Room
+from mud.models.room import Room, _has_lit_light_source
 from mud.time import Sunlight, time_info
 from mud.utils import rng_mm
 
@@ -240,7 +240,12 @@ def can_see_room(char: Character, room: Room) -> bool:
         return False
 
     if room_is_dark(room):
-        if not (_has_holylight(char) or char.is_immortal() or bool(char.affected_by & _VISIBILITY_AFFECTS)):
+        if not (
+            _has_holylight(char)
+            or char.is_immortal()
+            or bool(char.affected_by & _VISIBILITY_AFFECTS)
+            or _has_lit_light_source(char)
+        ):
             return False
 
     flags = int(getattr(room, "room_flags", 0) or 0)
