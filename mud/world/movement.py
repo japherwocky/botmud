@@ -27,7 +27,7 @@ from mud.registry import room_registry
 from mud.utils import rng_mm
 from mud.utils.act import act_format
 from mud.world.look import look
-from mud.world.vision import can_see_room
+from mud.world.vision import can_see_room, check_blind, room_is_dark
 
 dir_map: dict[str, Direction] = {
     "north": Direction.NORTH,
@@ -390,6 +390,8 @@ def move_character(char: Character, direction: str, *, _is_follow: bool = False)
     target_room_flags = int(getattr(target_room, "room_flags", 0) or 0)
 
     if not can_see_room(char, target_room):
+        if room_is_dark(target_room):
+            return "Alas, it's too dark to go that way."
         return "Alas, you cannot go that way."
 
     blocked_msg = _exit_block_message(char, exit)

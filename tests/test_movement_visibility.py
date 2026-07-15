@@ -29,7 +29,7 @@ def test_blind_player_blocked_by_dark_exit() -> None:
 
     result = move_character(player, "north")
 
-    assert result == "Alas, you cannot go that way."
+    assert result == "Alas, it's too dark to go that way."
     assert player.room is start
 
 
