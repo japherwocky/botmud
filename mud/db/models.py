@@ -5,6 +5,8 @@ from __future__ import annotations
 from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from mud.models.constants import PlayerFlag
+
 
 class Base(DeclarativeBase):
     """Declarative base with typing support for SQLAlchemy models."""
@@ -109,7 +111,7 @@ class Character(Base):
     sex: Mapped[int] = mapped_column(Integer, default=0)
     true_sex: Mapped[int] = mapped_column(Integer, default=0)
     alignment: Mapped[int] = mapped_column(Integer, default=0)
-    act: Mapped[int] = mapped_column(Integer, default=0)
+    act: Mapped[int] = mapped_column(Integer, default=int(PlayerFlag.AUTOEXIT))
     hometown_vnum: Mapped[int] = mapped_column(Integer, default=0)
     perm_stats: Mapped[str] = mapped_column(String, default="")
     size: Mapped[int] = mapped_column(Integer, default=0)
