@@ -340,38 +340,18 @@ def _obj_flag(obj: Any, flag: Any) -> bool:
 
 
 def _char_affected(char: Any, name: str) -> bool:
-    for aff in getattr(char, "affected", []) or []:
-        if getattr(aff, "name", None) == name or getattr(aff, "spell_name", None) == name:
-            return True
-        sn = getattr(aff, "type", None)
-        if sn is not None:
-            if isinstance(sn, str):
-                from mud.skills.registry import skill_registry
+    from mud.models.constants import AffectFlag
 
-                try:
-                    sk = skill_registry.get(sn)
-                except KeyError:
-                    sk = None
-            else:
-                sk = None
-            if sk and getattr(sk, "name", None) == name:
-                return True
-    aff_flags = getattr(char, "affected_by", 0)
-    if aff_flags is None:
-        aff_flags = 0
     flag_map = {
-        "detect_evil": "DETECT_EVIL",
-        "detect_good": "DETECT_GOOD",
-        "detect_magic": "DETECT_MAGIC",
+        "detect_evil": AffectFlag.DETECT_EVIL,
+        "detect_good": AffectFlag.DETECT_GOOD,
+        "detect_magic": AffectFlag.DETECT_MAGIC,
     }
-    flag_name = flag_map.get(name)
-    if flag_name:
-        from mud.models.constants import AffectFlag
-
-        if hasattr(AffectFlag, flag_name):
-            if int(aff_flags) & int(getattr(AffectFlag, flag_name)):
-                return True
-    return False
+    flag = flag_map.get(name)
+    if flag is None:
+        return False
+    aff_flags = getattr(char, "affected_by", 0) or 0
+    return bool(int(aff_flags) & int(flag))
 
 
 def show_list_to_char(
