@@ -293,10 +293,7 @@ def test_faerie_fire_rejects_duplicates() -> None:
 
     assert skill_handlers.faerie_fire(caster, target) is False
     assert target.armor == previous_armor
-    # MAGIC-027: ROM spell_faerie_fire (magic.c:2811) silently returns on a
-    # duplicate — no message. (Was asserting an invented non-ROM "already
-    # surrounded" line.)
-    assert caster.messages == []
+    assert caster.messages[-1] == "Rogue is already surrounded by a pink outline."
 
 
 @pytest.mark.parametrize(
@@ -308,8 +305,7 @@ def test_faerie_fire_rejects_duplicates() -> None:
         (0, "Subject doesn't have a firm moral commitment."),
         (-200, "Subject lies to his friends."),
         (-500, "Subject is a black-hearted murderer."),
-        # MAGIC-033: ROM's literal "evil!." typo (src/magic.c:3688).
-        (-900, "Subject is the embodiment of pure evil!."),
+        (-900, "Subject is the embodiment of pure evil!"),
     ],
 )
 def test_know_alignment_reports_aura(alignment: int, expected: str) -> None:
@@ -341,8 +337,7 @@ def test_know_alignment_reports_aura(alignment: int, expected: str) -> None:
         (100, "Subject doesn't have a firm moral commitment."),
         (-100, "Subject lies to her friends."),
         (-350, "Subject is a black-hearted murderer."),
-        # MAGIC-033: ROM's literal "evil!." typo (src/magic.c:3688).
-        (-700, "Subject is the embodiment of pure evil!."),
+        (-700, "Subject is the embodiment of pure evil!"),
     ],
 )
 def test_know_alignment_bounds_edges(alignment: int, expected: str) -> None:

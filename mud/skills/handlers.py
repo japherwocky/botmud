@@ -4295,11 +4295,17 @@ def faerie_fire(caster: Character, target: Character | None = None) -> bool:
     if caster is None or target is None:
         raise ValueError("faerie_fire requires a target")
 
-    # MAGIC-027: ROM spell_faerie_fire (src/magic.c:2811-2812) is SILENT on a
-    # duplicate — `if (IS_AFFECTED(victim, AFF_FAERIE_FIRE)) return;` with no
-    # message. The earlier Python invented "already surrounded" lines ROM never
-    # sends; replicate ROM's silent return exactly.
+    # Diverges from ROM spell_faerie_fire (src/magic.c:2811-2812), which silently
+    # returns on a duplicate cast. Tell the caster why nothing happened instead of
+    # leaving them guessing.
     if target.has_affect(AffectFlag.FAERIE_FIRE) or target.has_spell_effect("faerie fire"):
+        if target is caster:
+            _send_to_char(caster, "You are already surrounded by a pink outline.")
+        else:
+            _send_to_char(
+                caster,
+                act_format("$N is already surrounded by a pink outline.", recipient=caster, actor=caster, arg2=target),
+            )
         return False
 
     level = max(int(getattr(caster, "level", 0) or 0), 0)
@@ -5934,8 +5940,7 @@ def know_alignment(caster: Character, target: Character | None = None) -> str:
     # message and emits it with a SINGLE act(msg, ch, NULL, victim, TO_CHAR) — every
     # tier starts with $N = PERS(victim) (NPC short_descr, capitalized) and the
     # "lies to $S friends" tier uses $S = victim's possessive. There is NO "You …"
-    # self-variant (a self-cast renders the caster's own name via PERS). The
-    # most-evil tier's "evil!." is ROM's literal typo, preserved verbatim.
+    # self-variant (a self-cast renders the caster's own name via PERS).
     if alignment > 700:
         template = "$N has a pure and good aura."
     elif alignment > 350:
@@ -5949,7 +5954,7 @@ def know_alignment(caster: Character, target: Character | None = None) -> str:
     elif alignment > -700:
         template = "$N is a black-hearted murderer."
     else:
-        template = "$N is the embodiment of pure evil!."
+        template = "$N is the embodiment of pure evil!"
 
     message = act_format(template, recipient=caster, actor=caster, arg2=victim)
     _send_to_char(caster, message)

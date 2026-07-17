@@ -2,14 +2,16 @@
 
 ROM `spell_know_alignment` (`src/magic.c:3674-3690`) builds an alignment-band
 message and emits it with a single `act(msg, ch, NULL, victim, TO_CHAR)` — every
-tier starts with `$N` = PERS(victim), capitalized. Three divergences in the Python:
+tier starts with `$N` = PERS(victim), capitalized. Two divergences in the Python:
 
   1. NPC victims must render the **short_descr** (PERS), capitalized — the Python
      baked the keyword `name`.
   2. There is **no "You …" self-variant** — ROM always uses `$N`, so a self-cast
      shows the caster's own name (PERS(ch, ch) = name), not "You …".
-  3. The most-evil tier is ROM's literal "$N is the embodiment of pure evil!." —
-     note the double `!.` (a ROM typo, preserved verbatim).
+
+The most-evil tier's ROM text has a `!.` typo (an exclamation mark followed by a
+period); we fix the punctuation rather than preserve it, since parity with ROM's
+source is not a goal here.
 """
 
 from __future__ import annotations
@@ -47,7 +49,7 @@ def test_magic033_know_alignment_self_cast_shows_name_not_you():
     assert msg == "Diviner lies to his friends.", msg
 
 
-def test_magic033_know_alignment_most_evil_tier_preserves_rom_typo():
+def test_magic033_know_alignment_most_evil_tier_fixes_rom_typo():
     room = Room(vnum=99207, name="Sanctum")
     caster = Character(name="Diviner", level=24, is_npc=False, position=int(Position.STANDING))
     room.add_character(caster)
@@ -58,4 +60,4 @@ def test_magic033_know_alignment_most_evil_tier_preserves_rom_typo():
     room.add_character(demon)
 
     msg = know_alignment(caster, demon)
-    assert msg == "A vile demon is the embodiment of pure evil!.", msg
+    assert msg == "A vile demon is the embodiment of pure evil!", msg

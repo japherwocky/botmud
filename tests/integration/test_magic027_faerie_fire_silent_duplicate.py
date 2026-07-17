@@ -1,13 +1,15 @@
-"""MAGIC-027 — faerie_fire on an already-affected victim is SILENT (ROM parity).
+"""MAGIC-027 — faerie_fire on an already-affected victim tells the caster why.
 
 ROM `spell_faerie_fire` (`src/magic.c:2811-2812`):
 
     if (IS_AFFECTED (victim, AFF_FAERIE_FIRE))
         return;
 
-— a bare `return` with NO message. The Python `faerie_fire` handler invented two
-non-ROM lines ("You are already surrounded by a pink outline." / "$N is already
-surrounded by a pink outline."). ROM sends nothing; we replicate exactly.
+— a bare `return` with no message, leaving the caster to guess why nothing
+happened. We deliberately diverge from that: parity with ROM's source is not a
+goal here, and silently eating a recast is bad UX. The caster gets "You are
+already surrounded by a pink outline." (self-cast) or "$N is already surrounded
+by a pink outline." (cross-target) instead.
 """
 
 from __future__ import annotations
@@ -31,22 +33,21 @@ def _setup(self_cast: bool) -> tuple[Character, Character]:
     return caster, target
 
 
-def test_magic027_faerie_fire_duplicate_cross_target_is_silent():
+def test_magic027_faerie_fire_duplicate_cross_target_notifies_caster():
     caster, target = _setup(self_cast=False)
     assert faerie_fire(caster, target) is True
     caster.messages.clear()
     target.messages.clear()
 
     assert faerie_fire(caster, target) is False
-    # ROM emits NOTHING on the duplicate.
-    assert caster.messages == [], caster.messages
-    assert not any("already surrounded" in m for m in target.messages), target.messages
+    assert caster.messages[-1] == "Rogue is already surrounded by a pink outline."
+    assert target.messages == [], target.messages
 
 
-def test_magic027_faerie_fire_duplicate_self_cast_is_silent():
+def test_magic027_faerie_fire_duplicate_self_cast_notifies_caster():
     caster, target = _setup(self_cast=True)
     assert faerie_fire(caster, target) is True
     caster.messages.clear()
 
     assert faerie_fire(caster, target) is False
-    assert caster.messages == [], caster.messages
+    assert caster.messages[-1] == "You are already surrounded by a pink outline."
