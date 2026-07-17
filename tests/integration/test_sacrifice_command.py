@@ -207,26 +207,33 @@ def test_sacrifice_autosplit_with_group(test_room, actor, object_factory, movabl
 
 
 # ---------------------------------------------------------------------------
-# SAC-005: Zero-cost non-corpse gives zero silver
+# Reward: cost cap dropped, floor of 5 (deliberate ROM divergence)
 # ---------------------------------------------------------------------------
 
 
-def test_sacrifice_zero_cost_non_corpse_gives_zero_silver(test_room, actor, object_factory):
-    """SAC-005: UMIN(silver, obj->cost) is unconditional — zero cost gives 0 silver.
+def test_sacrifice_zero_cost_non_corpse_ignores_cost(test_room, actor, object_factory):
+    """Reward is level*3 regardless of cost — the ROM cost cap is deliberately gone.
 
-    ROM src/act_obj.c:1825: silver = UMIN(silver, obj->cost); (no obj_cost > 0 guard).
-    Old Python code had 'if obj_cost > 0' guard which wrongly gave level*3 silver.
+    ROM src/act_obj.c:1825 applies ``silver = UMIN(silver, obj->cost)`` to non-corpses,
+    so a zero-cost item paid nothing. We drop that cap so item level alone sets the
+    reward and junk still pays out for new players.
     """
-    # Level 10 gives silver=30 before cap; cost=0 => min(30, 0) = 0
     obj = _make_sacrificeable_obj(object_factory, short_descr="a worthless trinket", level=10, cost=0)
     test_room.contents.append(obj)
     obj.location = test_room
 
     do_sacrifice(actor, "trinket")
 
-    # ROM gives 0 silver (UMIN caps it), so message says "one silver coin" only if silver==1
-    # With cost=0 and silver capped at 0, ROM actually gives max(1, level*3) capped to 0 = 0
-    # The TO_CHAR message in ROM is only sent after silver is calculated, and silver=0
-    # means ROM says "one silver coin" only when silver==1. silver=0 is an edge case.
-    # The key invariant: actor.silver should be 0 (not 30).
-    assert actor.silver == 0, f"Zero-cost non-corpse should yield 0 silver (SAC-005); got {actor.silver}"
+    assert actor.silver == 30, f"Zero-cost level-10 item should still yield level*3=30 silver; got {actor.silver}"
+
+
+def test_sacrifice_low_level_item_hits_floor_of_five(test_room, actor, object_factory):
+    """Reward floors at 5 — a level-1 item pays 5, not ROM's max(1, 1*3) == 3."""
+    obj = _make_sacrificeable_obj(object_factory, short_descr="a bent spoon", level=1, cost=100)
+    test_room.contents.append(obj)
+    obj.location = test_room
+
+    result = do_sacrifice(actor, "spoon")
+
+    assert actor.silver == 5, f"Level-1 item should yield the floor of 5 silver; got {actor.silver}"
+    assert "5 silver coins" in result, f"Reward message should report 5 coins; got {result!r}"

@@ -1148,7 +1148,8 @@ def _auto_sacrifice(attacker: Character, corpse) -> None:
         return
 
     corpse_level = max(0, int(getattr(corpse, "level", 0) or 0))
-    silver_reward = max(1, corpse_level * 3)
+    # Floor of 5 rather than ROM's UMAX(1, ...) — kept in step with do_sacrifice.
+    silver_reward = max(5, corpse_level * 3)
     current_silver = max(0, int(getattr(attacker, "silver", 0) or 0))
 
     attacker.silver = current_silver + silver_reward

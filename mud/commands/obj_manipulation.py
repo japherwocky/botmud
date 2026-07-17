@@ -427,15 +427,12 @@ def do_sacrifice(char: Character, args: str) -> str:
             # $N PERS-rendered, $p object, buf[0] capitalized.
             return act_format("$N appears to be using $p.", recipient=char, actor=char, arg1=obj, arg2=person)
 
-    # Calculate silver reward
+    # Calculate silver reward. Diverges from ROM (act_obj.c:1822-1825, which pays
+    # UMIN(UMAX(1, level*3), cost) for non-corpses): the floor is 5 and the cost cap
+    # is dropped, so low-value items still pay enough to matter for new players.
     obj_level = getattr(obj, "level", 1)
-    obj_cost = getattr(obj, "cost", 0)
 
-    silver = max(1, obj_level * 3)
-
-    # SAC-005: ROM line 1825 — UMIN is unconditional for non-corpses (no obj_cost > 0 guard).
-    if item_type not in (ItemType.CORPSE_NPC, ItemType.CORPSE_PC) and str(item_type) not in ("corpse_npc", "corpse_pc"):
-        silver = min(silver, obj_cost)
+    silver = max(5, obj_level * 3)
 
     # ROM lines 1827-1836: send TO_CHAR message BEFORE granting silver.
     if silver == 1:

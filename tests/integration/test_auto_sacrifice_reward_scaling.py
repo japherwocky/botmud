@@ -4,13 +4,14 @@ ROM `src/act_obj.c:1822` computes the sacrifice reward as::
 
     silver = UMAX (1, obj->level * 3);
 
-and the corpse inherits the dead mob's level via
-`src/fight.c:1504` ``corpse->level = ch->level``. So a level-1 NPC
-corpse yields ``max(1, 1*3) == 3`` silver, a level-2 corpse 6, and a
-level-0 corpse the ``UMAX`` floor of 1.
+We deliberately raise that floor from 1 to 5 to be kinder to new players,
+giving ``max(5, obj->level * 3)``. The corpse still inherits the dead mob's
+level via `src/fight.c:1504` ``corpse->level = ch->level``, so a level-2
+corpse yields 6 silver and a level-5 corpse 15, while levels 0 and 1 both
+land on the floor of 5.
 
-`mud/combat/engine.py:_auto_sacrifice` reproduces this with
-``max(1, corpse_level * 3)``. This guard pins the per-level reward so a
+`mud/combat/engine.py:_auto_sacrifice` implements this with
+``max(5, corpse_level * 3)``. This guard pins the per-level reward so a
 future regression that drops ``corpse.level`` back to 0 (the symptom
 that surfaced live: a level-1 "wimpy monster" paying only 1 silver
 because its corpse came through level 0) fails loudly here instead of
@@ -48,14 +49,14 @@ class _MockCorpse:
 @pytest.mark.parametrize(
     ("corpse_level", "expected_silver", "expected_phrase"),
     [
-        (0, 1, "one silver coin"),  # UMAX floor — level-0 snail
-        (1, 3, "3 silver coins"),  # the wimpy monster (vnum 3703)
+        (0, 5, "5 silver coins"),  # floor — level-0 snail
+        (1, 5, "5 silver coins"),  # the wimpy monster (vnum 3703) — floor beats 1*3
         (2, 6, "6 silver coins"),  # the big creature (vnum 3706)
         (5, 15, "15 silver coins"),  # the beast (vnum 3714)
     ],
 )
 def test_auto_sacrifice_reward_scales_with_corpse_level(corpse_level, expected_silver, expected_phrase):
-    """AUTOSAC pays ``max(1, corpse.level * 3)`` silver — ROM act_obj.c:1822."""
+    """AUTOSAC pays ``max(5, corpse.level * 3)`` silver — floor raised from ROM's 1."""
     test_room = Room(vnum=2100, name="Test Room", description="A test room.", room_flags=0, sector_type=0)
     test_room.people = []
     test_room.contents = []
