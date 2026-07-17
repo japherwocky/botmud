@@ -296,6 +296,18 @@ def test_faerie_fire_rejects_duplicates() -> None:
     assert caster.messages[-1] == "Rogue is already surrounded by a pink outline."
 
 
+def test_faerie_fire_rejects_self_cast_duplicate() -> None:
+    caster = Character(name="Illusionist", level=18, is_npc=False)
+    room = _make_room(3005)
+    room.add_character(caster)
+
+    assert skill_handlers.faerie_fire(caster, caster) is True
+
+    caster.messages.clear()
+    assert skill_handlers.faerie_fire(caster, caster) is False
+    assert caster.messages[-1] == "You are already surrounded by a pink outline."
+
+
 @pytest.mark.parametrize(
     ("alignment", "expected"),
     [
@@ -369,3 +381,18 @@ def test_know_alignment_bounds_edges(alignment: int, expected: str) -> None:
     # own name (PERS(ch, ch)).
     assert self_message == "Oracle lies to his friends."
     assert caster.messages[-1] == "Oracle lies to his friends."
+
+
+def test_know_alignment_renders_npc_short_descr() -> None:
+    caster = Character(name="Diviner", level=24, is_npc=False)
+    goblin = Character(name="goblin", is_npc=True, short_descr="a green goblin", alignment=900)
+    room = _make_room(3012)
+    room.add_character(caster)
+    room.add_character(goblin)
+
+    caster.messages.clear()
+
+    message = skill_handlers.know_alignment(caster, goblin)
+
+    assert message == "A green goblin has a pure and good aura."
+    assert caster.messages[-1] == "A green goblin has a pure and good aura."
