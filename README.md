@@ -1,11 +1,9 @@
-# QuickMUD - A Modern ROM 2.4 Python Port
+# botmud - A Modern ROM 2.4 Python MUD
 
-[![Version](https://img.shields.io/badge/version-2.15.3-blue.svg)](https://github.com/japherwocky/botmud)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](tests/)
 
-QuickMUD is a modern Python port of the ROM 2.4b6 MUD engine, derived from ROM 2.4b6, Merc 2.1, and DikuMUD. This is a complete rewrite that brings the classic text-based MMORPG experience to modern Python with async networking and JSON world data. The engine is feature-complete and playable — all 255 ROM commands, combat, spells, and world systems are implemented and tested.
+botmud is a Python MUD engine forked from [rom24-quickmud-python](https://github.com/Nostoi/rom24-quickmud-python), a port of the ROM 2.4b6 MUD engine (itself derived from ROM 2.4b6, Merc 2.1, and DikuMUD). It brings the classic text-based MMORPG experience to modern Python with async networking and JSON world data. The engine is feature-complete and playable — all 255 ROM commands, combat, spells, and world systems are implemented and tested.
 
 ## What is a MUD?
 
@@ -23,49 +21,43 @@ A "[Multi-User Dungeon](https://en.wikipedia.org/wiki/MUD)" (MUD) is a text-base
 - **Admin Commands**: Teleport, spawn, ban management, and OLC building
 - **Comprehensive Testing**: 6,000+ passing tests across unit and integration suites
 
-## Installation
+## Getting Started
 
-### For Players & Server Operators
+Clone the repository and install in a virtual environment:
 
 ```bash
-pip install quickmud
+git clone https://github.com/japherwocky/botmud.git
+cd botmud
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -e .[dev]
 ```
 
-### Quick Start
-
-Run a QuickMUD server:
+### Running a Server
 
 **Telnet Server (port 5001):**
 ```bash
 python3 -m mud socketserver
-# or
-mud socketserver
 ```
 
 **WebSocket Server (port 8000):**
 ```bash
 python3 -m mud websocketserver
-# or
-mud websocketserver
 ```
 
 **SSH Server (port 2222):**
 ```bash
 python3 -m mud sshserver
-# or
-mud sshserver
 ```
 
 **All Three in One Process:**
 ```bash
 python3 -m mud multiserver
-# or
-mud multiserver
 # or, if you set up the Makefile:
 make multi
 ```
 
-Connect to the server:
+### Connecting
 
 **Via Telnet:**
 ```bash
@@ -78,52 +70,7 @@ ssh -p 2222 player@localhost
 # Note: SSH username/password are ignored; MUD authentication happens after connection
 ```
 
-## Web Interface
-
-QuickMUD includes a WebSocket server. The browser interface lives in a separate companion project so this engine repo can remain the canonical backend.
-
-Recommended layout:
-
-```text
-~/dev/projects/
-  botmud/
-  quickmud-web-client/
-```
-
-The browser client should connect to:
-
-```text
-ws://127.0.0.1:8000/ws
-```
-
-### Browser Client Setup
-
-From the companion `quickmud-web-client` repo:
-
-```bash
-cd ~/dev/projects/quickmud-web-client
-npm install
-npm run dev:all
-```
-
-That workflow starts this QuickMUD engine's WebSocket server, starts the frontend development server, and opens the browser client against the local `/ws` endpoint.
-
-### Companion Repo
-
-The web interface lives in a separate repository:
-**[`quickmud-web-client`](https://github.com/Nostoi/quickmud-web-client)**
-
-## For Developers
-
-### Development Installation
-
-```bash
-git clone https://github.com/japherwocky/botmud.git
-cd botmud
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -e .[dev]
-```
+## Development
 
 ### Running Tests
 
@@ -132,10 +79,18 @@ pytest  # Run the full suite
 pytest tests/integration/ -v  # Run the integration suite
 ```
 
-### Development Server
+### Dependencies
+
+For a fully reproducible environment, use the pinned requirements file:
 
 ```bash
-python -m mud  # Start development server
+pip install -r requirements.txt
+```
+
+To update dependencies:
+
+```bash
+pip-compile requirements.in
 ```
 
 ## Architecture
@@ -161,8 +116,8 @@ Game systems are implemented in:
 Build and run with Docker:
 
 ```bash
-docker build -t quickmud .
-docker run -p 5001:5001 quickmud
+docker build -t botmud .
+docker run -p 5001:5001 botmud
 ```
 
 Or use docker-compose:
@@ -171,19 +126,7 @@ Or use docker-compose:
 docker-compose up
 ```
 
-Connect via telnet:
-
-```bash
-telnet localhost 5001
-```
-
-## Project Status
-
-**Version**: 2.15.3
-**Playability**: Feature-complete and running. All 255 ROM commands, combat, spells, skills, movement, shops, mob programs, OLC building, and admin tools are implemented and tested. You can run a server and play today.
-**Compatibility**: Python 3.10+, cross-platform
-
-### Implemented Systems
+## Implemented Systems
 
 - Combat Engine with THAC0 and damage calculations
 - Skills & Spells with ROM-faithful formulas
@@ -196,49 +139,14 @@ telnet localhost 5001
 - Admin Tools: teleport, spawn, ban management, wiznet
 - Networking: async telnet, WebSocket, and SSH servers
 
-### Quality Metrics
-
-- **Test Suite**: 6,000+ passing tests
-- **Code Coverage**: Comprehensive unit and integration test layers
-- **Type Safety**: Full type hints throughout codebase
-
 ## Documentation
 
 - [User Guide](docs/USER_GUIDE.md) — Player and server operator documentation
 - [Admin Guide](docs/ADMIN_GUIDE.md) — Administrator and immortal documentation
-- [Builder Migration Guide](docs/BUILDER_MIGRATION_GUIDE.md) — For ROM builders transitioning to QuickMUD
+- [Builder Migration Guide](docs/BUILDER_MIGRATION_GUIDE.md) — For ROM builders transitioning to botmud
 - [Installation Guide](docs/installation.md)
 - [Configuration](docs/configuration.md)
 - [World Building](docs/world-building.md)
-
-## Dependencies
-
-For a fully reproducible environment, use the pinned requirements file:
-
-```bash
-pip install -r requirements.txt
-```
-
-To update dependencies:
-
-```bash
-pip-compile requirements.in
-```
-
-## Publishing
-
-To release a new version to PyPI:
-
-1. Update the version in `pyproject.toml`
-2. Commit and tag:
-
-```bash
-git commit -am "release: v1.2.3"
-git tag v1.2.3
-git push origin main --tags
-```
-
-The GitHub Actions workflow will build and publish the package when the tag is pushed.
 
 ## Contributing
 

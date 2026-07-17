@@ -3,9 +3,9 @@ requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rom24-quickmud-python"
+name = "botmud"
 version = "2.15.3"
-description = "A modern Python port of the ROM 2.4b6 MUD engine with full telnet server and JSON world loading"
+description = "A modern Python MUD engine (ROM 2.4b6 lineage) with telnet, WebSocket, and SSH servers and JSON world loading"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -64,11 +64,10 @@ test = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Nostoi/rom24-quickmud-python"
-Repository = "https://github.com/Nostoi/rom24-quickmud-python.git"
-Documentation = "https://github.com/Nostoi/rom24-quickmud-python/blob/master/README.md"
-"Bug Tracker" = "https://github.com/Nostoi/rom24-quickmud-python/issues"
-Changelog = "https://github.com/Nostoi/rom24-quickmud-python/releases"
+Homepage = "https://github.com/japherwocky/botmud"
+Repository = "https://github.com/japherwocky/botmud.git"
+Documentation = "https://github.com/japherwocky/botmud/blob/master/README.md"
+"Bug Tracker" = "https://github.com/japherwocky/botmud/issues"
 
 [project.scripts]
 mud = "mud.__main__:cli"

@@ -1,4 +1,4 @@
-# QuickMUD development Makefile
+# botmud development Makefile
 # Simple shortcuts for common tasks. Works on Unix-like shells and Windows
 # shells that understand standard Make (MSYS2, Git Bash, WSL, etc.).
 
@@ -24,7 +24,7 @@ endif
 .PHONY: help install install-dev test test-parallel test-integration test-parity test-coverage lint format format-check typecheck server websocket ssh clean
 
 help:
-	@echo "QuickMUD development tasks"
+	@echo "botmud development tasks"
 	@echo ""
 	@echo "  make install          Create .venv and install pinned dev dependencies"
 	@echo "  make install-dev      Alias for install"
