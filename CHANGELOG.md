@@ -126,21 +126,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-<<<<<<< HEAD
-- **JSON loader defers D (door) resets until all areas are loaded.** Previously
-  door resets were applied immediately while parsing each area file, so a
-  cross-area reset (e.g. graveyard referencing midgaard room 3124) failed when
-  filesystem order differed from `area.lst`. D resets are now appended to
-  `area.resets` and processed by `apply_resets()` after `link_exits()`, making
-  the boot order independent and removing the spurious "Invalid D reset room
-  3124" warning.
-- **Multi-server no longer bootstraps the world three times.** `telnet_server`
-  and `ssh_server` moved world initialization out of `create_server()` and into
-  their standalone `start_server()` entry points, so `mud multiserver`'s single
-  lifespan bootstrap is the only one. This eliminates the triple
-  "Invalid D reset room 3124" warning and avoids redundant migrations/world
-  loads.
-=======
 - **`MobInstance.add_affect` now applies hitroll/damroll/saving_throw modifiers
   (GL-032 follow-up).** ROM `affect_modify` (`src/handler.c:1018-1164`) is uniform
   for PCs and NPCs, and `Character.add_affect` applies these kwargs — but
@@ -240,7 +225,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the coin branch (→ "Sorry, you can't do that." on `amount <= 0`) instead of
   falling through to the item path. Closes the `is_number`/`atoi` parity class
   with shared `rom_is_number`/`rom_atoi` helpers in `mud/math/c_compat.py`.
->>>>>>> e0e09a51 (fix(parity): MobInstance.add_affect applies stat modifiers (GL-032 follow-up))
+- **JSON loader defers D (door) resets until all areas are loaded.** Previously
+  door resets were applied immediately while parsing each area file, so a
+  cross-area reset (e.g. graveyard referencing midgaard room 3124) failed when
+  filesystem order differed from `area.lst`. D resets are now appended to
+  `area.resets` and processed by `apply_resets()` after `link_exits()`, making
+  the boot order independent and removing the spurious "Invalid D reset room
+  3124" warning.
+- **Multi-server no longer bootstraps the world three times.** `telnet_server`
+  and `ssh_server` moved world initialization out of `create_server()` and into
+  their standalone `start_server()` entry points, so `mud multiserver`'s single
+  lifespan bootstrap is the only one. This eliminates the triple
+  "Invalid D reset room 3124" warning and avoids redundant migrations/world
+  loads.
 - **PUT-005 — `put all <container>` with nothing eligible now silent (was a
   non-ROM "You have nothing to put.").** ROM's put-all loop
   (`src/act_obj.c:451-491`) has no such message.
