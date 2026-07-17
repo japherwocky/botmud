@@ -11,6 +11,7 @@ from mud.models.character import Character
 from mud.models.constants import OBJ_VNUM_PIT, ExtraFlag, ItemType, PlayerFlag, WearFlag
 from mud.utils import rng_mm
 from mud.utils.act import act_format, act_to_room
+from mud.wiznet import WiznetFlag, wiznet
 from mud.world.obj_find import get_obj_carry, get_obj_here, get_obj_wear
 
 # Container flags
@@ -451,13 +452,21 @@ def do_sacrifice(char: Character, args: str) -> str:
         if members > 1:
             from mud.commands.group_commands import do_split
 
-            do_split(char, f"{silver} silver")
+            # do_split reports the split to the actor through its return value, so
+            # fold it into ours — dropping it loses "You split N silver coins."
+            split_msg = do_split(char, f"{silver} silver")
+            if split_msg:
+                char_msg = f"{char_msg}\n{split_msg}"
 
     # SAC-001: ROM line 1856 — broadcast TO_ROOM before extract_obj.
     if room is not None:
         # INV-025: act_to_room renders $n per-recipient (PERS masking) + dispatches
         # TRIG_ACT (ROM src/act_obj.c:1856, no MOBtrigger wrap).
         act_to_room(room, "$n sacrifices $p to Mota.", char, arg1=obj, exclude=char)
+
+    # ROM src/act_obj.c:1858 — immortals watching WIZ_SACCING see every sacrifice,
+    # not just the AUTOSAC ones.
+    wiznet("$N sends up $p as a burnt offering.", char, obj, WiznetFlag.WIZ_SACCING, None, 0)
 
     _extract_obj(char, obj)
 

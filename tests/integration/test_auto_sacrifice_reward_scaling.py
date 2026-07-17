@@ -33,7 +33,12 @@ from mud.world.world_state import create_test_character
 
 
 class _MockCorpse:
-    """Minimal NPC corpse stand-in satisfying _auto_sacrifice's gates."""
+    """Minimal NPC corpse stand-in satisfying _auto_sacrifice's gates.
+
+    Registers itself in ``room.contents`` like a real corpse: _auto_sacrifice
+    delegates to do_sacrifice, which resolves the corpse by keyword out of the
+    room rather than being handed the object.
+    """
 
     def __init__(self, level: int, *, room) -> None:
         self.short_descr = "the corpse of a wimpy monster"
@@ -44,6 +49,7 @@ class _MockCorpse:
         self.contained_items: list = []
         self.location = room
         self.prototype = None
+        room.contents.append(self)
 
 
 @pytest.mark.parametrize(

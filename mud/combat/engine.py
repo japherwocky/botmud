@@ -5,7 +5,7 @@ from mud.account.account_manager import save_character
 from mud.advancement import exp_per_level, gain_exp
 from mud.affects.saves import _check_immune as _riv_check
 from mud.affects.saves import saves_spell
-from mud.characters import is_clan_member, is_same_clan, is_same_group
+from mud.characters import is_clan_member, is_same_clan
 from mud.characters.follow import stop_follower
 from mud.combat.death import raw_kill
 from mud.combat.messages import TYPE_HIT, DamageMessages, dam_message
@@ -1126,137 +1126,38 @@ def _auto_collect_coins(attacker: Character, corpse) -> bool:
 
 
 def _auto_sacrifice(attacker: Character, corpse) -> None:
-    """Sacrifice empty NPC corpses when AUTOSAC is enabled, mirroring ROM."""
+    """Sacrifice empty NPC corpses when AUTOSAC is enabled.
+
+    ROM src/fight.c:970 does not reimplement the sacrifice — it dispatches the
+    ordinary command via ``do_function (ch, &do_sacrifice, "corpse")``. We do the
+    same, so the reward math, AUTOSPLIT handling, room broadcast, wiznet and
+    extraction all live in ``do_sacrifice`` and cannot drift from the manual path.
+    """
 
     if not _player_has_flag(attacker, PlayerFlag.AUTOSAC):
         return
     if not _corpse_is_npc(corpse):
         return
+    # ROM src/fight.c:964-967 — leave the corpse be if autoloot left treasure in it.
     if _player_has_flag(attacker, PlayerFlag.AUTOLOOT) and getattr(corpse, "contained_items", []):
         return
 
     if not can_see_object(attacker, corpse):
         return
 
-    room = getattr(corpse, "location", None) or getattr(attacker, "room", None)
-    if room is None:
-        return
-
+    # do_sacrifice re-checks these and would return a refusal message. Gate here so
+    # an unsacrificeable corpse is skipped silently rather than nagging the player
+    # after every kill.
     if not _object_has_wear_flag(corpse, WearFlag.TAKE):
         return
     if _object_has_wear_flag(corpse, WearFlag.NO_SAC):
         return
 
-    corpse_level = max(0, int(getattr(corpse, "level", 0) or 0))
-    # Floor of 5 rather than ROM's UMAX(1, ...) — kept in step with do_sacrifice.
-    silver_reward = max(5, corpse_level * 3)
-    current_silver = max(0, int(getattr(attacker, "silver", 0) or 0))
+    from mud.commands.obj_manipulation import do_sacrifice
 
-    attacker.silver = current_silver + silver_reward
-    if silver_reward == 1:
-        _push_message(attacker, "Mota gives you one silver coin for your sacrifice.")
-    else:
-        _push_message(attacker, f"Mota gives you {silver_reward} silver coins for your sacrifice.")
-
-    corpse_name = getattr(corpse, "short_descr", None) or getattr(corpse, "name", "") or "corpse"
-    # mirroring ROM src/act_obj.c:1856 dispatched from
-    # src/fight.c:961-970 — `act("$n sacrifices $p to Mota.", ch,
-    # obj, NULL, TO_ROOM)`. PERS substitution on $n (attacker)
-    # per-listener (FIGHT-014). The helper's first arg is named
-    # `victim` for historical reasons but the function just
-    # PERS-renders that character for each room observer — works
-    # equally for an attacker. Corpse name passes through verbatim
-    # ($p is not can_see-gated).
-    _broadcast_pos_change(
-        attacker,
-        "{name} sacrifices {corpse} to Mota.",
-        corpse=corpse_name,
-    )
-    wiznet(
-        "$N sends up $p as a burnt offering.",
-        attacker,
-        corpse,
-        WiznetFlag.WIZ_SACCING,
-        None,
-        0,
-    )
-
-    try:
-        from mud.game_loop import _extract_obj as _legacy_extract_obj
-    except ImportError:  # pragma: no cover - defensive guard
-        _legacy_extract_obj = None
-
-    if _legacy_extract_obj is not None:
-        _legacy_extract_obj(corpse)
-    else:  # pragma: no cover - fallback for isolated tests
-        for item in list(getattr(corpse, "contained_items", []) or []):
-            if hasattr(item, "location") and getattr(item, "location", None) is corpse:
-                item.location = None
-        if hasattr(corpse, "contained_items"):
-            try:
-                corpse.contained_items.clear()
-            except AttributeError:
-                corpse.contained_items = []
-        corpse.gold = 0
-        corpse.silver = 0
-
-    if hasattr(corpse, "contained_items"):
-        try:
-            corpse.contained_items.clear()
-        except AttributeError:  # pragma: no cover - defensive guard
-            corpse.contained_items = []
-    corpse.gold = 0
-    corpse.silver = 0
-
-    if hasattr(room, "contents") and corpse in room.contents:
-        room.contents.remove(corpse)
-    if hasattr(corpse, "location"):
-        corpse.location = None
-
-    if not _player_has_flag(attacker, PlayerFlag.AUTOSPLIT):
-        return
-
-    people = list(getattr(room, "people", []) or [])
-    group_members: list[Character] = []
-    for member in people:
-        if not is_same_group(member, attacker):
-            continue
-        if hasattr(member, "has_affect") and member.has_affect(AffectFlag.CHARM):
-            continue
-        group_members.append(member)
-
-    member_count = len(group_members)
-    if member_count < 2:
-        _push_message(attacker, "Just keep it all.")
-        return
-    if silver_reward <= 1:
-        return
-
-    share = silver_reward // member_count
-    remainder = silver_reward % member_count
-    if share == 0:
-        _push_message(attacker, "Don't even bother, cheapskate.")
-        return
-
-    attacker.silver = current_silver + share + remainder
-    _push_message(attacker, f"You split {silver_reward} silver coins. Your share is {share + remainder} silver.")
-
-    # ROM src/act_comm.c:1946-1962 — per-member act("$n splits %d silver coins. Your
-    # share is %d silver.", ch, NULL, gch, TO_VICT). $n resolves through PERS(ch, gch)
-    # per recipient (masking invisible actors) and act_new caps the first letter
-    # (src/comm.c:2376). FIGHT-034.
-    from mud.utils.messaging import push_message
-
-    for member in group_members:
-        if member is attacker:
-            continue
-        member.silver = max(0, int(getattr(member, "silver", 0) or 0)) + share
-        # Per-recipient PERS + capitalize, matching ROM act(TO_VICT).
-        member_msg = capitalize_act_line(
-            f"{pers(attacker, member)} splits {silver_reward} silver coins. Your share is {share} silver."
-        )
-        # INV-001: single-channel delivery (push_message XOR).
-        push_message(member, member_msg)
+    message = do_sacrifice(attacker, "corpse")
+    if message:
+        _push_message(attacker, message)
 
 
 def _handle_auto_actions(attacker: Character, corpse) -> None:

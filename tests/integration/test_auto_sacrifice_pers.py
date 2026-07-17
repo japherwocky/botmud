@@ -22,17 +22,25 @@ from mud.world.world_state import create_test_character
 
 
 class _MockCorpse:
-    """Minimal corpse stand-in satisfying _auto_sacrifice's checks."""
+    """Minimal corpse stand-in satisfying _auto_sacrifice's checks.
+
+    Registers itself in ``room.contents`` like a real corpse: _auto_sacrifice
+    delegates to do_sacrifice, which resolves the corpse by keyword out of the
+    room rather than being handed the object.
+    """
 
     def __init__(self, name: str, *, room) -> None:
         self.short_descr = name
-        self.name = name
+        # ROM corpses carry "corpse" as a lookup keyword; short_descr is the
+        # display name.
+        self.name = "corpse"
         self.item_type = int(ItemType.CORPSE_NPC)
         self.wear_flags = int(WearFlag.TAKE)
         self.level = 5
         self.contained_items: list = []
         self.location = room
         self.prototype = None
+        room.contents.append(self)
 
 
 def test_fight_014_auto_sacrifice_broadcast_uses_pers_for_invisible_attacker():

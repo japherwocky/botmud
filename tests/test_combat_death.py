@@ -301,7 +301,7 @@ def test_autosacrifice_autosplit_shares_silver(monkeypatch: pytest.MonkeyPatch) 
     assert any("Your share is 10 silver" in msg for msg in ally.messages)
 
 
-def test_autosacrifice_autosplit_solo_messages(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_autosacrifice_autosplit_solo_does_not_split(monkeypatch: pytest.MonkeyPatch) -> None:
     _ensure_world()
     attacker = create_test_character("Attacker", 3001)
     attacker.act = int(PlayerFlag.AUTOSAC | PlayerFlag.AUTOSPLIT)
@@ -325,7 +325,16 @@ def test_autosacrifice_autosplit_solo_messages(monkeypatch: pytest.MonkeyPatch) 
 
     attack_round(attacker, victim)
 
-    assert any(message == "Just keep it all." for message in attacker.messages)
+    # A solo AUTOSPLIT player never reaches do_split: do_sacrifice only invokes it
+    # when the group has more than one member, so the ungrouped refusal ("Just keep
+    # it all.") must not spam after every kill.
+    assert not any(message == "Just keep it all." for message in attacker.messages), (
+        f"solo autosac should not run a split: {attacker.messages!r}"
+    )
+    # The sacrifice itself still pays out.
+    assert any("silver coins for your sacrifice" in message for message in attacker.messages), (
+        f"solo autosac reward missing: {attacker.messages!r}"
+    )
 
 
 def test_autosacrifice_requires_visibility(monkeypatch: pytest.MonkeyPatch) -> None:
