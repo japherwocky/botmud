@@ -1,26 +1,11 @@
 from __future__ import annotations
 
-import pytest
-
-from mud.models.character import character_registry
 from mud.models.constants import ActFlag
 from mud.models.mob import MobIndex
 from mud.models.room import Room
-from mud.registry import area_registry, mob_registry, obj_registry, room_registry
+from mud.registry import mob_registry, room_registry
 from mud.spawning.mob_spawner import spawn_mob
 from mud.spawning.templates import MobInstance
-from mud.world import initialize_world
-
-
-@pytest.fixture(autouse=True)
-def setup_world():
-    initialize_world("area/area.lst")
-    yield
-    area_registry.clear()
-    mob_registry.clear()
-    obj_registry.clear()
-    room_registry.clear()
-    character_registry.clear()
 
 
 def create_mob_with_act_flag(act_flag: ActFlag, level: int = 10, vnum: int = 9998) -> MobInstance:

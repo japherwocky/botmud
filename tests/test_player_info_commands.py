@@ -12,19 +12,16 @@ from mud.commands.session import do_score
 from mud.handler import class_name, race_name
 from mud.models.character import PCData
 from mud.models.constants import CommFlag, PlayerFlag, Sex
-from mud.registry import area_registry, mob_registry, obj_registry, room_registry
-from mud.world import create_test_character, initialize_world
+from mud.world import create_test_character
 
 
+# The world is isolated by the conftest `_isolate_world` autouse; this file
+# additionally clears the global descriptor list (used by info commands like
+# whois/score to enumerate online players).
 @pytest.fixture(autouse=True)
-def setup_world():
-    initialize_world("area/area.lst")
+def _clear_descriptors():
     global_registry.descriptor_list = []
     yield
-    area_registry.clear()
-    mob_registry.clear()
-    obj_registry.clear()
-    room_registry.clear()
     global_registry.descriptor_list = []
 
 

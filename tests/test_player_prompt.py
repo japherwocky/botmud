@@ -1,22 +1,10 @@
 from __future__ import annotations
 
-import pytest
 from helpers_player import set_comm_flags
 
 from mud.commands.auto_settings import do_prompt
 from mud.models.constants import CommFlag
-from mud.registry import area_registry, mob_registry, obj_registry, room_registry
-from mud.world import create_test_character, initialize_world
-
-
-@pytest.fixture(autouse=True)
-def setup_world():
-    initialize_world("area/area.lst")
-    yield
-    area_registry.clear()
-    mob_registry.clear()
-    obj_registry.clear()
-    room_registry.clear()
+from mud.world import create_test_character
 
 
 class TestPromptCommand:

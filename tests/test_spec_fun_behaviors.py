@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import pytest
-
-from mud.models.character import Character, character_registry
+from mud.models.character import Character
 from mud.models.constants import (
     ActFlag,
     ItemType,
@@ -14,28 +12,17 @@ from mud.models.constants import (
 from mud.models.mob import MobIndex
 from mud.models.object import Object
 from mud.models.room import Room
-from mud.registry import area_registry, mob_registry, obj_registry, room_registry
+from mud.registry import mob_registry, room_registry
 from mud.spawning.mob_spawner import spawn_mob
 from mud.spec_funs import (
     _reset_spec_mayor_state,
     run_npc_specs,
 )
 from mud.time import time_info
-from mud.world import create_test_character, initialize_world
+from mud.world import create_test_character
 
 if TYPE_CHECKING:
     from mud.spawning.templates import MobInstance
-
-
-@pytest.fixture(autouse=True)
-def setup_world():
-    initialize_world("area/area.lst")
-    yield
-    area_registry.clear()
-    mob_registry.clear()
-    obj_registry.clear()
-    room_registry.clear()
-    character_registry.clear()
 
 
 def create_mob_with_spec(spec_name: str, level: int = 10, vnum: int = 9999) -> MobInstance:

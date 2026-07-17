@@ -1,20 +1,7 @@
 from __future__ import annotations
 
-import pytest
-
 from mud.commands.remaining_rom import do_wimpy
-from mud.registry import area_registry, mob_registry, obj_registry, room_registry
-from mud.world import create_test_character, initialize_world
-
-
-@pytest.fixture(autouse=True)
-def setup_world():
-    initialize_world("area/area.lst")
-    yield
-    area_registry.clear()
-    mob_registry.clear()
-    obj_registry.clear()
-    room_registry.clear()
+from mud.world import create_test_character
 
 
 class TestWimpyCommand:
