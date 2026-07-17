@@ -24,11 +24,11 @@
 
 ## Migration Overview
 
-QuickMUD provides **100% ROM 2.4b behavioral parity**, meaning your ROM knowledge and building experience transfer directly. However, QuickMUD uses **JSON** for area files instead of ROM's traditional text format.
+QuickMUD started as a port of ROM 2.4b, so your ROM knowledge and building experience transfer directly. It is a fork rather than a clone, though: gameplay deliberately diverges from ROM where we think we can do better, so treat ROM behavior as the starting point rather than a guarantee. QuickMUD also uses **JSON** for area files instead of ROM's traditional text format.
 
 ### Why Migrate to QuickMUD?
 
-✅ **100% ROM Compatible** - Same behavior, same commands  
+✅ **Familiar to ROM Builders** - Same concepts, same commands  
 ✅ **Modern Platform** - Python 3.10+ with async networking  
 ✅ **JSON World Data** - Human-readable, easy to edit  
 ✅ **Version Control Friendly** - Git-friendly JSON format  
@@ -49,16 +49,19 @@ QuickMUD provides **100% ROM 2.4b behavioral parity**, meaning your ROM knowledg
 
 ## QuickMUD vs ROM C
 
-### What's the Same (100% Parity)
+### What Carries Over
+
+These work the way a ROM builder expects, except where we've chosen to
+diverge — the concepts and data model are unchanged either way.
 
 | Feature | ROM C | QuickMUD |
 |---------|-------|----------|
-| **Combat System** | ✅ Identical | ✅ Identical |
-| **Skills/Spells** | ✅ Same mechanics | ✅ Same mechanics |
-| **Resets** | ✅ Same behavior | ✅ Same behavior |
-| **Shops** | ✅ Same economy | ✅ Same economy |
-| **Mobs/Objects** | ✅ Same flags | ✅ Same flags |
-| **Area Properties** | ✅ Same fields | ✅ Same fields |
+| **Combat System** | ✅ | ✅ Same model |
+| **Skills/Spells** | ✅ | ✅ Same mechanics |
+| **Resets** | ✅ | ✅ Same behavior |
+| **Shops** | ✅ | ✅ Same economy |
+| **Mobs/Objects** | ✅ | ✅ Same flags |
+| **Area Properties** | ✅ | ✅ Same fields |
 | **OLC Commands** | ✅ Same commands | ✅ Same commands |
 
 ### What's Different (Format Only)
@@ -948,11 +951,11 @@ For building help:
 
 ## Conclusion
 
-QuickMUD provides a modern, maintainable platform for ROM building while maintaining **100% behavioral compatibility** with ROM 2.4b. The JSON format is easier to work with, version control, and validate than traditional ROM area files.
+QuickMUD provides a modern, maintainable platform for ROM building, built on ROM 2.4b's concepts and data model. The JSON format is easier to work with, version control, and validate than traditional ROM area files.
 
 **Key Takeaways:**
 
-✅ **Same ROM experience** - 100% parity  
+✅ **Familiar ROM experience** - Same concepts and workflow  
 ✅ **Better format** - JSON is cleaner  
 ✅ **Same OLC** - Commands work identically  
 ✅ **Modern tools** - Python, git, editors  

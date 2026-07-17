@@ -45,7 +45,7 @@ Exits: north south
 
 ### Why QuickMUD?
 
-- ✅ **100% ROM 2.4b Behavioral Parity** - Authentic ROM experience
+- ✅ **Classic ROM 2.4b Gameplay** - Familiar commands, combat, and world
 - ✅ **Modern Python** - Easy to install and extend
 - ✅ **Active Development** - Regular updates and bug fixes
 - ✅ **Cross-Platform** - Runs on Windows, Mac, Linux
@@ -183,8 +183,7 @@ sudo systemctl start quickmud
              \___\_\\__,_|_|\\___|_|  |_||_|  |_| \___/|____/
                                                               
                     ROM 2.4b - QuickMUD Python Port
-                         100% Behavioral Parity
-                              
+
 By what name do you wish to be known? 
 ```
 
@@ -348,7 +347,7 @@ cast 'magic missile' # Mage: cast spell
 
 ## Combat System
 
-QuickMUD uses the classic ROM combat system with 100% behavioral parity to the original.
+QuickMUD uses the classic ROM combat system.
 
 ### How Combat Works
 
