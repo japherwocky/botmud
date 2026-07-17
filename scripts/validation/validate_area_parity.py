@@ -3,7 +3,6 @@
 Area Parity Validation Tool
 
 Compares *.are files with their corresponding JSON files to detect discrepancies.
-Validates that convert_enhanced.py produces accurate conversions.
 
 Usage:
     python scripts/validate_area_parity.py [--verbose] [--fix]

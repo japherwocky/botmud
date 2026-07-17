@@ -6,8 +6,6 @@ This directory contains historical documentation, session reports, and developme
 
 - **agents/** - Agent configuration and execution documentation
 - **sessions/** - Session summaries and autonomous run reports
-- **reports/** - Completion reports and status updates
-- **planning/** - Planning documents and implementation roadmaps
 - **parity/** - ROM parity tracking and analysis
 - **specs/** - Technical specifications and analysis reports
 
@@ -21,5 +19,3 @@ For current documentation, see:
 - [README.md](../README.md) - Main project documentation
 - [CHANGELOG.md](../CHANGELOG.md) - Release history
 - [docs/](../docs/) - User and developer guides
-- [AGENTS.md](../AGENTS.md) - AI agent development guide
-- [ARCHITECTURAL_TASKS.md](../ARCHITECTURAL_TASKS.md) - Current task tracking
