@@ -171,6 +171,9 @@ def test_lore_appraises_known_objects(monkeypatch: pytest.MonkeyPatch) -> None:
     caster.add_object(wand)
 
     monkeypatch.setattr(rng_mm, "number_percent", lambda: 5)
+    # check_improve rolls its own (unrelated) RNG to decide skill-ups; stub it out
+    # so this test only depends on the success roll it's actually patching above.
+    monkeypatch.setattr(skill_handlers, "check_improve", lambda *args, **kwargs: None)
 
     caster.messages.clear()
     result = skill_handlers.lore(caster, wand)
