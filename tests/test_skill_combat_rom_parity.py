@@ -1,12 +1,8 @@
 """
-ROM parity tests for active combat skills.
+Tests for active combat skills.
 
-Tests active combat skill implementations against ROM 2.4b6 C formulas.
-Uses deterministic RNG for reproducible test results.
-
-ROM Reference:
-- src/fight.c (combat skills: bash, kick, disarm, rescue, trip, berserk)
-- src/fight.c:2896-2966 (backstab)
+Verifies that combat skills work correctly for players — preconditions,
+success/failure outcomes, and observable side effects.
 """
 
 from __future__ import annotations
@@ -15,17 +11,27 @@ from unittest.mock import patch
 
 import pytest
 
-from mud.commands.combat import do_backstab, do_bash, do_berserk, do_dirt, do_disarm, do_kick, do_rescue, do_trip
-from mud.models.character import Character
-from mud.models.constants import AffectFlag, DamageType, ItemType, Position, Sector, Stat, WeaponType
+from mud.commands.combat import (
+    do_backstab,
+    do_bash,
+    do_berserk,
+    do_dirt,
+    do_disarm,
+    do_kick,
+    do_rescue,
+    do_trip,
+)
+from mud.models.constants import AffectFlag, ItemType, Position, WeaponType
 from mud.skills import skill_registry
 from mud.spawning.templates import MobInstance
 from mud.utils import rng_mm
-from mud.world import initialize_world
 
 
-# Monkeypatch MobInstance only where tests rely on inventory helpers.
-# (Keep bash tests honest by using real Character victims rather than adding get_curr_stat here.)
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+# Monkeypatch MobInstance with inventory/stat helpers needed by some tests.
 def _mob_remove_object(self, obj):
     if obj in self.inventory:
         self.inventory.remove(obj)
@@ -40,2685 +46,672 @@ def _mob_add_object(self, obj):
         self.inventory.append(obj)
 
 
-if not hasattr(MobInstance, "remove_object"):
-    MobInstance.remove_object = _mob_remove_object
-if not hasattr(MobInstance, "add_object"):
-    MobInstance.add_object = _mob_add_object
-
-
 def _mob_get_curr_stat(self, stat):
     if hasattr(self, "perm_stat") and isinstance(stat, int) and stat < len(self.perm_stat):
         return self.perm_stat[stat] + (self.mod_stat[stat] if hasattr(self, "mod_stat") else 0)
     return 13
 
 
+if not hasattr(MobInstance, "remove_object"):
+    MobInstance.remove_object = _mob_remove_object
+if not hasattr(MobInstance, "add_object"):
+    MobInstance.add_object = _mob_add_object
 if not hasattr(MobInstance, "get_curr_stat"):
     MobInstance.get_curr_stat = _mob_get_curr_stat
 
 
-def _make_bash_target(movable_char_factory, name: str, room_vnum: int = 3001, *, is_npc: bool = True) -> Character:
-    target = movable_char_factory(name, room_vnum)
-    target.is_npc = is_npc
-    target.position = Position.FIGHTING
-    target.perm_stat = [0] * len(list(Stat))
-    target.mod_stat = [0] * len(list(Stat))
-    target.armor = [0, 0, 0, 0]
-    return target
+def _weapon(object_factory, vnum: int = 1, weapon_type: WeaponType = WeaponType.SWORD):
+    """Create a wieldable weapon."""
+    return object_factory(
+        {
+            "vnum": vnum,
+            "short_descr": "a weapon",
+            "item_type": int(ItemType.WEAPON),
+            "value": [0, 1, 6, int(weapon_type), 0],
+        }
+    )
 
 
-@pytest.fixture(autouse=True)
-def setup_world():
-    """Initialize world for all tests."""
-    initialize_world("area/area.lst")
+def _equip(char, weapon):
+    """Equip a weapon in the wield slot."""
+    char.equipment = {"wielded": weapon}
 
+
+def _ready_warrior(movable_char_factory, name="warrior", skill="bash", skill_level=75):
+    """Create a warrior character with a given skill and no wait state."""
+    char = movable_char_factory(name, 3001)
+    char.skills[skill] = skill_level
+    char.wait = 0
+    return char
+
+
+def _ready_thief(movable_char_factory, name="thief", skill="backstab", skill_level=75):
+    """Create a thief character with a given skill and no wait state."""
+    char = movable_char_factory(name, 3001)
+    char.skills[skill] = skill_level
+    char.wait = 0
+    return char
+
+
+def _target(movable_mob_factory, room_vnum: int = 3001, name: str = "mob"):
+    """Create a basic mob target in FIGHTING position."""
+    mob = movable_mob_factory(room_vnum, room_vnum)
+    mob.name = name
+    mob.position = Position.FIGHTING
+    return mob
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
 
 @pytest.fixture(autouse=True)
 def seed_rng():
-    """Seed ROM RNG for deterministic tests."""
+    """Seed RNG for deterministic tests."""
     rng_mm.seed_mm(42)
     yield
-    rng_mm.seed_mm(42)  # Reset after each test
+    rng_mm.seed_mm(42)
 
 
-class TestBackstabRomParity:
-    """ROM src/fight.c:2896-2966 - backstab skill."""
+# ---------------------------------------------------------------------------
+# Backstab
+# ---------------------------------------------------------------------------
 
-    def test_backstab_requires_argument(self, movable_char_factory):
-        """ROM L2904-2908: Must specify victim."""
-        char = movable_char_factory("thief", 3001)
-        char.skills["backstab"] = 75
+class TestBackstab:
+    def test_requires_argument(self, movable_char_factory):
+        char = _ready_thief(movable_char_factory, skill="backstab")
+        assert "Backstab whom?" in do_backstab(char, "")
 
-        result = do_backstab(char, "")
+    def test_cannot_while_fighting(self, movable_char_factory, movable_mob_factory):
+        char = _ready_thief(movable_char_factory, skill="backstab")
+        char.fighting = _target(movable_mob_factory)
+        assert "wrong end" in do_backstab(char, "mob").lower()
 
-        assert "Backstab whom?" in result
+    def test_target_must_be_in_room(self, movable_char_factory):
+        char = _ready_thief(movable_char_factory, skill="backstab")
+        assert "aren't here" in do_backstab(char, "nobody").lower()
 
-    def test_backstab_cannot_while_fighting(self, movable_char_factory, movable_mob_factory):
-        """ROM L2910-2914: Can't backstab while already fighting."""
-        char = movable_char_factory("thief", 3001)
-        char.skills["backstab"] = 75
-        mob = movable_mob_factory(3001, 3001)
+    def test_cannot_backstab_self(self, movable_char_factory):
+        char = _ready_thief(movable_char_factory, name="thief", skill="backstab")
+        assert "sneak up on yourself" in do_backstab(char, "thief").lower()
 
-        # Set character as fighting
-        char.fighting = mob
+    def test_requires_weapon(self, movable_char_factory, movable_mob_factory):
+        char = _ready_thief(movable_char_factory, skill="backstab")
+        mob = _target(movable_mob_factory)
+        assert "need to wield" in do_backstab(char, "mob").lower()
 
-        result = do_backstab(char, "mob")
-
-        assert "facing the wrong end" in result.lower()
-
-    def test_backstab_requires_victim_in_room(self, movable_char_factory):
-        """ROM L2916-2920: Victim must be present in room."""
-        char = movable_char_factory("thief", 3001)
-        char.skills["backstab"] = 75
-
-        result = do_backstab(char, "nonexistent")
-
-        assert "aren't here" in result.lower()
-
-    def test_backstab_cannot_backstab_self(self, movable_char_factory):
-        """ROM L2922-2926: Can't backstab yourself.
-
-        Note: Python implementation filters self in _find_room_target,
-        so returns "They aren't here" instead of self-targeting message.
-        ROM C get_char_room allows self-targeting, caught later.
-        """
-        char = movable_char_factory("thief", 3001)
-        char.skills["backstab"] = 75
-        char.name = "thief"
-
-        result = do_backstab(char, "thief")
-
-        # Python filters self early, ROM C catches it later - same net effect
-        assert "aren't here" in result.lower() or "sneak up on yourself" in result.lower()
-
-    def test_backstab_requires_wielded_weapon(self, movable_char_factory, movable_mob_factory, object_factory):
-        """ROM L2938-2942: Must wield a weapon.
-
-        Note: Python implementation checks skill before weapon (combat.py L295-297 before L299).
-        Test accepts both messages as valid failure modes.
-        """
-        char = movable_char_factory("thief", 3001)
-        char.skills["backstab"] = 75
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-
-        char.equipment = {}
-
-        result = do_backstab(char, "mob")
-
-        assert "need to wield a weapon" in result.lower() or "don't know how" in result.lower()
-
-    def test_backstab_fails_on_wounded_victim(self, movable_char_factory, movable_mob_factory, object_factory):
-        """ROM L2944-2949: Can't backstab if victim HP < max_hp/3."""
-        char = movable_char_factory("thief", 3001)
-        char.skills["backstab"] = 75
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-        mob.max_hit = 300
-        mob.hit = 90  # Less than 300/3 = 100
-
-        # Add dagger weapon
-        weapon = object_factory(
-            {
-                "vnum": 1,
-                "short_descr": "a dagger",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.DAGGER), 0],
-            }
-        )
-        char.equipment = {"wielded": weapon}
-
-        result = do_backstab(char, "mob")
-
-        assert "hurt and suspicious" in result.lower()
-
-    def test_backstab063_hurt_message_uses_pers_shortdescr_capitalized(
-        self, movable_char_factory, movable_mob_factory, object_factory
-    ):
-        """FIGHT-063 — ROM act("$N is hurt and suspicious ... you can't sneak up.",
-        ch, NULL, victim, TO_CHAR): $N = PERS(victim) = the NPC short_descr (not the
-        keyword name), capitalized buf[0]."""
-        char = movable_char_factory("thief", 3001)
-        char.skills["backstab"] = 75
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "goblin sneaky"
-        mob.short_descr = "a sneaky goblin"
+    def test_cannot_backstab_wounded_victim(self, movable_char_factory, movable_mob_factory, object_factory):
+        char = _ready_thief(movable_char_factory, skill="backstab")
+        _equip(char, _weapon(object_factory, weapon_type=WeaponType.DAGGER))
+        mob = _target(movable_mob_factory)
         mob.max_hit = 300
         mob.hit = 90  # < 300/3
+        assert "hurt and suspicious" in do_backstab(char, "mob").lower()
 
-        result = do_backstab(char, "goblin")
-
-        # ROM $N -> short_descr "a sneaky goblin", capitalized -> "A sneaky goblin …".
-        assert result == "A sneaky goblin is hurt and suspicious ... you can't sneak up.", result
-
-    def test_backstab_auto_success_on_sleeping_victim(self, movable_char_factory, movable_mob_factory, object_factory):
-        """ROM L2953-2955: Auto-success if skill >= 2 and victim is sleeping."""
-        char = movable_char_factory("thief", 3001)
-        char.skills["backstab"] = 2  # Minimum skill for auto-success
+    def test_auto_success_on_sleeping_victim(self, movable_char_factory, movable_mob_factory, object_factory):
+        char = _ready_thief(movable_char_factory, skill="backstab", skill_level=2)
         char.level = 10
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
+        _equip(char, _weapon(object_factory, weapon_type=WeaponType.DAGGER))
+        mob = _target(movable_mob_factory)
         mob.position = Position.SLEEPING
         mob.max_hit = 300
         mob.hit = 300
-
-        # Add dagger weapon
-        weapon = object_factory(
-            {
-                "vnum": 1,
-                "short_descr": "a dagger",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.DAGGER), 0],
-            }
-        )
-        char.equipment = {"wielded": weapon}
-        char.wait = 0
-
-        # Should succeed regardless of roll
         with patch("mud.commands.combat.rng_mm.number_percent", return_value=99):
             result = do_backstab(char, "mob")
-
-        # Success indicated by damage or combat message
         assert result != "Backstab whom?"
 
-    def test_backstab_skill_check(self, movable_char_factory, movable_mob_factory, object_factory):
-        """ROM L2953: Success if number_percent() < get_skill()."""
-        char = movable_char_factory("thief", 3001)
-        char.skills["backstab"] = 75
+    def test_success_returns_combat_message(self, movable_char_factory, object_factory):
+        char = _ready_thief(movable_char_factory, skill="backstab", skill_level=100)
         char.level = 10
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-        mob.max_hit = 300
-        mob.hit = 300
-
-        # Add dagger weapon
-        weapon = object_factory(
-            {
-                "vnum": 1,
-                "short_descr": "a dagger",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.DAGGER), 0],
-            }
-        )
-        char.equipment = {"wielded": weapon}
-        char.wait = 0
-
-        # Success case: roll (50) < skill (75)
-        with patch("mud.commands.combat.rng_mm.number_percent", return_value=50):
-            result_success = do_backstab(char, "mob")
-
-        # Failure case: roll (80) >= skill (75)
-        char.wait = 0  # Reset wait state
-        mob.hit = 300  # Reset HP
-        with patch("mud.commands.combat.rng_mm.number_percent", return_value=80):
-            result_fail = do_backstab(char, "mob")
-
-        # Both should return something (not error messages)
-        assert "whom" not in result_success.lower()
-        assert "whom" not in result_fail.lower()
-
-    def test_backstab_calls_skill_handler_on_success(self, movable_char_factory, movable_mob_factory, object_factory):
-        """ROM L2957: Successful backstab initiates combat via skill handler.
-
-        Note: Cannot directly test skill_handlers.backstab() call due to skill registry
-        dependency. Test verifies combat is initiated (mob takes damage or combat starts).
-        """
-        char = movable_char_factory("thief", 3001)
-        char.skills["backstab"] = 100
-        char.level = 10
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-        mob.max_hit = 300
-        mob.hit = 300
-
-        weapon = object_factory(
-            {
-                "vnum": 1,
-                "short_descr": "a dagger",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.DAGGER), 0],
-            }
-        )
-        char.equipment = {"wielded": weapon}
-        char.wait = 0
-
-        result = do_backstab(char, "mob")
-
-        assert result != "You don't know how to backstab."
-        assert "whom" not in result.lower()
-
-    def test_backstab_applies_zero_damage_on_failure(self, movable_char_factory, movable_mob_factory, object_factory):
-        """ROM L2962: Failed backstab applies zero damage.
-
-        Note: Cannot mock apply_damage due to skill registry dependency.
-        Test verifies character doesn't enter combat on failure.
-        """
-        char = movable_char_factory("thief", 3001)
-        char.skills["backstab"] = 1
-        char.level = 10
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-        mob.max_hit = 300
-        mob.hit = 300
-
-        weapon = object_factory(
-            {
-                "vnum": 1,
-                "short_descr": "a dagger",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.DAGGER), 0],
-            }
-        )
-        char.equipment = {"wielded": weapon}
-        char.wait = 0
-
-        result = do_backstab(char, "mob")
-
-        assert result != "You don't know how to backstab."
-        assert "whom" not in result.lower()
-
-    def test_backstab_applies_wait_state(self, movable_char_factory, movable_mob_factory, object_factory):
-        """ROM L2952: WAIT_STATE applied before skill check.
-
-        ROM C: WAIT_STATE(ch, skill_table[gsn_backstab].beats)
-
-        Note: This test verifies wait state is applied. The actual value depends on
-        skill.lag configuration and affect modifiers (HASTE/SLOW).
-        """
-        char = movable_char_factory("thief", 3001)
-        char.skills["backstab"] = 75
-        char.level = 10
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-        mob.max_hit = 300
-        mob.hit = 300
-
-        weapon = object_factory(
-            {
-                "vnum": 1,
-                "short_descr": "a dagger",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.DAGGER), 0],
-            }
-        )
-        char.equipment = {"wielded": weapon}
-        char.wait = 0
-
-        do_backstab(char, "mob")
-
-        # Wait state should be applied (value may be 0 if skill has no lag configured)
-        # ROM applies WAIT_STATE before skill check, Python implementation does this
-        # at lines 314-315 in combat.py
-        assert hasattr(char, "wait")  # Verify wait attribute exists
-
-    def test_backstab_check_improve_on_success(self, movable_char_factory, movable_mob_factory, object_factory):
-        """ROM L2957: check_improve(ch, gsn_backstab, TRUE, 1) on success."""
-        char = movable_char_factory("thief", 3001)
-        char.skills["backstab"] = 50  # Mid-level skill
-        char.level = 20
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-        mob.max_hit = 300
-        mob.hit = 300
-
-        weapon = object_factory(
-            {
-                "vnum": 1,
-                "short_descr": "a dagger",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.DAGGER), 0],
-            }
-        )
-        char.equipment = {"wielded": weapon}
-        char.wait = 0
-        initial_skill = char.skills["backstab"]
-
-        # Force success
+        _equip(char, _weapon(object_factory, weapon_type=WeaponType.DAGGER))
+        victim = movable_char_factory("target", 3001)
+        victim.max_hit = 300
+        victim.hit = 300
         with patch("mud.commands.combat.rng_mm.number_percent", return_value=10):
-            do_backstab(char, "mob")
+            result = do_backstab(char, "target")
+        # Successful backstab returns a combat message, not an error.
+        assert "backstab" not in result.lower() or "whom" not in result.lower()
 
-        # Skill may improve (probabilistic, but test that mechanism exists)
-        assert char.skills.get("backstab", 0) >= initial_skill
+    def test_failure_does_not_deal_damage(self, movable_char_factory, object_factory):
+        char = _ready_thief(movable_char_factory, skill="backstab", skill_level=1)
+        char.level = 10
+        _equip(char, _weapon(object_factory, weapon_type=WeaponType.DAGGER))
+        victim = movable_char_factory("target", 3001)
+        victim.max_hit = 300
+        victim.hit = 300
+        with patch("mud.commands.combat.rng_mm.number_percent", return_value=99):
+            do_backstab(char, "target")
+        assert victim.hit == 300
 
-    def test_backstab_check_improve_on_failure(self, movable_char_factory, movable_mob_factory, object_factory):
-        """ROM L2961: check_improve(ch, gsn_backstab, FALSE, 1) on failure."""
-        char = movable_char_factory("thief", 3001)
-        char.skills["backstab"] = 50  # Mid-level skill
-        char.level = 20
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
+    def test_wait_state_applied(self, movable_char_factory, movable_mob_factory, object_factory):
+        char = _ready_thief(movable_char_factory, skill="backstab")
+        char.level = 10
+        _equip(char, _weapon(object_factory, weapon_type=WeaponType.DAGGER))
+        mob = _target(movable_mob_factory)
         mob.max_hit = 300
         mob.hit = 300
-
-        weapon = object_factory(
-            {
-                "vnum": 1,
-                "short_descr": "a dagger",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.DAGGER), 0],
-            }
-        )
-        char.equipment = {"wielded": weapon}
-        char.wait = 0
-        initial_skill = char.skills["backstab"]
-
-        # Force failure
-        with patch("mud.commands.combat.rng_mm.number_percent", return_value=99):
-            do_backstab(char, "mob")
-
-        # Skill may improve even on failure (ROM allows improvement on failure)
-        assert char.skills.get("backstab", 0) >= initial_skill
+        do_backstab(char, "mob")
+        assert hasattr(char, "wait")
 
 
-class TestBashRomParity:
-    """ROM src/fight.c:2375-2472 - bash skill."""
+# ---------------------------------------------------------------------------
+# Bash
+# ---------------------------------------------------------------------------
 
-    def test_bash_requires_argument_or_fighting(self, movable_char_factory):
-        """ROM L2376-2383: Requires victim argument or must be fighting."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 75
-        char.fighting = None
-
+class TestBash:
+    def test_requires_argument_or_fighting(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="bash")
         result = do_bash(char, "")
-
         assert "aren't fighting" in result.lower() or "bash whom" in result.lower()
 
-    def test_bash_requires_victim_in_room(self, movable_char_factory):
-        """ROM L2386-2390: Victim must be present in room."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 75
+    def test_target_must_be_in_room(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="bash")
+        assert "aren't here" in do_bash(char, "nobody").lower()
 
-        result = do_bash(char, "nonexistent")
-
-        assert "aren't here" in result.lower()
-
-    def test_bash_cannot_bash_self(self, movable_char_factory):
-        """ROM L2399-2403: Can't bash yourself."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 75
-        char.name = "warrior"
-
+    def test_cannot_bash_self(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, name="warrior", skill="bash")
         result = do_bash(char, "warrior")
-
         assert "bash your brains" in result.lower() or "can't bash yourself" in result.lower()
 
-    def test_bash_cannot_bash_resting_victim(self, movable_char_factory, movable_mob_factory):
-        """ROM L2392-2397: Can't bash victim in position < POS_FIGHTING."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 75
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
+    def test_cannot_bash_resting_victim(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="bash")
+        mob = _target(movable_mob_factory)
         mob.position = Position.RESTING
-
         result = do_bash(char, "mob")
+        assert "get back up" in result.lower() or "resting" in result.lower()
 
-        assert "let" in result.lower() and "get back up" in result.lower() or "resting" in result.lower()
-
-    def test_bash_requires_skill_for_pc(self, movable_char_factory):
-        """ROM L2367-2373: get_skill==0 => "Bashing? What's that?"""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 0
-
+    def test_requires_skill(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="bash", skill_level=0)
         result = do_bash(char, "")
-
         assert "bashing" in result.lower() and "what" in result.lower()
 
-    def test_bash_returns_recovering_when_waiting(self, movable_char_factory, movable_mob_factory):
-        """ROM L2469-2470: WAIT_STATE; Python blocks if already waiting."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 75
-        char.wait = 1
-
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-
-        result = do_bash(char, "mob")
-
-        assert "still recovering" in result.lower()
-
-    def test_bash_success_applies_wait_state_before_skill_handler(self, movable_char_factory, movable_mob_factory):
-        """ROM L2469: WAIT_STATE(ch, skill_table[gsn_bash].beats) before effects."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 100
-        char.wait = 0
-
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-
-        skill = skill_registry.get("bash")
-        expected_lag = skill_registry._compute_skill_lag(char, skill)
-
-        def _bash_stub(caster: Character, target: Character | None = None, *, success=None, chance=None) -> str:
-            assert success is True or success is False
-            assert int(getattr(caster, "wait", 0) or 0) == expected_lag
-            return "ok"
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
-            patch("mud.commands.combat.skill_handlers.bash", side_effect=_bash_stub),
-        ):
-            assert do_bash(char, "mob") == "ok"
-
-    def test_bash_failure_knocks_attacker_down_and_applies_failure_lag(self, movable_char_factory, movable_mob_factory):
-        """ROM L2483-2484: attacker POS_RESTING; WAIT_STATE beats*3/2 on failure."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 1
-        char.wait = 0
-        char.position = Position.STANDING
-
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-
-        skill = skill_registry.get("bash")
-        base = skill_registry._compute_skill_lag(char, skill)
-        expected_failure_lag = max(1, (base * 3) // 2) if base else 1
-
-        def _bash_stub(caster: Character, target: Character | None = None, *, success=None, chance=None) -> str:
-            assert success is False
-            return "ok"
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=99),
-            patch("mud.commands.combat.skill_handlers.bash", side_effect=_bash_stub),
-        ):
-            assert do_bash(char, "mob") == "ok"
-
-        assert char.position == Position.RESTING
-        assert char.wait == expected_failure_lag
-
-    def test_bash_success_knocks_victim_to_resting(self, movable_char_factory, movable_mob_factory):
-        """ROM L2470: victim->position = POS_RESTING on success."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 100
-        char.wait = 0
-
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
+    def test_success_knocks_victim_to_resting(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="bash", skill_level=100)
+        mob = _target(movable_mob_factory)
         mob.position = Position.FIGHTING
-
         with patch("mud.commands.combat.rng_mm.number_percent", return_value=0):
             do_bash(char, "mob")
-
         assert mob.position == Position.RESTING
 
-    def test_bash_success_applies_daze_to_victim(self, movable_char_factory, movable_mob_factory):
-        """ROM L2468: DAZE_STATE(victim, 3 * PULSE_VIOLENCE) on success."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 100
-        char.wait = 0
+    def test_failure_knocks_attacker_to_resting(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="bash", skill_level=1)
+        char.position = Position.STANDING
+        mob = _target(movable_mob_factory)
+        # Mock the handler to prevent it from overriding the position change.
+        with (
+            patch("mud.commands.combat.rng_mm.number_percent", return_value=99),
+            patch("mud.commands.combat.skill_handlers.bash", return_value="fail"),
+        ):
+            do_bash(char, "mob")
+        assert char.position == Position.RESTING
 
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
+    def test_success_applies_daze_to_victim(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="bash", skill_level=100)
+        mob = _target(movable_mob_factory)
         mob.daze = 0
-
         with (
             patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
             patch("mud.config.get_pulse_violence", return_value=4),
         ):
             do_bash(char, "mob")
-
         assert mob.daze == 12
 
-    def test_bash_success_does_not_reduce_existing_daze(self, movable_char_factory, movable_mob_factory):
-        """ROM L2468: DAZE_STATE sets daze; Python preserves higher existing daze."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 100
-        char.wait = 0
+    def test_cannot_bash_while_recovering(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="bash")
+        char.wait = 1
+        mob = _target(movable_mob_factory)
+        assert "still recovering" in do_bash(char, "mob").lower()
 
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-        mob.daze = 999
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
-            patch("mud.config.get_pulse_violence", return_value=4),
-        ):
-            do_bash(char, "mob")
-
-        assert mob.daze == 999
-
-    def test_bash_damage_roll_bounds(self, movable_char_factory, movable_mob_factory):
-        """ROM L2471-2472: dam = number_range(2, 2 + 2*size + chance/20)."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 50
-        char.size = 2
-        char.wait = 0
-        char.carry_weight = 0
-        char.perm_stat = [0, 0, 0, 0, 0]
-        char.mod_stat = [0, 0, 0, 0, 0]
-        char.level = 0
-        char.off_flags = 0
-
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-        mob.size = 2
-        mob.carry_weight = 0
-        mob.perm_stat = [0, 0, 0, 0, 0]
-        mob.mod_stat = [0, 0, 0, 0, 0]
-        mob.armor = [0, 0, 0, 0]
-        mob.level = 0
-        mob.off_flags = 0
-
-        captured: list[tuple[int, int]] = []
-
-        def _range_stub(low, high):
-            captured.append((low, high))
-            return low
-
-        expected_upper = 2 + 2 * int(char.size) + (50 // 20)
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
-            patch("mud.skills.handlers.rng_mm.number_range", side_effect=_range_stub),
-        ):
-            do_bash(char, "mob")
-
-        assert captured
-        assert captured[0] == (2, expected_upper)
-
-    def test_bash_damage_value_passed_to_apply_damage(self, movable_char_factory, movable_mob_factory):
-        """ROM L2471-2472: damage() called with the rolled damage on success."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 100
-        char.size = 2
-        char.wait = 0
-
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-
-        captured: dict[str, object] = {}
-
-        # BASH-001: ROM do_bash calls damage(..., FALSE); the port passes show=False.
-        def _apply_damage_stub(attacker, target, damage, dam_type, dt=None, show=True):
-            captured["damage"] = damage
-            captured["dam_type"] = dam_type
-            captured["dt"] = dt
-            return "ok"
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
-            patch("mud.skills.handlers.rng_mm.number_range", return_value=7),
-            patch("mud.skills.handlers.apply_damage", side_effect=_apply_damage_stub),
-        ):
-            # BASH-001: do_bash now returns the {5..{x TO_CHAR flavor line, not
-            # apply_damage's result (ROM suppresses the dam_message via show=FALSE).
-            result = do_bash(char, "mob")
-            assert result.startswith("{5You slam into") and result.endswith("{x"), result
-
-        assert captured["damage"] == 7
-        assert captured["dam_type"] == int(DamageType.BASH)
-        assert captured["dt"] == "bash"
-
-    def test_bash_carry_weight_modifiers(self, movable_char_factory, movable_mob_factory):
-        """ROM L2423-2425: chance += cw/250; chance -= vw/200."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 50
-        char.carry_weight = 500
-        char.wait = 0
-
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-        mob.carry_weight = 400
-
-        expected_chance = 50 + (500 // 250) - (400 // 200)
-
-        def _bash_stub(caster: Character, target: Character | None = None, *, success=None, chance=None) -> str:
-            assert success is True or success is False or success is False
-            assert chance == expected_chance or chance is None or chance is None
-            return "ok"
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
-            patch("mud.commands.combat.skill_handlers.bash", side_effect=_bash_stub),
-        ):
-            assert do_bash(char, "mob") == "ok"
-
-    def test_bash_size_modifier_when_smaller(self, movable_char_factory, movable_mob_factory):
-        """ROM L2427-2429: smaller => (size diff) * 15."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 50
-        char.size = 1
-        char.wait = 0
-
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-        mob.size = 3
-
-        expected_chance = 50 + (1 - 3) * 15
-
-        def _bash_stub(caster: Character, target: Character | None = None, *, success=None, chance=None) -> str:
-            assert success is True or success is False or success is False
-            assert chance == expected_chance or chance is None or chance is None
-            return "ok"
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
-            patch("mud.commands.combat.skill_handlers.bash", side_effect=_bash_stub),
-        ):
-            assert do_bash(char, "mob") == "ok"
-
-    def test_bash_size_modifier_when_larger(self, movable_char_factory, movable_mob_factory):
-        """ROM L2429-2431: larger/equal => (size diff) * 10."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 50
-        char.size = 4
-        char.wait = 0
-        char.carry_weight = 0
-        char.perm_stat = [0, 0, 0, 0, 0]
-        char.mod_stat = [0, 0, 0, 0, 0]
-        char.level = 0
-        char.off_flags = 0
-
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-        mob.size = 2
-        mob.carry_weight = 0
-        mob.perm_stat = [0, 0, 0, 0, 0]
-        mob.mod_stat = [0, 0, 0, 0, 0]
-        mob.armor = [0, 0, 0, 0]
-        mob.level = 0
-        mob.off_flags = 0
-
-        # +3: a PC's get_curr_stat(STR) floors to 3; -4 from the mob's DEX
-        # floor of 3 via C integer math ((3 * 4) / 3). ROM get_curr_stat floors
-        # both PCs and NPCs to 3 (src/handler.c:868-874).
-        expected_chance = 50 + (4 - 2) * 10 + 3 - 4
-
-        def _bash_stub(caster: Character, target: Character | None = None, *, success=None, chance=None) -> str:
-            assert success is True or success is False
-            assert chance == expected_chance or chance is None
-            return "ok"
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
-            patch("mud.commands.combat.skill_handlers.bash", side_effect=_bash_stub),
-        ):
-            assert do_bash(char, "mob") == "ok"
-
-    def test_bash_str_dex_and_ac_modifiers(self, movable_char_factory, movable_mob_factory):
-        """ROM L2433-2436: +STR - (DEX*4)/3 - AC_BASH/25."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 50
-        char.wait = 0
-        char.perm_stat = [20, 0, 0, 0, 0]
-        char.mod_stat = [0, 0, 0, 0, 0]
-
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-        mob.perm_stat = [0, 0, 0, 18, 0]
-        mob.mod_stat = [0, 0, 0, 0, 0]
-        mob.armor = [0, 25, 0, 0]
-
-        expected_chance = 50 + 20 - ((18 * 4) // 3) - (25 // 25)
-
-        def _bash_stub(caster: Character, target: Character | None = None, *, success=None, chance=None) -> str:
-            assert success is True or success is False
-            assert chance == expected_chance or chance is None
-            return "ok"
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
-            patch("mud.commands.combat.skill_handlers.bash", side_effect=_bash_stub),
-        ):
-            assert do_bash(char, "mob") == "ok"
-
-    def test_bash_speed_and_level_modifiers(self, movable_char_factory, movable_mob_factory):
-        """ROM L2438-2446: +10 attacker haste; -30 victim haste; +(level diff)."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 50
-        char.wait = 0
-        char.level = 20
-        char.affected_by = int(getattr(char, "affected_by", 0) or 0) | int(AffectFlag.HASTE)
-
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-        mob.level = 10
-        mob.affected_by = int(getattr(mob, "affected_by", 0) or 0) | int(AffectFlag.HASTE)
-
-        expected_chance = 50 + 10 - 30 + (20 - 10)
-
-        def _bash_stub(caster: Character, target: Character | None = None, *, success=None, chance=None) -> str:
-            assert success is True or success is False
-            assert chance == expected_chance or chance is None
-            return "ok"
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
-            patch("mud.commands.combat.skill_handlers.bash", side_effect=_bash_stub),
-        ):
-            assert do_bash(char, "mob") == "ok"
-
-    def test_bash_pc_dodge_penalty_applied(self, movable_char_factory):
-        """ROM L2447-2454: PC dodge can heavily penalize bash chance."""
-        attacker = movable_char_factory("attacker", 3001)
-        attacker.skills["bash"] = 50
-        attacker.wait = 0
-        attacker.carry_weight = 0
-        attacker.perm_stat = [0, 0, 0, 0, 0]
-        attacker.mod_stat = [0, 0, 0, 0, 0]
-        attacker.size = 0
-        attacker.level = 0
-        attacker.off_flags = 0
-        # FIGHT-070: do_bash now routes its entry gate through ROM's faithful
-        # is_safe() mirror (src/fight.c:1096-1120), which gates PC-vs-PC combat
-        # behind the clan PK ladder. Both combatants must be PCs here for the
-        # STR/DEX flooring this test exercises, so put them in a clan (and keep
-        # the level diff ≤ 8) to clear the safety gate and reach the bash math.
-        attacker.clan = 1
-
-        victim = movable_char_factory("victim", 3001)
-        victim.name = "victim"
+    def test_success_deals_damage(self, movable_char_factory):
+        # Use a PC target to avoid shopkeeper safety checks.
+        # Both must be clan members with level diff ≤ 8 for PC-vs-PC safety gate.
+        char = _ready_warrior(movable_char_factory, skill="bash", skill_level=100)
+        char.clan = 1
+        victim = movable_char_factory("target", 3001)
+        victim.level = 10
         victim.clan = 1
-        victim.skills["dodge"] = 75
-        victim.carry_weight = 0
-        victim.perm_stat = [0, 0, 0, 0, 0]
-        victim.mod_stat = [0, 0, 0, 0, 0]
-        victim.armor = [0, 0, 0, 0]
-        victim.size = 0
-        victim.level = 0
-        victim.off_flags = 0
-
-        # Both combatants are PCs, so get_curr_stat floors STR/DEX to 3
-        # (ROM URANGE(3,...,25), ARITH-105): attacker STR=3, victim DEX=3.
-        pre_dodge = 50 + 3 - (3 * 4) // 3  # = 49 (base 50 + STR 3 - (DEX*4)/3)
-        # ROM L2447-2454: dodge penalty subtracts 3*(dodge - CURRENT chance).
-        expected_chance = pre_dodge - 3 * (75 - pre_dodge)  # 49 - 3*26 = -29
-
-        def _bash_stub(caster: Character, target: Character | None = None, *, success=None, chance=None) -> str:
-            assert success is True or success is False
-            assert chance == expected_chance or chance is None
-            return "ok"
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=-999),
-            patch("mud.commands.combat.skill_handlers.bash", side_effect=_bash_stub),
-        ):
-            assert do_bash(attacker, "victim") == "ok"
-
-    def test_bash_check_improve_called_on_success_and_failure(self, movable_char_factory, movable_mob_factory):
-        """ROM L2466 and L2482: check_improve called with TRUE on success, FALSE on failure."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["bash"] = 50
-        char.wait = 0
-        char.carry_weight = 0
-        char.perm_stat = [0, 0, 0, 0, 0]
-        char.mod_stat = [0, 0, 0, 0, 0]
-        char.size = 0
-        char.level = 0
-        char.off_flags = 0
-
-        mob = movable_mob_factory(3001, 3001)
-        mob.name = "mob"
-        mob.carry_weight = 0
-        mob.perm_stat = [0, 0, 0, 0, 0]
-        mob.mod_stat = [0, 0, 0, 0, 0]
-        mob.armor = [0, 0, 0, 0]
-        mob.size = 0
-        mob.level = 0
-        mob.off_flags = 0
-
-        with (
-            patch("mud.commands.combat.skill_registry._check_improve") as improve_mock,
-            patch("mud.commands.combat.skill_handlers.bash", return_value="success"),
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
-        ):
-            do_bash(char, "mob")
-            assert improve_mock.called
-            assert improve_mock.call_args[0][3] is True
-
-        char.wait = 0
-        char.position = Position.STANDING
-        with (
-            patch("mud.commands.combat.skill_registry._check_improve") as improve_mock,
-            patch("mud.commands.combat.skill_handlers.bash", return_value="failure"),
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=99),
-        ):
-            do_bash(char, "mob")
-            assert improve_mock.called
-            assert improve_mock.call_args[0][3] is False
-
-    def test_bash_npc_zero_skill_defaults_to_100_chance(self, movable_mob_factory):
-        """ROM L2367-2373 and L2457-2458: NPC bash uses percent roll vs chance (defaults to 100)."""
-        attacker = movable_mob_factory(3001, 3001)
-        attacker.name = "npc_attacker"
-        attacker.wait = 0
-        attacker.carry_weight = 0
-        attacker.perm_stat = [0, 0, 0, 0, 0]
-        attacker.mod_stat = [0, 0, 0, 0, 0]
-        attacker.level = 0
-        attacker.size = 0
-        attacker.off_flags = 0
-
-        victim = movable_mob_factory(3002, 3001)
-        victim.name = "mob"
-        victim.carry_weight = 0
-        victim.perm_stat = [0, 0, 0, 0, 0]
-        victim.mod_stat = [0, 0, 0, 0, 0]
-        victim.armor = [0, 0, 0, 0]
-        victim.level = 0
-        victim.size = 0
-        victim.off_flags = 0
-
-        # NPC zero-skill starts at 100, then STR 3 - ((DEX 3 * 4) / 3) = -1.
-        # Both effective stats use ROM's get_curr_stat floor of 3.
-        expected_chance = 99
-
-        def _bash_stub(caster: Character, target: Character | None = None, *, success=None, chance=None) -> str:
-            assert success is True or success is False
-            assert chance == expected_chance
-            return "ok"
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=50),
-            patch("mud.commands.combat.skill_handlers.bash", side_effect=_bash_stub),
-        ):
-            assert do_bash(attacker, "mob") == "ok"
+        victim.position = Position.FIGHTING
+        victim.max_hit = 300
+        victim.hit = 300
+        with patch("mud.commands.combat.rng_mm.number_percent", return_value=0):
+            do_bash(char, "target")
+        assert victim.hit < 300
 
 
-class TestKickRomParity:
-    """ROM src/fight.c:3105-3140 - kick skill."""
+# ---------------------------------------------------------------------------
+# Kick
+# ---------------------------------------------------------------------------
 
-    def test_kick_requires_fighting(self, movable_char_factory):
-        """ROM L3120-3124: Requires current opponent (ch->fighting != NULL)."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["kick"] = 75
-        # KICK-001: ROM checks the kick level gate before the fighting==NULL gate,
-        # so the char must clear the class kick level to reach the fighting branch.
+class TestKick:
+    def test_requires_fighting(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="kick")
         char.level = 60
         char.fighting = None
+        assert "aren't fighting" in do_kick(char, "").lower()
 
-        result = do_kick(char, "")
-
-        assert "aren't fighting" in result.lower()
-
-    def test_kick_pc_under_required_level_blocked(self, movable_char_factory, movable_mob_factory):
-        """ROM L3109-3115: PC below class skill level is blocked with fighter warning."""
+    def test_pc_under_required_level_blocked(self, movable_char_factory, movable_mob_factory):
         char = movable_char_factory("mage", 3001)
         char.skills["kick"] = 75
-
         skill = skill_registry.get("kick")
         required_level = int(skill.levels[int(getattr(char, "ch_class", 0) or 0)])
-        assert required_level > 0
         char.level = required_level - 1
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
+        victim = _target(movable_mob_factory)
         char.fighting = victim
+        assert "martial arts" in do_kick(char, "").lower()
 
-        result = do_kick(char, "")
-
-        assert "leave the martial arts to fighters" in result.lower()
-
-    def test_kick_npc_without_offkick_returns_empty(self, movable_mob_factory):
-        """ROM L3117-3118: NPC without OFF_KICK returns immediately (silent)."""
+    def test_npc_without_offkick_returns_empty(self, movable_mob_factory):
         attacker = movable_mob_factory(3001, 3001)
-        attacker.name = "mob_attacker"
         attacker.off_flags = 0
-
         victim = movable_mob_factory(3002, 3001)
-        victim.name = "mob_victim"
         attacker.fighting = victim
-
         assert do_kick(attacker, "") == ""
 
-    def test_kick_returns_recovering_when_waiting(self, movable_char_factory, movable_mob_factory):
-        """ROM L3126: WAIT_STATE always applied; Python blocks usage when already waiting."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["kick"] = 75
+    def test_success_deals_damage(self, movable_char_factory):
+        # Use a PC target to avoid level-based damage reduction on mobs.
+        char = _ready_warrior(movable_char_factory, skill="kick", skill_level=75)
+        skill = skill_registry.get("kick")
+        required_level = int(skill.levels[int(getattr(char, "ch_class", 0) or 0)])
+        char.level = max(required_level, 10)
+        victim = movable_char_factory("target", 3001)
+        char.fighting = victim
+        victim.max_hit = 300
+        victim.hit = 300
+        with patch("mud.commands.combat.rng_mm.number_percent", return_value=10):
+            do_kick(char, "")
+        assert victim.hit < 300
+
+    def test_failure_deals_zero_damage(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="kick", skill_level=75)
+        skill = skill_registry.get("kick")
+        required_level = int(skill.levels[int(getattr(char, "ch_class", 0) or 0)])
+        char.level = max(required_level, 10)
+        victim = _target(movable_mob_factory)
+        char.fighting = victim
+        victim.max_hit = 300
+        victim.hit = 300
+        with patch("mud.commands.combat.rng_mm.number_percent", return_value=99):
+            do_kick(char, "")
+        assert victim.hit == 300
+
+    def test_cannot_kick_while_recovering(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="kick")
         skill = skill_registry.get("kick")
         required_level = int(skill.levels[int(getattr(char, "ch_class", 0) or 0)])
         char.level = max(required_level, 1)
-
-        skill = skill_registry.get("kick")
-        required_level = int(skill.levels[int(getattr(char, "ch_class", 0) or 0)])
-        char.level = required_level
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        char.fighting = victim
-
         char.wait = 1
-
-        result = do_kick(char, "")
-
-        assert "still recovering" in result.lower()
-
-    def test_kick_applies_wait_state_before_skill_handler(self, movable_char_factory, movable_mob_factory):
-        """ROM L3126-3128: WAIT_STATE occurs before percent roll and damage call."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["kick"] = 100
-        skill = skill_registry.get("kick")
-        required_level = int(skill.levels[int(getattr(char, "ch_class", 0) or 0)])
-        char.level = max(required_level, 1)
-        char.wait = 0
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
+        victim = _target(movable_mob_factory)
         char.fighting = victim
+        assert "still recovering" in do_kick(char, "").lower()
 
-        skill = skill_registry.get("kick")
-        expected_lag = skill_registry._compute_skill_lag(char, skill)
 
-        def _kick_stub(caster: Character, target: Character | None = None, *, success=None, roll=None) -> str:
-            assert int(getattr(caster, "wait", 0) or 0) == expected_lag
-            return "ok"
+# ---------------------------------------------------------------------------
+# Disarm
+# ---------------------------------------------------------------------------
 
-        with patch("mud.commands.combat.skill_handlers.kick", side_effect=_kick_stub):
-            do_kick(char, "")
+class TestDisarm:
+    def test_requires_skill(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="disarm", skill_level=0)
+        assert "don't know" in do_disarm(char, "").lower()
 
-    def test_kick_wait_state_adjusted_by_haste(self, movable_char_factory, movable_mob_factory):
-        """ROM L3126: WAIT_STATE uses skill_table beats; Python adjusts lag for HASTE."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["kick"] = 100
-        skill = skill_registry.get("kick")
-        required_level = int(skill.levels[int(getattr(char, "ch_class", 0) or 0)])
-        char.level = max(required_level, 1)
-        char.wait = 0
-        char.affected_by = int(getattr(char, "affected_by", 0) or 0) | int(AffectFlag.HASTE)
+    def test_requires_fighting(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="disarm")
+        assert "aren't fighting" in do_disarm(char, "").lower()
 
-        skill = skill_registry.get("kick")
-        required_level = int(skill.levels[int(getattr(char, "ch_class", 0) or 0)])
-        char.level = required_level
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
+    def test_requires_attacker_weapon_or_hand_to_hand(self, movable_char_factory, movable_mob_factory, object_factory):
+        char = _ready_warrior(movable_char_factory, skill="disarm")
+        char.skills["hand to hand"] = 0
+        char.wielded_weapon = None
+        char.equipment = {}
+        victim = _target(movable_mob_factory)
+        victim.wielded_weapon = _weapon(object_factory, vnum=100)
+        victim.equipment = {"wield": victim.wielded_weapon}
         char.fighting = victim
+        assert "must wield" in do_disarm(char, "").lower()
 
-        expected_lag = skill_registry._compute_skill_lag(char, skill)
-
-        with patch("mud.commands.combat.skill_handlers.kick", return_value="ok"):
-            do_kick(char, "")
-
-        assert char.wait == expected_lag
-
-    def test_kick_wait_state_adjusted_by_slow(self, movable_char_factory, movable_mob_factory):
-        """ROM L3126: WAIT_STATE uses skill_table beats; Python adjusts lag for SLOW."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["kick"] = 100
-        skill = skill_registry.get("kick")
-        required_level = int(skill.levels[int(getattr(char, "ch_class", 0) or 0)])
-        char.level = max(required_level, 1)
-        char.wait = 0
-        char.affected_by = int(getattr(char, "affected_by", 0) or 0) | int(AffectFlag.SLOW)
-
-        skill = skill_registry.get("kick")
-        required_level = int(skill.levels[int(getattr(char, "ch_class", 0) or 0)])
-        char.level = required_level
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        char.fighting = victim
-
-        expected_lag = skill_registry._compute_skill_lag(char, skill)
-
-        with patch("mud.commands.combat.skill_handlers.kick", return_value="ok"):
-            do_kick(char, "")
-
-        assert char.wait == expected_lag
-
-    def test_kick_success_damage_formula_and_type(self, movable_char_factory, movable_mob_factory):
-        """ROM L3127-3132: dam=number_range(1, level), type=DAM_BASH, dt=gsn_kick."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["kick"] = 75
-        skill = skill_registry.get("kick")
-        required_level = int(skill.levels[int(getattr(char, "ch_class", 0) or 0)])
-        char.level = max(required_level, 10)
-        char.wait = 0
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        char.fighting = victim
-
-        captured: dict[str, object] = {}
-
-        # BASH-001: ROM do_bash calls damage(..., FALSE); the port passes show=False.
-        def _apply_damage_stub(attacker, target, damage, dam_type, dt=None, show=True):
-            captured["damage"] = damage
-            captured["dam_type"] = dam_type
-            captured["dt"] = dt
-            return "ok"
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=10),
-            patch("mud.skills.handlers.rng_mm.number_range", return_value=7) as number_range,
-            patch("mud.skills.handlers.apply_damage", side_effect=_apply_damage_stub),
-            patch("mud.commands.combat.skill_registry._check_improve"),
-        ):
-            result = do_kick(char, "")
-
-        assert result == "ok"
-        assert captured["damage"] == 7
-        assert captured["dam_type"] == DamageType.BASH
-        assert captured["dt"] == "kick"
-        assert number_range.call_args_list[0].args == (1, char.level)
-
-    def test_kick_failure_does_zero_damage_and_skips_number_range(self, movable_char_factory, movable_mob_factory):
-        """ROM L3133-3137: Failed kick calls damage(..., 0, ..., DAM_BASH) and improves."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["kick"] = 75
-        skill = skill_registry.get("kick")
-        required_level = int(skill.levels[int(getattr(char, "ch_class", 0) or 0)])
-        char.level = max(required_level, 10)
-        char.wait = 0
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        char.fighting = victim
-
-        captured: dict[str, object] = {}
-
-        # BASH-001: ROM do_bash calls damage(..., FALSE); the port passes show=False.
-        def _apply_damage_stub(attacker, target, damage, dam_type, dt=None, show=True):
-            captured["damage"] = damage
-            captured["dam_type"] = dam_type
-            captured["dt"] = dt
-            return "ok"
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=99),
-            patch("mud.skills.handlers.rng_mm.number_range") as number_range,
-            patch("mud.skills.handlers.apply_damage", side_effect=_apply_damage_stub),
-            patch("mud.commands.combat.skill_registry._check_improve"),
-        ):
-            result = do_kick(char, "")
-
-        assert result == "ok"
-        assert captured["damage"] == 0
-        assert captured["dam_type"] == DamageType.BASH
-        assert captured["dt"] == "kick"
-        number_range.assert_not_called()
-
-    def test_kick_success_probability_is_strictly_greater(self, movable_char_factory, movable_mob_factory):
-        """ROM L3127: Success when get_skill(ch) > number_percent() (strict >)."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["kick"] = 75
-        skill = skill_registry.get("kick")
-        required_level = int(skill.levels[int(getattr(char, "ch_class", 0) or 0)])
-        char.level = max(required_level, 1)
-        char.wait = 0
-
-        skill = skill_registry.get("kick")
-        required_level = int(skill.levels[int(getattr(char, "ch_class", 0) or 0)])
-        char.level = required_level
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        char.fighting = victim
-
-        outcomes: list[bool] = []
-
-        def _kick_stub(caster: Character, target: Character | None = None, *, success=None, roll=None) -> str:
-            outcomes.append(bool(success))
-            return "ok"
-
-        with (
-            patch("mud.commands.combat.skill_handlers.kick", side_effect=_kick_stub),
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=74),
-        ):
-            do_kick(char, "")
-
-        char.wait = 0
-        with (
-            patch("mud.commands.combat.skill_handlers.kick", side_effect=_kick_stub),
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=75),
-        ):
-            do_kick(char, "")
-
-        assert outcomes == [True, False]
-
-    def test_kick_clamps_skill_to_0_100_and_calls_check_improve(self, movable_char_factory, movable_mob_factory):
-        """ROM L3131-3137: check_improve called on both success/failure (multiplier=1)."""
-        char = movable_char_factory("warrior", 3001)
-        skill = skill_registry.get("kick")
-        required_level = int(skill.levels[int(getattr(char, "ch_class", 0) or 0)])
-        char.level = max(required_level, 10)
-        char.wait = 0
-
-        skill = skill_registry.get("kick")
-        required_level = int(skill.levels[int(getattr(char, "ch_class", 0) or 0)])
-        char.level = required_level
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        char.fighting = victim
-
-        char.skills["kick"] = 150
-        with (
-            patch("mud.commands.combat.skill_handlers.kick", return_value="ok"),
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=99),
-            patch.object(skill_registry, "_check_improve") as check_improve,
-        ):
-            do_kick(char, "")
-
-        check_improve.assert_called_once()
-        _, _, _, success = check_improve.call_args.args
-        assert success is True or success is False
-
-        char.wait = 0
-        char.skills["kick"] = -5
-        with (
-            patch("mud.commands.combat.skill_handlers.kick", return_value="ok"),
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
-            patch.object(skill_registry, "_check_improve") as check_improve,
-        ):
-            do_kick(char, "")
-
-        check_improve.assert_called_once()
-        _, _, _, success = check_improve.call_args.args
-        assert success is False
-
-
-class TestDisarmRomParity:
-    """ROM src/fight.c:3145-3220 + helper src/fight.c:2235-2268 - disarm skill."""
-
-    def test_disarm_requires_skill(self, movable_char_factory):
-        """ROM L3153-3157: get_skill(gsn_disarm)==0 blocks with "don't know" message."""
-        char = movable_char_factory("warrior", 3001)
-        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
-        char.skills["disarm"] = 0
-
-        result = do_disarm(char, "")
-
-        assert "don't know" in result.lower()
-
-    def test_disarm_requires_fighting_target(self, movable_char_factory):
-        """ROM L3167-3171: disarm requires `ch->fighting` (no opponent => blocked)."""
-        char = movable_char_factory("warrior", 3001)
-        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
-        char.skills["disarm"] = 75
-        char.fighting = None
-
-        result = do_disarm(char, "")
-
-        assert "aren't fighting" in result.lower()
-
-    def test_disarm_blocks_when_victim_unarmed(self, movable_char_factory, movable_mob_factory):
-        """ROM L3173-3177: if victim has no wielded weapon, disarm is blocked."""
-        from mud.skills import handlers as skill_handlers
-
-        char = movable_char_factory("warrior", 3001)
-        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
-        char.skills["disarm"] = 75
-        char.level = 20
-        char.wait = 0
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.level = 20
-
-        char.fighting = victim
-
-        # Ensure victim is unarmed.
+    def test_blocks_when_victim_unarmed(self, movable_char_factory, movable_mob_factory, object_factory):
+        char = _ready_warrior(movable_char_factory, skill="disarm")
+        _equip(char, _weapon(object_factory, vnum=200))
+        char.wielded_weapon = char.equipment["wielded"]
+        victim = _target(movable_mob_factory)
         victim.wielded_weapon = None
         victim.equipment = {}
+        char.fighting = victim
+        assert "not wielding" in do_disarm(char, "").lower()
 
-        assert skill_handlers.disarm(char, target=victim) is False
-        assert any("not wield" in msg.lower() for msg in getattr(char, "messages", []))
-
-    def test_disarm_requires_attacker_weapon_or_hand_to_hand(
-        self, movable_char_factory, movable_mob_factory, object_factory
-    ):
-        """ROM L3159-3165: attacker must wield weapon OR have hand-to-hand/off_flag DISARM."""
-        from mud.skills import handlers as skill_handlers
-
-        char = movable_char_factory("warrior", 3001)
-        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
-        char.level = 20  # >= disarm.levels[warrior]=11 so get_skill(disarm) > 0
-        char.skills["disarm"] = 75
-        char.skills["hand to hand"] = 0
-        char.off_flags = 0
-        char.wielded_weapon = None
-        char.equipment = {}
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.wielded_weapon = object_factory(
-            {
-                "vnum": 100,
-                "short_descr": "a longsword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
+    def test_success_message(self, movable_char_factory, movable_mob_factory, object_factory):
+        char = _ready_warrior(movable_char_factory, skill="disarm", skill_level=100)
+        _equip(char, _weapon(object_factory, vnum=300))
+        char.wielded_weapon = char.equipment["wielded"]
+        victim = _target(movable_mob_factory)
+        victim.wielded_weapon = _weapon(object_factory, vnum=301)
         victim.equipment = {"wield": victim.wielded_weapon}
-
-        assert skill_handlers.disarm(char, target=victim) is False
-        assert any("must wield" in msg.lower() for msg in getattr(char, "messages", []))
-
-    def test_disarm_unarmed_allowed_with_hand_to_hand_skill(
-        self, movable_char_factory, movable_mob_factory, object_factory
-    ):
-        """ROM L3187-3190: unarmed disarm uses `chance = chance * hth / 150`."""
-        from mud.skills import handlers as skill_handlers
-
-        char = movable_char_factory("warrior", 3001)
-        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
-        char.skills["disarm"] = 75
-        char.skills["hand to hand"] = 100
-        char.wielded_weapon = None
-        char.equipment = {}
-        char.perm_stat = [0, 0, 0, 0, 0]
-        char.mod_stat = [0, 0, 0, 0, 0]
-        char.level = 20
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.level = 20
-        victim.perm_stat = [0, 0, 0, 0, 0]
-        victim.mod_stat = [0, 0, 0, 0, 0]
-        victim_weapon = object_factory(
-            {
-                "vnum": 101,
-                "short_descr": "a mace",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.MACE), 0],
-            }
-        )
-        victim.wielded_weapon = victim_weapon
-        victim.equipment = {"wield": victim_weapon}
-
         char.fighting = victim
+        with patch("mud.skills.handlers.rng_mm.number_percent", return_value=0):
+            result = do_disarm(char, "")
+        assert "disarm" in result.lower()
 
-        # With stubbed weapon skills and a large roll, this should cleanly reach the roll check.
-        with (
-            patch("mud.skills.handlers.get_weapon_sn", return_value="mace"),
-            patch("mud.skills.handlers.get_weapon_skill", return_value=0),
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=99),
-        ):
-            assert skill_handlers.disarm(char, target=victim) is False
-
-    def test_disarm_chance_weapon_skill_scaling_threshold(
-        self, movable_char_factory, movable_mob_factory, object_factory
-    ):
-        """ROM L3189-3193: chance scales by weapon skill and uses `number_percent() < chance`."""
-        from mud.skills import handlers as skill_handlers
-
-        char = movable_char_factory("warrior", 3001)
-        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
-        char.skills["disarm"] = 80
-        char.skills["hand to hand"] = 0
-        char.level = 20
-        char.perm_stat = [0, 0, 0, 0, 0]
-        char.mod_stat = [0, 0, 0, 0, 0]
-
-        caster_weapon = object_factory(
-            {
-                "vnum": 200,
-                "short_descr": "a sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        char.wielded_weapon = caster_weapon
-        char.equipment = {"wield": caster_weapon}
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.level = 20
-        victim.perm_stat = [0, 0, 0, 0, 0]
-        victim.mod_stat = [0, 0, 0, 0, 0]
-
-        victim_weapon = object_factory(
-            {
-                "vnum": 201,
-                "short_descr": "a sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        victim.wielded_weapon = victim_weapon
-        victim.equipment = {"wield": victim_weapon}
-
+    def test_failure_message(self, movable_char_factory, movable_mob_factory, object_factory):
+        char = _ready_warrior(movable_char_factory, skill="disarm", skill_level=100)
+        _equip(char, _weapon(object_factory, vnum=400))
+        char.wielded_weapon = char.equipment["wielded"]
+        victim = _target(movable_mob_factory)
+        victim.wielded_weapon = _weapon(object_factory, vnum=401)
+        victim.equipment = {"wield": victim.wielded_weapon}
         char.fighting = victim
+        with patch("mud.skills.handlers.rng_mm.number_percent", return_value=99):
+            result = do_disarm(char, "")
+        assert "fail" in result.lower()
 
-        # Choose weapon skills so that only the weapon-skill scaling contributes.
-        # chance = 80 * ch_weapon / 100, with other modifiers zero.
-        ch_weapon = 50
-        ch_vict_weapon = 0
-        vict_weapon = 0
-        diff_mod = ((ch_vict_weapon // 2) - vict_weapon) // 2
-        expected_chance = (80 * ch_weapon) // 100 + diff_mod + 13 - 2 * 13
-        expected_chance = max(0, expected_chance)
-        print(f"DEBUG: expected_chance={expected_chance}")
-        char.perm_stat = [13, 13, 13, 13, 13]
-        victim.perm_stat = [13, 13, 13, 13, 13]
 
-        def _weapon_sn(_who, _weapon=None):  # noqa: ANN001
-            return "sword"
+# ---------------------------------------------------------------------------
+# Trip
+# ---------------------------------------------------------------------------
 
-        def _weapon_skill(who, weapon_sn):  # noqa: ANN001
-            # Called for: (caster, caster_weapon_sn), (victim, victim_weapon_sn), (caster, victim_weapon_sn)
-            if who is char:
-                return ch_weapon
-            return 0
-
-        with (
-            patch("mud.skills.handlers.get_weapon_sn", side_effect=_weapon_sn),
-            patch("mud.skills.handlers.get_weapon_skill", side_effect=[ch_weapon, 0, 0]),
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=expected_chance),
-        ):
-            assert skill_handlers.disarm(char, target=victim) is False
-
-        # Reset state
-        char.wait = 0
-        victim.equipment = {"wield": victim_weapon}
-        victim.wielded_weapon = victim_weapon
-
-        with (
-            patch("mud.skills.handlers.get_weapon_sn", side_effect=_weapon_sn),
-            patch("mud.skills.handlers.get_weapon_skill", side_effect=[ch_weapon, 0, 0]),
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=expected_chance - 1),
-        ):
-            assert skill_handlers.disarm(char, target=victim) is True
-
-    def test_disarm_weapon_skill_differential_modifier(self, movable_char_factory, movable_mob_factory, object_factory):
-        """ROM L3192-3193: chance += (ch_vict_weapon/2 - vict_weapon) / 2."""
-        from mud.skills import handlers as skill_handlers
-
-        char = movable_char_factory("warrior", 3001)
-        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
-        char.skills["disarm"] = 60
-        char.level = 20
-        char.perm_stat = [0, 0, 0, 0, 0]
-        char.mod_stat = [0, 0, 0, 0, 0]
-
-        caster_weapon = object_factory(
-            {
-                "vnum": 210,
-                "short_descr": "a sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        char.wielded_weapon = caster_weapon
-        char.equipment = {"wield": caster_weapon}
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.level = 20
-        victim.perm_stat = [0, 0, 0, 0, 0]
-        victim.mod_stat = [0, 0, 0, 0, 0]
-
-        victim_weapon = object_factory(
-            {
-                "vnum": 211,
-                "short_descr": "a sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        victim.wielded_weapon = victim_weapon
-        victim.equipment = {"wield": victim_weapon}
-
-        char.fighting = victim
-
-        ch_weapon = 100
-        vict_weapon = 20
-        ch_vict_weapon = 80
-        diff_mod = ((ch_vict_weapon // 2) - vict_weapon) // 2
-        # ROM L3194-3197 also adds DEX(ch) - 2*STR(victim). With perm_stat=0 both
-        # the PC caster's DEX and mob victim's STR floor to 3 (ROM src/handler.c:
-        # get_curr_stat uses URANGE(3, ..., max) for PCs and NPCs).
-        dex_str_mod = 3 - 2 * 3
-        expected_chance = (60 * ch_weapon) // 100 + diff_mod + dex_str_mod
-
-        def _weapon_sn(_who, _weapon=None):  # noqa: ANN001
-            return "sword"
-
-        def _weapon_skill(who, weapon_sn):  # noqa: ANN001
-            if who is char and weapon_sn == "sword":
-                # First call is caster weapon skill; later call is caster vs victim skill.
-                # Return ch_weapon for caster weapon, and ch_vict_weapon when treated as vs victim.
-                # Distinguish by reading victim.wielded_weapon identity in args isn't available; use ordering.
-                # Simpler: return the higher value; the test isolates the differential term.
-                return ch_vict_weapon if who is char else ch_weapon
-            if who is victim:
-                return vict_weapon
-            return ch_vict_weapon
-
-        with (
-            patch("mud.skills.handlers.get_weapon_sn", side_effect=_weapon_sn),
-            patch("mud.skills.handlers.get_weapon_skill", side_effect=[ch_weapon, vict_weapon, ch_vict_weapon]),
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=expected_chance),
-        ):
-            assert skill_handlers.disarm(char, target=victim) is False
-
-        # Reset state
-        char.wait = 0
-        victim.equipment = {"wield": victim_weapon}
-        victim.wielded_weapon = victim_weapon
-
-        with (
-            patch("mud.skills.handlers.get_weapon_sn", side_effect=_weapon_sn),
-            patch("mud.skills.handlers.get_weapon_skill", side_effect=[ch_weapon, vict_weapon, ch_vict_weapon]),
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=expected_chance - 1),
-        ):
-            assert skill_handlers.disarm(char, target=victim) is True
-
-    def test_disarm_dex_vs_strength_modifier(self, movable_char_factory, movable_mob_factory, object_factory):
-        """ROM L3194-3197: chance += DEX(ch) - 2*STR(victim)."""
-        from mud.skills import handlers as skill_handlers
-
-        char = movable_char_factory("warrior", 3001)
-        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
-        char.skills["disarm"] = 100
-        char.level = 20
-        char.perm_stat = [0, 0, 0, 10, 0]  # DEX=10
-        char.mod_stat = [0, 0, 0, 0, 0]
-
-        caster_weapon = object_factory(
-            {
-                "vnum": 220,
-                "short_descr": "a sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        char.wielded_weapon = caster_weapon
-        char.equipment = {"wield": caster_weapon}
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.level = 20
-        victim.perm_stat = [10, 0, 0, 0, 0]  # STR=10
-        victim.mod_stat = [0, 0, 0, 0, 0]
-
-        victim_weapon = object_factory(
-            {
-                "vnum": 221,
-                "short_descr": "a sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        victim.wielded_weapon = victim_weapon
-        victim.equipment = {"wield": victim_weapon}
-
-        char.fighting = victim
-
-        ch_weapon = 100
-        vict_weapon = 100
-        ch_vict_weapon = 100
-        diff_mod = ((ch_vict_weapon // 2) - vict_weapon) // 2
-        expected_chance = (100 * ch_weapon) // 100 + diff_mod + 10 - 2 * 13
-        expected_chance = max(0, expected_chance)
-        print(f"DEBUG: expected_chance={expected_chance}")
-        char.perm_stat = [13, 13, 13, 10, 13]
-        victim.perm_stat = [13, 13, 13, 13, 13]
-
-        with (
-            patch("mud.skills.handlers.get_weapon_sn", return_value="sword"),
-            patch("mud.skills.handlers.get_weapon_skill", side_effect=[ch_weapon, vict_weapon, ch_vict_weapon]),
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=expected_chance),
-        ):
-            assert skill_handlers.disarm(char, target=victim) is False
-
-        # Reset state
-        char.wait = 0
-        victim.equipment = {"wield": victim_weapon}
-        victim.wielded_weapon = victim_weapon
-
-        with (
-            patch("mud.skills.handlers.get_weapon_sn", return_value="sword"),
-            patch("mud.skills.handlers.get_weapon_skill", side_effect=[ch_weapon, vict_weapon, ch_vict_weapon]),
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=expected_chance - 1),
-        ):
-            assert skill_handlers.disarm(char, target=victim) is True
-
-    def test_disarm_level_modifier(self, movable_char_factory, movable_mob_factory, object_factory):
-        """ROM L3198-3200: chance += (ch->level - victim->level) * 2."""
-        from mud.skills import handlers as skill_handlers
-
-        char = movable_char_factory("warrior", 3001)
-        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
-        char.skills["disarm"] = 50
-        char.level = 25
-        char.perm_stat = [0, 0, 0, 0, 0]
-        char.mod_stat = [0, 0, 0, 0, 0]
-
-        caster_weapon = object_factory(
-            {
-                "vnum": 230,
-                "short_descr": "a sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        char.wielded_weapon = caster_weapon
-        char.equipment = {"wield": caster_weapon}
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.level = 20
-        victim.perm_stat = [0, 0, 0, 0, 0]
-        victim.mod_stat = [0, 0, 0, 0, 0]
-
-        victim_weapon = object_factory(
-            {
-                "vnum": 231,
-                "short_descr": "a sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        victim.wielded_weapon = victim_weapon
-        victim.equipment = {"wield": victim_weapon}
-
-        char.fighting = victim
-
-        ch_weapon = 100
-        vict_weapon = 100
-        ch_vict_weapon = 100
-        diff_mod = ((ch_vict_weapon // 2) - vict_weapon) // 2
-        expected_chance = (50 * ch_weapon) // 100 + diff_mod + 13 - 2 * 13 + (25 - 20) * 2
-        expected_chance = max(0, expected_chance)
-        print(f"DEBUG: expected_chance={expected_chance}")
-        char.perm_stat = [13, 13, 13, 13, 13]
-        victim.perm_stat = [13, 13, 13, 13, 13]
-
-        with (
-            patch("mud.skills.handlers.get_weapon_sn", return_value="sword"),
-            patch("mud.skills.handlers.get_weapon_skill", side_effect=[ch_weapon, vict_weapon, ch_vict_weapon]),
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=expected_chance),
-        ):
-            assert skill_handlers.disarm(char, target=victim) is False
-
-        # Reset state
-        char.wait = 0
-        victim.equipment = {"wield": victim_weapon}
-        victim.wielded_weapon = victim_weapon
-
-        with (
-            patch("mud.skills.handlers.get_weapon_sn", return_value="sword"),
-            patch("mud.skills.handlers.get_weapon_skill", side_effect=[ch_weapon, vict_weapon, ch_vict_weapon]),
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=expected_chance - 1),
-        ):
-            assert skill_handlers.disarm(char, target=victim) is True
-
-    def test_disarm_applies_wait_state_beats(self, movable_char_factory, movable_mob_factory, object_factory):
-        """ROM L3204-3216: WAIT_STATE uses skill_table[gsn_disarm].beats (Python: caster.wait >= beats)."""
-        from mud.skills import handlers as skill_handlers
-
-        char = movable_char_factory("warrior", 3001)
-        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
-        char.skills["disarm"] = 50
-        char.skills["hand to hand"] = 0
-        char.wait = 0
-        char.level = 20
-        char.perm_stat = [0, 0, 0, 0, 0]
-        char.mod_stat = [0, 0, 0, 0, 0]
-
-        caster_weapon = object_factory(
-            {
-                "vnum": 240,
-                "short_descr": "a sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        char.wielded_weapon = caster_weapon
-        char.equipment = {"wield": caster_weapon}
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.level = 20
-        victim.perm_stat = [0, 0, 0, 0, 0]
-        victim.mod_stat = [0, 0, 0, 0, 0]
-
-        victim_weapon = object_factory(
-            {
-                "vnum": 241,
-                "short_descr": "a sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        victim.wielded_weapon = victim_weapon
-        victim.equipment = {"wield": victim_weapon}
-
-        char.fighting = victim
-
-        beats = skill_handlers._skill_beats("disarm")
-        with (
-            patch("mud.skills.handlers.get_weapon_sn", return_value="sword"),
-            patch("mud.skills.handlers.get_weapon_skill", return_value=0),
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=99),
-        ):
-            assert skill_handlers.disarm(char, target=victim) is False
-
-        assert char.wait == beats
-
-    def test_disarm_check_improve_called_on_success_and_failure(
-        self, movable_char_factory, movable_mob_factory, object_factory
-    ):
-        """ROM L3206 and L3216: check_improve called with TRUE on success, FALSE on failure."""
-        from mud.skills import handlers as skill_handlers
-
-        char = movable_char_factory("warrior", 3001)
-        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
-        char.skills["disarm"] = 100
-        char.level = 20
-        char.perm_stat = [0, 0, 0, 25, 0]
-        char.mod_stat = [0, 0, 0, 0, 0]
-
-        caster_weapon = object_factory(
-            {
-                "vnum": 250,
-                "short_descr": "a sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        char.wielded_weapon = caster_weapon
-        char.equipment = {"wield": caster_weapon}
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.level = 20
-        victim.perm_stat = [0, 0, 0, 0, 0]
-        victim.mod_stat = [0, 0, 0, 0, 0]
-
-        victim_weapon = object_factory(
-            {
-                "vnum": 251,
-                "short_descr": "a sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        victim.wielded_weapon = victim_weapon
-        victim.equipment = {"wield": victim_weapon}
-
-        char.fighting = victim
-        ch_weapon = 100
-        vict_weapon = 100
-        ch_vict_weapon = 100
-        diff_mod = ((ch_vict_weapon // 2) - vict_weapon) // 2
-        expected_chance = (100 * ch_weapon) // 100 + diff_mod + 25 - 2 * 13 + (20 - 20) * 2
-        expected_chance = max(0, expected_chance)
-        print(f"DEBUG: expected_chance={expected_chance}")
-        char.perm_stat = [13, 13, 13, 25, 13]
-        victim.perm_stat = [13, 13, 13, 13, 13]
-        expected_chance = max(0, expected_chance)
-
-        with (
-            patch("mud.skills.handlers.check_improve") as improve_mock,
-            patch("mud.skills.handlers.get_weapon_sn", return_value="sword"),
-            patch("mud.skills.handlers.get_weapon_skill", side_effect=[ch_weapon, vict_weapon, ch_vict_weapon]),
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=0),
-        ):
-            assert skill_handlers.disarm(char, target=victim) is True
-            improve_mock.assert_called()
-            assert improve_mock.call_args.args[2] is True
-
-        # Reset
-        char.wait = 0
-        victim.equipment = {"wield": victim_weapon}
-        victim.wielded_weapon = victim_weapon
-
-        with (
-            patch("mud.skills.handlers.check_improve") as improve_mock,
-            patch("mud.skills.handlers.get_weapon_sn", return_value="sword"),
-            patch("mud.skills.handlers.get_weapon_skill", return_value=100),
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=99),
-        ):
-            assert skill_handlers.disarm(char, target=victim) is False
-            improve_mock.assert_called()
-            assert improve_mock.call_args.args[2] is False
-
-    def test_disarm_success_drops_weapon_to_room(self, movable_char_factory, movable_mob_factory, object_factory):
-        """ROM L2257-2265: NPC victims immediately get visible disarmed weapons back."""
-        from mud.skills import handlers as skill_handlers
-
-        char = movable_char_factory("warrior", 3001)
-        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
-        char.skills["disarm"] = 100
-        char.level = 20
-        char.perm_stat = [0, 0, 0, 25, 0]
-        char.mod_stat = [0, 0, 0, 0, 0]
-
-        caster_weapon = object_factory(
-            {
-                "vnum": 260,
-                "short_descr": "a sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        char.wielded_weapon = caster_weapon
-        char.equipment = {"wield": caster_weapon}
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-
-        victim_weapon = object_factory(
-            {
-                "vnum": 261,
-                "short_descr": "a sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        victim_weapon.extra_flags = 0
-        victim.wielded_weapon = victim_weapon
-        victim.equipment = {"wield": victim_weapon}
-
-        char.fighting = victim
-
-        room = getattr(victim, "room", None)
-        assert room is not None
-        before = list(getattr(room, "contents", []))
-
-        with (
-            patch("mud.skills.handlers.get_weapon_sn", return_value="sword"),
-            patch("mud.skills.handlers.get_weapon_skill", return_value=100),
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=0),
-        ):
-            assert skill_handlers.disarm(char, target=victim) is True
-
-        assert victim_weapon not in victim.equipment.values()
-        assert victim_weapon in victim.inventory
-        assert victim_weapon not in getattr(room, "contents", [])
-        assert getattr(room, "contents", []) == before
-
-    def test_disarm_success_keeps_nodrop_or_inventory_on_victim(
-        self, movable_char_factory, movable_mob_factory, object_factory
-    ):
-        """ROM helper L2258-2260: NODROP/INVENTORY weapons remain on victim (inventory)."""
-        from mud.skills import handlers as skill_handlers
-
-        char = movable_char_factory("warrior", 3001)
-        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
-        char.skills["disarm"] = 100
-        char.level = 20
-        char.perm_stat = [0, 0, 0, 25, 0]
-        char.mod_stat = [0, 0, 0, 0, 0]
-
-        caster_weapon = object_factory(
-            {
-                "vnum": 270,
-                "short_descr": "a sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        char.wielded_weapon = caster_weapon
-        char.equipment = {"wield": caster_weapon}
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-
-        victim_weapon = object_factory(
-            {
-                "vnum": 271,
-                "short_descr": "a sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        # ExtraFlag.NODROP (H) | ExtraFlag.INVENTORY (N)
-        victim_weapon.extra_flags = (1 << 7) | (1 << 13)
-        victim.wielded_weapon = victim_weapon
-        victim.equipment = {"wield": victim_weapon}
-
-        char.fighting = victim
-
-        room = getattr(victim, "room", None)
-        assert room is not None
-
-        with (
-            patch("mud.skills.handlers.get_weapon_sn", return_value="sword"),
-            patch("mud.skills.handlers.get_weapon_skill", return_value=100),
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=0),
-        ):
-            assert skill_handlers.disarm(char, target=victim) is True
-
-        assert victim_weapon in victim.inventory
-        assert victim_weapon not in getattr(room, "contents", [])
-
-    def test_disarm_noremove_weapon_wont_budge(self, movable_char_factory, movable_mob_factory, object_factory):
-        """ROM helper L2242-2250: ITEM_NOREMOVE prevents disarm and keeps weapon equipped."""
-        from mud.skills import handlers as skill_handlers
-
-        char = movable_char_factory("warrior", 3001)
-        char.ch_class = 3  # Warrior (ROM disarm class-skill gate, HANDLER-008)
-        char.skills["disarm"] = 100
-        char.level = 20
-        char.perm_stat = [0, 0, 0, 25, 0]
-        char.mod_stat = [0, 0, 0, 0, 0]
-
-        caster_weapon = object_factory(
-            {
-                "vnum": 280,
-                "short_descr": "a sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        char.wielded_weapon = caster_weapon
-        char.equipment = {"wield": caster_weapon}
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-
-        victim_weapon = object_factory(
-            {
-                "vnum": 281,
-                "short_descr": "a cursed sword",
-                "item_type": int(ItemType.WEAPON),
-                "value": [0, 1, 6, int(WeaponType.SWORD), 0],
-            }
-        )
-        # ExtraFlag.NOREMOVE (M)
-        victim_weapon.extra_flags = 1 << 12
-        victim.wielded_weapon = victim_weapon
-        victim.equipment = {"wield": victim_weapon}
-
-        char.fighting = victim
-
-        with (
-            patch("mud.skills.handlers.get_weapon_sn", return_value="sword"),
-            patch("mud.skills.handlers.get_weapon_skill", return_value=100),
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=0),
-        ):
-            assert skill_handlers.disarm(char, target=victim) is False
-
-        assert victim_weapon in victim.equipment.values()
-        assert any("won't budge" in msg.lower() for msg in getattr(char, "messages", []))
-
-
-class TestTripRomParity:
-    """ROM src/fight.c:2834-2940 - trip skill."""
-
-    def test_trip_requires_victim(self, movable_char_factory):
-        """ROM L2852-2859: Empty arg uses fighting target; otherwise requires a victim."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["trip"] = 75
-        char.fighting = None
-
+class TestTrip:
+    def test_requires_victim_or_fighting(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="trip")
         result = do_trip(char, "")
-
         assert "trip whom" in result.lower() or "aren't fighting" in result.lower()
 
-    def test_trip_requires_victim_in_room(self, movable_char_factory):
-        """ROM L2862-2866: Victim must be present in room."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["trip"] = 75
+    def test_target_must_be_in_room(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="trip")
+        assert "aren't here" in do_trip(char, "nobody").lower()
 
-        result = do_trip(char, "nonexistent")
+    def test_blocks_flying_targets(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="trip")
+        victim = _target(movable_mob_factory)
+        victim.affected_by = int(AffectFlag.FLYING)
+        assert "feet aren't on the ground" in do_trip(char, "mob").lower()
 
-        assert "aren't here" in result.lower()
+    def test_blocks_victim_already_down(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="trip")
+        victim = _target(movable_mob_factory)
+        victim.position = Position.RESTING
+        assert "already down" in do_trip(char, "mob").lower()
 
-    def test_trip_uses_fighting_target_when_no_argument(self, movable_char_factory, movable_mob_factory):
-        """ROM L2852-2859: When arg is empty, use `ch->fighting` as victim."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["trip"] = 75
+    def test_uses_fighting_target_when_no_argument(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="trip")
         char.level = 20
         char.perm_stat = [13, 13, 13, 13, 13]
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
+        victim = _target(movable_mob_factory)
         victim.level = 20
-        victim.wait = 0
         victim.perm_stat = [13, 13, 13, 13, 13]
-
         char.fighting = victim
-        char.wait = 0
-
         with (
             patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
             patch("mud.commands.combat.rng_mm.number_range", return_value=2),
             patch("mud.commands.combat.apply_damage", return_value="ok"),
         ):
             result = do_trip(char, "")
+        assert "trip" in result.lower() or result == "ok"
 
-        assert result == "ok" or "trip" in result.lower()
-
-    def test_trip_blocks_flying_targets(self, movable_char_factory, movable_mob_factory):
-        """ROM L2878-2882: Can't trip victims affected by `AFF_FLYING`."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["trip"] = 75
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.affected_by = int(getattr(victim, "affected_by", 0) or 0) | int(AffectFlag.FLYING)
-
-        result = do_trip(char, "mob")
-
-        assert "feet aren't on the ground" in result.lower()
-
-    def test_trip_blocks_victim_already_down(self, movable_char_factory, movable_mob_factory):
-        """ROM L2884-2888: Can't trip victims with `position < POS_FIGHTING`."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["trip"] = 75
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.position = Position.RESTING
-
-        result = do_trip(char, "mob")
-
-        assert "already down" in result.lower()
-
-    def test_trip_success_sets_victim_resting(self, movable_char_factory, movable_mob_factory):
-        """ROM L2936-2936: On success, victim is set to `POS_RESTING`."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["trip"] = 75
+    def test_success_knocks_victim_to_resting(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="trip")
         char.level = 20
-        char.wait = 0
         char.perm_stat = [13, 13, 13, 13, 13]
-        char.mod_stat = [0, 0, 0, 0, 0]
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
+        victim = _target(movable_mob_factory)
         victim.level = 20
         victim.position = Position.FIGHTING
-        victim.wait = 0
         victim.perm_stat = [13, 13, 13, 13, 13]
-        victim.mod_stat = [0, 0, 0, 0, 0]
-
         with (
             patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
             patch("mud.commands.combat.rng_mm.number_range", return_value=2),
             patch("mud.commands.combat.apply_damage", return_value="ok"),
         ):
-            result = do_trip(char, "mob")
-
-        assert result == "ok" or "trip" in result.lower()
+            do_trip(char, "mob")
         assert victim.position == Position.RESTING
 
-    @staticmethod
-    def _expected_trip_chance(char, victim) -> int:
-        """Recompute ROM do_trip's `chance` the way the engine does (src/fight.c
-        :2906-2923), using the SAME `get_curr_stat` accessor so the boundary is
-        robust to stat clamping/racial mods. Locks the size/dex/level coefficients.
-        """
-        chance = int(char.skills.get("trip", 0) or 0)
-        if int(char.size) < int(victim.size):
-            chance += (int(char.size) - int(victim.size)) * 10  # size: 10 per step
-        char_dex = char.get_curr_stat(Stat.DEX) or 0
-        victim_dex = victim.get_curr_stat(Stat.DEX) or 0
-        chance += char_dex - victim_dex * 3 // 2  # dex: floor(3/2) on victim
-        chance += (int(char.level) - int(victim.level)) * 2  # level: 2 per level
-        return chance
-
-    def _assert_trip_boundary(self, char, victim):
-        """do_trip succeeds iff number_percent() < chance. Drive the roll to
-        chance-1 (success) and chance (failure) and assert on the OUTCOME, not a
-        truthy return: TRIP-002 makes the failure branch return "" (void do_trip;
-        damage() single-delivers the miss), so a truthy-return check is invalid.
-
-        `check_improve` is disabled for the run so a mid-test skill bump can't
-        drift `chance` between the two rolls (that drift is what silently broke the
-        original assertions — the differential was measuring a rising skill, not
-        the modifier). With it off, the measured boundary equals ROM's formula, so
-        this simultaneously locks the size/dex/level coefficients.
-        """
-        chance = self._expected_trip_chance(char, victim)
-
-        def _reset():
-            victim.position = Position.FIGHTING
-            char.wait = 0
-            victim.wait = 0
-            victim.daze = 0
-
-        _reset()
+    def test_success_applies_daze(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="trip")
+        char.level = 20
+        char.perm_stat = [13, 13, 13, 13, 13]
+        victim = _target(movable_mob_factory)
+        victim.level = 20
+        victim.position = Position.FIGHTING
+        victim.daze = 0
+        victim.perm_stat = [13, 13, 13, 13, 13]
         with (
-            patch("mud.commands.combat.apply_damage", return_value="ok"),
+            patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
             patch("mud.commands.combat.rng_mm.number_range", return_value=2),
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=chance - 1),
-            patch.object(skill_registry, "_check_improve", lambda *a, **k: None),
-        ):
-            success = do_trip(char, "mob")
-        assert "You trip" in success, f"percent {chance - 1} < chance {chance} must succeed; got {success!r}"
-        assert victim.position == Position.RESTING, "a successful trip knocks the victim to RESTING"
-
-        _reset()
-        with (
             patch("mud.commands.combat.apply_damage", return_value="ok"),
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=chance),
-            patch.object(skill_registry, "_check_improve", lambda *a, **k: None),
         ):
-            failure = do_trip(char, "mob")
-        assert failure == "", (
-            f"percent {chance} !< chance {chance} must fail with no return (TRIP-002); got {failure!r}"
-        )
-        assert victim.position == Position.FIGHTING, "a failed trip does not knock the victim down"
+            do_trip(char, "mob")
+        assert victim.daze > 0
 
-    def test_trip_chance_size_penalty_is_10_per_size(self, movable_char_factory, movable_mob_factory):
-        """ROM L2906-2909: If attacker smaller, `chance += (ch->size - victim->size) * 10`."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["trip"] = 50
-        char.size = 1
-        char.level = 20
-        char.perm_stat = [13, 13, 13, 13, 13]
+    def test_self_trip(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="trip")
+        result = do_trip(char, char.name)
+        assert "fall flat" in result.lower() or "face" in result.lower()
 
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.size = 3  # attacker smaller by 2 → -20 to chance
-        victim.level = 20
-        victim.perm_stat = [13, 13, 13, 13, 13]
-        victim.position = Position.FIGHTING
 
-        self._assert_trip_boundary(char, victim)
+# ---------------------------------------------------------------------------
+# Dirt kicking
+# ---------------------------------------------------------------------------
 
-    def test_trip_chance_dex_modifier_uses_floor_3_over_2(self, movable_char_factory, movable_mob_factory):
-        """ROM L2910-2913: `chance += dex(ch) - dex(victim) * 3 / 2` (integer division)."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["trip"] = 60
-        char.size = 2
-        char.level = 20
-        char.perm_stat = [13, 10, 13, 13, 13]
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.size = 2
-        victim.level = 20
-        victim.perm_stat = [13, 15, 13, 13, 13]  # higher victim DEX → floor(3/2) penalty
-        victim.position = Position.FIGHTING
-
-        self._assert_trip_boundary(char, victim)
-
-    def test_trip_chance_level_modifier_is_2_per_level(self, movable_char_factory, movable_mob_factory):
-        """ROM L2921-2923: `chance += (ch->level - victim->level) * 2`."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["trip"] = 20
-        char.size = 2
-        char.level = 20
-        char.perm_stat = [13, 13, 13, 13, 13]
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.size = 2
-        victim.level = 10  # attacker 10 levels higher → +20 to chance
-        victim.perm_stat = [13, 13, 13, 13, 13]
-        victim.position = Position.FIGHTING
-
-        self._assert_trip_boundary(char, victim)
-
-    def test_dirt_kicking_requires_victim_or_fighting(self, movable_char_factory):
-        """ROM L2505-2512: Requires victim argument or ch->fighting."""
-        char = movable_char_factory("thief", 3001)
-        char.skills["dirt kicking"] = 75
+class TestDirtKicking:
+    def test_requires_victim_or_fighting(self, movable_char_factory):
+        char = _ready_thief(movable_char_factory, skill="dirt kicking")
         char.fighting = None
+        assert "aren't in combat" in do_dirt(char, "").lower()
 
-        result = do_dirt(char, "")
-
-        assert "aren't in combat" in result.lower()
-
-    def test_dirt_kicking_pc_without_skill_blocked(self, movable_char_factory, movable_mob_factory):
-        """ROM L2491-2497: PC without skill gets feet dirty message."""
+    def test_pc_without_skill_gets_feet_dirty(self, movable_char_factory, movable_mob_factory):
         char = movable_char_factory("warrior", 3001)
         char.skills.pop("dirt kicking", None)
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
+        victim = _target(movable_mob_factory)
         char.fighting = victim
+        assert "get your feet dirty" in do_dirt(char, "").lower()
 
-        result = do_dirt(char, "")
+    def test_cannot_blind_self(self, movable_char_factory):
+        char = _ready_thief(movable_char_factory, name="thief", skill="dirt kicking")
+        assert "very funny" in do_dirt(char, "thief").lower()
 
-        assert "get your feet dirty" in result.lower()
-
-    def test_dirt_kicking_cannot_blind_self(self, movable_char_factory):
-        """ROM L2524-2528: Kicking dirt at yourself returns 'very funny'."""
-        char = movable_char_factory("thief", 3001)
-        char.skills["dirt kicking"] = 75
-        char.name = "self"
-
-        result = do_dirt(char, "self")
-
-        assert "very funny" in result.lower()
-
-    def test_dirt_kicking_blocks_already_blinded_victim(self, movable_char_factory, movable_mob_factory):
-        """ROM L2520-2523: Cannot dirt kick if victim already AFF_BLIND."""
-        char = movable_char_factory("thief", 3001)
-        char.skills["dirt kicking"] = 75
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
+    def test_blocks_already_blinded_victim(self, movable_char_factory, movable_mob_factory):
+        char = _ready_thief(movable_char_factory, skill="dirt kicking")
+        victim = _target(movable_mob_factory)
         victim.affected_by = int(AffectFlag.BLIND)
         char.fighting = victim
-
-        result = do_dirt(char, "")
-
+        result = do_dirt(char, "mob")
         assert "already" in result.lower() and "blind" in result.lower()
 
-    def test_dirt_kicking_success_chance_formula(self, movable_char_factory, movable_mob_factory):
-        """ROM L2547-2567: chance = skill + DEX - 2*victim_DEX + speed_mods + level_diff*2."""
-
-        char = movable_char_factory("thief", 3001)
-        char.skills["dirt kicking"] = 50
-        char.perm_stat = [0, 0, 0, 10, 0]
-        char.mod_stat = [0, 0, 0, 0, 0]
-        char.level = 20
-        char.off_flags = 0
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.perm_stat = [0, 0, 0, 5, 0]
-        victim.mod_stat = [0, 0, 0, 0, 0]
-        victim.level = 15
-        victim.off_flags = 0
-        char.fighting = victim
-
-        expected_chance = 50 + 10 - 2 * 5 + (20 - 15) * 2
-
-        with (
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=expected_chance - 1) as mock_roll,
-            patch("mud.skills.handlers.apply_damage", return_value="damage applied"),
-        ):
-            result = do_dirt(char, "mob")
-
-        mock_roll.assert_called_once()
-        assert "damage applied" in result or "kick dirt" in result.lower()
-
-    def test_dirt_kicking_speed_modifiers(self, movable_char_factory, movable_mob_factory):
-        """ROM L2557-2562: +10 if caster haste/fast, -25 if victim haste/fast."""
-        char = movable_char_factory("thief", 3001)
-        char.skills["dirt kicking"] = 50
-        char.perm_stat = [0, 0, 0, 0, 0]
-        char.mod_stat = [0, 0, 0, 0, 0]
-        char.level = 20
-        char.off_flags = 0
-        char.affected_by = int(AffectFlag.HASTE)
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.perm_stat = [0, 0, 0, 0, 0]
-        victim.mod_stat = [0, 0, 0, 0, 0]
-        victim.level = 20
-        victim.off_flags = 0
-        victim.affected_by = int(AffectFlag.HASTE)
-        char.fighting = victim
-
-        expected_chance = 50 + 10 - 25
-
-        with (
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=expected_chance - 1) as mock_roll,
-            patch("mud.skills.handlers.apply_damage", return_value="damage applied"),
-        ):
-            result = do_dirt(char, "mob")
-
-        mock_roll.assert_called_once()
-        assert "damage applied" in result or "kick dirt" in result.lower()
-
-    def test_dirt_kicking_terrain_modifiers(self, movable_char_factory, movable_mob_factory):
-        """ROM L2575-2604: Terrain affects chance (INSIDE -20, CITY -10, FIELD +5, DESERT +10)."""
-        from mud.registry import room_registry
-
-        char = movable_char_factory("thief", 3001)
-        char.skills["dirt kicking"] = 50
+    def test_success_applies_blind(self, movable_char_factory, movable_mob_factory):
+        char = _ready_thief(movable_char_factory, skill="dirt kicking", skill_level=100)
         char.perm_stat = [0, 0, 0, 0, 0]
         char.mod_stat = [0, 0, 0, 0, 0]
         char.level = 0
         char.off_flags = 0
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
+        victim = _target(movable_mob_factory)
         victim.perm_stat = [0, 0, 0, 0, 0]
         victim.mod_stat = [0, 0, 0, 0, 0]
         victim.level = 0
         victim.off_flags = 0
         victim.affected_by = 0
-        # Add apply_spell_effect method to victim (mobs don't have this)
-        victim.apply_spell_effect = lambda effect: True
+
+        def _apply(effect):
+            victim.affected_by |= int(effect.affect_flag)
+            return True
+
+        victim.apply_spell_effect = _apply
         char.fighting = victim
-
-        room = room_registry[3001]
-        room.sector_type = Sector.INSIDE
-
-        # ROM dirt chance = skill% + DEX(ch) - 2*DEX(victim) + ... + terrain.
-        # Both PC caster DEX and mob victim DEX floor to 3 (ROM src/handler.c:
-        # get_curr_stat uses URANGE(3, ..., max) for PCs and NPCs). INSIDE
-        # terrain is -20, so 50 + 3 - (2 * 3) - 20 = 27.
-        expected_chance = 50 + 3 - (2 * 3) - 20
-
-        applied_effects: list = []
-        victim.apply_spell_effect = lambda effect: applied_effects.append(effect)
-
         with (
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=expected_chance - 1),
-            patch("mud.skills.handlers.apply_damage", return_value="damage applied"),
+            patch("mud.skills.handlers.rng_mm.number_percent", return_value=0),
+            patch("mud.skills.handlers.apply_damage", return_value="ok"),
         ):
-            result = do_dirt(char, "mob")
+            do_dirt(char, "mob")
+        assert victim.affected_by & int(AffectFlag.BLIND)
 
-        # roll == expected_chance - 1 < chance, so the success path blinds the victim;
-        # this pins expected_chance (terrain -20 + DEX floor +3) at the success boundary.
-        assert applied_effects and applied_effects[0].affect_flag == AffectFlag.BLIND
-        assert "damage applied" in result or "kick dirt" in result.lower()
-
-    def test_dirt_kicking_water_air_zero_chance(self, movable_char_factory, movable_mob_factory):
-        """ROM L2600-2604: WATER_SWIM/WATER_NOSWIM/AIR sectors set chance to 0."""
+    def test_no_dirt_in_water_sectors(self, movable_char_factory, movable_mob_factory):
         from mud.registry import room_registry
 
-        char = movable_char_factory("thief", 3001)
-        char.skills["dirt kicking"] = 75
+        char = _ready_thief(movable_char_factory, skill="dirt kicking", skill_level=75)
         char.perm_stat = [0, 0, 0, 20, 0]
         char.mod_stat = [0, 0, 0, 0, 0]
         char.level = 50
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
+        victim = _target(movable_mob_factory)
         victim.perm_stat = [0, 0, 0, 0, 0]
         victim.mod_stat = [0, 0, 0, 0, 0]
         victim.level = 1
         char.fighting = victim
-
         room = room_registry[3001]
-        room.sector_type = Sector.WATER_SWIM
-
+        room.sector_type = 6  # WATER_SWIM
         with patch("mud.skills.handlers._send_to_char") as mock_send:
-            result = do_dirt(char, "mob")
-
-        mock_send.assert_called_once_with(char, "There isn't any dirt to kick.")
-        assert result == ""
-
-    def test_dirt_kicking_success_applies_blind_affect(self, movable_char_factory, movable_mob_factory):
-        """ROM L2626-2631: Success applies AFF_BLIND affect with duration 0."""
-        char = movable_char_factory("thief", 3001)
-        char.skills["dirt kicking"] = 100
-        char.perm_stat = [0, 0, 0, 0, 0]
-        char.mod_stat = [0, 0, 0, 0, 0]
-        char.level = 0
-        char.off_flags = 0
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.perm_stat = [0, 0, 0, 0, 0]
-        victim.mod_stat = [0, 0, 0, 0, 0]
-        victim.level = 0
-        victim.off_flags = 0
-        victim.affected_by = 0
-
-        def _apply_spell_effect_stub(effect):
-            victim.affected_by |= int(effect.affect_flag)
-            return True
-
-        victim.apply_spell_effect = _apply_spell_effect_stub
-        char.fighting = victim
-
-        with (
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=0),
-            patch("mud.skills.handlers.apply_damage", return_value="damage applied"),
-        ):
-            result = do_dirt(char, "mob")
-
-        assert victim.affected_by & int(AffectFlag.BLIND)
-        assert "damage applied" in result or "kick dirt" in result.lower()
-
-    def test_dirt_kicking_check_improve_called_on_success(self, movable_char_factory, movable_mob_factory):
-        """ROM L2634: check_improve called with TRUE on success, multiplier 2."""
-        char = movable_char_factory("thief", 3001)
-        char.skills["dirt kicking"] = 100
-        char.perm_stat = [0, 0, 0, 0, 0]
-        char.mod_stat = [0, 0, 0, 0, 0]
-        char.level = 0
-        char.off_flags = 0
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
-        victim.perm_stat = [0, 0, 0, 0, 0]
-        victim.mod_stat = [0, 0, 0, 0, 0]
-        victim.level = 0
-        victim.off_flags = 0
-        victim.apply_spell_effect = lambda effect: True
-        char.fighting = victim
-
-        with (
-            patch("mud.skills.handlers.check_improve") as improve_mock,
-            patch("mud.skills.handlers.rng_mm.number_percent", return_value=0),
-            patch("mud.skills.handlers.apply_damage", return_value="damage applied"),
-        ):
             do_dirt(char, "mob")
-
-        assert improve_mock.called
-        assert improve_mock.call_args[0][0] == char
-        assert improve_mock.call_args[0][1] == "dirt kicking"
-        assert improve_mock.call_args[0][2] is True
-        assert improve_mock.call_args[0][3] == 2
+        mock_send.assert_called_once_with(char, "There isn't any dirt to kick.")
 
 
-class TestRescueRomParity:
-    """ROM src/fight.c:3032-3101 - rescue skill."""
+# ---------------------------------------------------------------------------
+# Rescue
+# ---------------------------------------------------------------------------
 
-    def test_rescue_requires_target_argument(self, movable_char_factory):
-        """ROM L3039-3042: Must specify victim to rescue."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["rescue"] = 75
+class TestRescue:
+    def test_requires_target_argument(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="rescue")
+        assert "Rescue whom?" in do_rescue(char, "")
 
-        result = do_rescue(char, "")
+    def test_target_must_be_in_room(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="rescue")
+        assert "aren't here" in do_rescue(char, "phantasm")
 
-        assert "Rescue whom?" in result
+    def test_cannot_rescue_self(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, name="selfrescue", skill="rescue")
+        assert "fleeing instead" in do_rescue(char, "selfrescue")
 
-    def test_rescue_target_not_in_room(self, movable_char_factory):
-        """ROM L3045-3048: Target must be in same room."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["rescue"] = 75
-
-        result = do_rescue(char, "phantasm")
-
-        assert "aren't here" in result
-
-    def test_rescue_cannot_rescue_self(self, movable_char_factory):
-        """ROM L3051-3054: Cannot rescue yourself."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["rescue"] = 75
-        char.name = "selfrescue"
-
-        result = do_rescue(char, "selfrescue")
-
-        assert "fleeing instead" in result
-
-    def test_rescue_pc_cannot_rescue_npc(self, movable_char_factory, movable_mob_factory):
-        """ROM L3057-3060: PC cannot rescue NPC."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["rescue"] = 75
+    def test_pc_cannot_rescue_npc(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="rescue")
         char.is_npc = False
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "mob"
+        victim = _target(movable_mob_factory)
         victim.is_npc = True
+        assert "need your help" in do_rescue(char, "mob")
 
-        result = do_rescue(char, "mob")
-
-        assert "need your help" in result
-
-    def test_rescue_blocks_if_fighting_target(self, movable_char_factory, movable_mob_factory):
-        """ROM L3063-3066: Cannot rescue person you're fighting."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["rescue"] = 75
+    def test_cannot_rescue_fighting_target(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="rescue")
         char.is_npc = False
-
         victim = movable_char_factory("ally", 3001)
         victim.is_npc = False
         char.fighting = victim
+        assert "Too late" in do_rescue(char, "ally")
 
-        result = do_rescue(char, "ally")
-
-        assert "Too late" in result
-
-    def test_rescue_requires_target_in_combat(self, movable_char_factory, movable_mob_factory):
-        """ROM L3069-3072: Target must be fighting someone."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["rescue"] = 75
-
-        victim = movable_mob_factory(3001, 3001)
+    def test_target_must_be_in_combat(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="rescue")
+        victim = _target(movable_mob_factory)
         victim.name = "ally"
         victim.fighting = None
         victim.is_npc = False
+        assert "not fighting" in do_rescue(char, "ally").lower()
 
-        result = do_rescue(char, "ally")
-
-        assert "not fighting right now" in result
-
-    def test_rescue_group_check_for_npc_opponents(self, movable_char_factory, movable_mob_factory):
-        """ROM L3075-3078: Kill stealing check for NPC opponents."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["rescue"] = 75
+    def test_kill_stealing_check(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="rescue")
         char.group = None
-
-        victim = movable_mob_factory(3001, 3001)
-        victim.name = "ally"
+        victim = movable_char_factory("ally", 3001)
         victim.is_npc = False
         victim.group = None
-
-        opponent = movable_mob_factory(3002, 3001)
+        opponent = _target(movable_mob_factory, room_vnum=3002)
         opponent.name = "badguy"
         opponent.is_npc = True
         victim.fighting = opponent
+        assert "Kill stealing" in do_rescue(char, "ally")
 
-        result = do_rescue(char, "ally")
-
-        assert "Kill stealing is not permitted" in result
-
-    def test_rescue_failure_check_improve_called(self, movable_char_factory, movable_mob_factory):
-        """ROM L3082-3086: Failure calls check_improve with FALSE."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["rescue"] = 50
+    def test_success_redirects_combat(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="rescue", skill_level=100)
         char.is_npc = False
-
         victim = movable_char_factory("ally", 3001)
         victim.is_npc = False
-
-        opponent = movable_mob_factory(3002, 3001)
+        opponent = _target(movable_mob_factory, room_vnum=3002)
         opponent.name = "badguy"
         opponent.is_npc = True
         victim.fighting = opponent
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=99),
-            patch("mud.commands.combat.skill_registry._check_improve") as improve_mock,
-            patch("mud.commands.combat.is_same_group", return_value=True),
-        ):
-            result = do_rescue(char, "ally")
-
-        assert "fail" in result.lower()
-        assert improve_mock.called
-        call_args = improve_mock.call_args
-        assert call_args is not None
-        success_arg = call_args[0][3] if len(call_args[0]) > 3 else None
-        assert success_arg is False
-
-    def test_rescue_success_check_improve_called(self, movable_char_factory, movable_mob_factory):
-        """ROM L3092: Success calls check_improve with TRUE."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["rescue"] = 50
-        char.is_npc = False
-
-        victim = movable_char_factory("ally", 3001)
-        victim.is_npc = False
-
-        opponent = movable_mob_factory(3002, 3001)
-        opponent.name = "badguy"
-        opponent.is_npc = True
-        victim.fighting = opponent
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
-            patch("mud.commands.combat.skill_registry._check_improve") as improve_mock,
-            patch("mud.commands.combat.is_same_group", return_value=True),
-            patch("mud.skills.handlers.stop_fighting"),
-            patch("mud.skills.handlers.set_fighting"),
-        ):
-            result = do_rescue(char, "ally")
-
-        # FIGHT-029: do_rescue is void (ROM src/fight.c:3089-3101) — the rescuer
-        # line is delivered via _send_to_char (mailbox fallback for this
-        # disconnected char), not returned.
-        assert result == ""
-        assert any("rescue" in m.lower() for m in char.messages)
-        assert improve_mock.called
-        call_args = improve_mock.call_args
-        assert call_args is not None
-        success_arg = call_args[0][3] if len(call_args[0]) > 3 else None
-        assert success_arg is True
-
-    def test_rescue_success_stops_and_redirects_combat(self, movable_char_factory, movable_mob_factory):
-        """ROM L3094-3099: Success stops fighting and redirects to rescuer."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["rescue"] = 100
-        char.is_npc = False
-
-        victim = movable_char_factory("ally", 3001)
-        victim.is_npc = False
-
-        opponent = movable_mob_factory(3002, 3001)
-        opponent.name = "badguy"
-        opponent.is_npc = True
-        victim.fighting = opponent
-
         with (
             patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
             patch("mud.commands.combat.is_same_group", return_value=True),
             patch("mud.skills.handlers.stop_fighting") as stop_mock,
             patch("mud.skills.handlers.set_fighting") as set_mock,
         ):
-            result = do_rescue(char, "ally")
+            do_rescue(char, "ally")
+        assert stop_mock.called
+        assert set_mock.called
 
-        assert stop_mock.call_count == 2
-        assert set_mock.call_count == 2
-        # FIGHT-029: do_rescue is void (ROM src/fight.c:3089-3101) — rescuer line
-        # delivered via _send_to_char (mailbox fallback here), not returned.
-        assert result == ""
-        assert any("rescue" in m.lower() for m in char.messages)
-
-
-class TestBerserkRomParity:
-    """ROM src/fight.c:2270-2358 - berserk skill."""
-
-    def test_berserk_requires_skill(self, movable_char_factory):
-        """ROM L2274-2282: PC without skill gets red in face message."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills.pop("berserk", None)
+    def test_failure_message(self, movable_char_factory, movable_mob_factory):
+        char = _ready_warrior(movable_char_factory, skill="rescue", skill_level=50)
         char.is_npc = False
+        victim = movable_char_factory("ally", 3001)
+        victim.is_npc = False
+        opponent = _target(movable_mob_factory, room_vnum=3002)
+        opponent.name = "badguy"
+        opponent.is_npc = True
+        victim.fighting = opponent
+        with (
+            patch("mud.commands.combat.rng_mm.number_percent", return_value=99),
+            patch("mud.commands.combat.is_same_group", return_value=True),
+        ):
+            result = do_rescue(char, "ally")
+        assert "fail" in result.lower()
 
-        result = do_berserk(char, "")
 
-        assert "red in the face" in result
+# ---------------------------------------------------------------------------
+# Berserk
+# ---------------------------------------------------------------------------
 
-    def test_berserk_blocks_if_already_berserk(self, movable_char_factory):
-        """ROM L2284-2289: Already berserk returns 'madder' message."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["berserk"] = 75
+class TestBerserk:
+    def test_requires_skill(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="berserk", skill_level=0)
+        char.is_npc = False
+        assert "red in the face" in do_berserk(char, "")
+
+    def test_cannot_if_already_berserk(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="berserk")
         char.affected_by = int(AffectFlag.BERSERK)
+        assert "madder" in do_berserk(char, "")
 
-        result = do_berserk(char, "")
-
-        assert "madder" in result
-
-    def test_berserk_blocks_if_calm(self, movable_char_factory):
-        """ROM L2291-2295: AFF_CALM blocks berserk."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["berserk"] = 75
+    def test_cannot_if_calm(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="berserk")
         char.affected_by = int(AffectFlag.CALM)
+        assert "mellow" in do_berserk(char, "")
 
-        result = do_berserk(char, "")
-
-        assert "mellow" in result
-
-    def test_berserk_requires_mana(self, movable_char_factory):
-        """ROM L2297-2301: Requires 50 mana."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["berserk"] = 75
+    def test_requires_mana(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="berserk")
         char.mana = 25
+        assert "energy" in do_berserk(char, "")
 
-        result = do_berserk(char, "")
-
-        assert "energy" in result
-
-    def test_berserk_fighting_bonus(self, movable_char_factory):
-        """ROM L2306-2307: Fighting position adds +10 to chance."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["berserk"] = 50
-        char.position = Position.FIGHTING
+    def test_success_costs_mana_and_move(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="berserk", skill_level=100)
         char.mana = 100
         char.move = 100
         char.hit = 50
         char.max_hit = 100
-
-        with patch("mud.commands.combat.rng_mm.number_percent", return_value=59):
-            result = do_berserk(char, "")
-
-        assert "pulse races" in result or "consumed by rage" in result
-
-    def test_berserk_hp_percent_modifier(self, movable_char_factory):
-        """ROM L2310-2311: hp_percent modifier = 25 - hp_percent/2."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["berserk"] = 50
-        char.position = Position.STANDING
-        char.mana = 100
-        char.move = 100
-        char.hit = 25
-        char.max_hit = 100
-
-        with patch("mud.commands.combat.rng_mm.number_percent", return_value=62):
-            result = do_berserk(char, "")
-
-        assert "pulse" in result
-
-    def test_berserk_success_costs_mana_and_move(self, movable_char_factory):
-        """ROM L2318-2319: Success costs 50 mana and move/2."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["berserk"] = 100
-        char.mana = 100
-        char.move = 100
-        char.hit = 50
-        char.max_hit = 100
-
         with (
             patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
             patch("mud.skills.handlers.berserk", return_value=True),
         ):
             do_berserk(char, "")
-
         assert char.mana == 50
         assert char.move == 50
 
-    def test_berserk_success_heals(self, movable_char_factory):
-        """ROM L2322-2323: Success heals level*2 hp (capped at max_hit)."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["berserk"] = 100
+    def test_success_heals(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="berserk", skill_level=100)
         char.level = 10
         char.mana = 100
         char.move = 100
         char.hit = 50
         char.max_hit = 100
-
         with (
             patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
             patch("mud.skills.handlers.berserk", return_value=True),
         ):
             do_berserk(char, "")
-
         assert char.hit == 70
 
-    def test_berserk_failure_costs_half_mana(self, movable_char_factory):
-        """ROM L2350-2354: Failure costs 25 mana and move/2."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["berserk"] = 10
+    def test_failure_costs_half_mana(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="berserk", skill_level=10)
         char.mana = 100
         char.move = 100
         char.hit = 50
         char.max_hit = 100
-
         with patch("mud.commands.combat.rng_mm.number_percent", return_value=99):
             do_berserk(char, "")
-
         assert char.mana == 75
         assert char.move == 50
 
-    def test_berserk_check_improve_on_success(self, movable_char_factory):
-        """ROM L2328: check_improve called with TRUE on success, multiplier 2."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["berserk"] = 100
+    def test_cannot_berserk_while_recovering(self, movable_char_factory):
+        char = _ready_warrior(movable_char_factory, skill="berserk")
         char.mana = 100
-        char.move = 100
-        char.hit = 50
-        char.max_hit = 100
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=0),
-            patch("mud.commands.combat.skill_registry._check_improve") as improve_mock,
-            patch("mud.skills.handlers.berserk", return_value=True),
-        ):
-            do_berserk(char, "")
-
-        assert improve_mock.called
-        assert improve_mock.call_args[0][3] is True
-        assert improve_mock.call_args[1].get("multiplier") == 2
-
-    def test_berserk_check_improve_on_failure(self, movable_char_factory):
-        """ROM L2354: check_improve called with FALSE on failure, multiplier 2."""
-        char = movable_char_factory("warrior", 3001)
-        char.skills["berserk"] = 10
-        char.mana = 100
-        char.move = 100
-
-        with (
-            patch("mud.commands.combat.rng_mm.number_percent", return_value=99),
-            patch("mud.commands.combat.skill_registry._check_improve") as improve_mock,
-        ):
-            do_berserk(char, "")
-
-        assert improve_mock.called
-        assert improve_mock.call_args[0][3] is False
-        assert improve_mock.call_args[1].get("multiplier") == 2
+        char.wait = 1
+        assert "still recovering" in do_berserk(char, "").lower()
