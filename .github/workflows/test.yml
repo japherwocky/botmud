@@ -67,7 +67,7 @@ jobs:
           pip install -r requirements.txt
           pip install -e .
       - name: Test with pytest
-        run: pytest --tb=short
+        run: pytest --tb=short -n auto
 
   # Linux-only — opens real sockets. The `runs-on: ubuntu-latest` is always
   # Linux so no separate os gate is needed (and `runner.os` is not a valid
