@@ -13,8 +13,14 @@ import os
 # see a fresh empty DB and tests would race the schema.
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 
+import gc as _gc
+
 import pytest  # noqa: E402  (must follow the DATABASE_URL setup above)
 from helpers import ensure_can_move as _ensure_can_move_helper  # noqa: E402
+
+# Periodic-GC counter. Without periodic Gen-2 collection, ~900 iterations
+# of initialize_world exhaust RAM (circular refs never freed).
+_gc_counter: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -73,6 +79,13 @@ def _isolate_world():
     obj_registry.clear()
     room_registry.clear()
     character_registry.clear()
+    # Periodically force Gen-2 GC to free circular-referenced world
+    # objects (Room → people, Character → room, inventories, etc.).
+    # Without this, ~900 iterations exhaust RAM (~32 GB typ.).
+    global _gc_counter
+    _gc_counter += 1
+    if _gc_counter % 100 == 0:
+        _gc.collect()
 
 
 # ---------------------------------------------------------------------------
