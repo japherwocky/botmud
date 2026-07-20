@@ -30,6 +30,7 @@ from mud.utils import rng_mm
 # Shared helpers
 # ---------------------------------------------------------------------------
 
+
 # Monkeypatch MobInstance with inventory/stat helpers needed by some tests.
 def _mob_remove_object(self, obj):
     if obj in self.inventory:
@@ -104,6 +105,7 @@ def _target(movable_mob_factory, room_vnum: int = 3001, name: str = "mob"):
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(autouse=True)
 def seed_rng():
     """Seed RNG for deterministic tests."""
@@ -115,6 +117,7 @@ def seed_rng():
 # ---------------------------------------------------------------------------
 # Backstab
 # ---------------------------------------------------------------------------
+
 
 class TestBackstab:
     def test_requires_argument(self, movable_char_factory):
@@ -196,6 +199,7 @@ class TestBackstab:
 # ---------------------------------------------------------------------------
 # Bash
 # ---------------------------------------------------------------------------
+
 
 class TestBash:
     def test_requires_argument_or_fighting(self, movable_char_factory):
@@ -281,6 +285,7 @@ class TestBash:
 # Kick
 # ---------------------------------------------------------------------------
 
+
 class TestKick:
     def test_requires_fighting(self, movable_char_factory):
         char = _ready_warrior(movable_char_factory, skill="kick")
@@ -347,6 +352,7 @@ class TestKick:
 # Disarm
 # ---------------------------------------------------------------------------
 
+
 class TestDisarm:
     def test_requires_skill(self, movable_char_factory, movable_mob_factory):
         char = _ready_warrior(movable_char_factory, skill="disarm", skill_level=0)
@@ -405,6 +411,7 @@ class TestDisarm:
 # ---------------------------------------------------------------------------
 # Trip
 # ---------------------------------------------------------------------------
+
 
 class TestTrip:
     def test_requires_victim_or_fighting(self, movable_char_factory):
@@ -487,6 +494,7 @@ class TestTrip:
 # Dirt kicking
 # ---------------------------------------------------------------------------
 
+
 class TestDirtKicking:
     def test_requires_victim_or_fighting(self, movable_char_factory):
         char = _ready_thief(movable_char_factory, skill="dirt kicking")
@@ -560,6 +568,7 @@ class TestDirtKicking:
 # ---------------------------------------------------------------------------
 # Rescue
 # ---------------------------------------------------------------------------
+
 
 class TestRescue:
     def test_requires_target_argument(self, movable_char_factory):
@@ -648,6 +657,7 @@ class TestRescue:
 # ---------------------------------------------------------------------------
 # Berserk
 # ---------------------------------------------------------------------------
+
 
 class TestBerserk:
     def test_requires_skill(self, movable_char_factory):

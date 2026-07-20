@@ -535,7 +535,9 @@ def test_multi_hit_with_haste(monkeypatch):
 
 def test_multi_hit_second_attack(monkeypatch):
     attacker, victim = _make_multi_hit_combatants(
-        monkeypatch, victim_hp=20, second_attack=True,
+        monkeypatch,
+        victim_hp=20,
+        second_attack=True,
     )
 
     combat_engine.set_fighting(attacker, victim)
@@ -583,7 +585,10 @@ def test_multi_hit_with_slow(monkeypatch):
 
 def test_multi_hit_victim_dies_early(monkeypatch):
     attacker, victim = _make_multi_hit_combatants(
-        monkeypatch, victim_hp=3, damroll=5, second_attack=True,
+        monkeypatch,
+        victim_hp=3,
+        damroll=5,
+        second_attack=True,
     )
 
     results = combat_engine.multi_hit(attacker, victim)

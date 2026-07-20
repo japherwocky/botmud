@@ -42,6 +42,7 @@ from mud.wiznet import WiznetFlag
 # Shared helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_room(vnum, name="Test", *, flags=0, light=0):
     """Create an Area + Room pair and register the room."""
     area = Area(name=name)
@@ -64,8 +65,12 @@ def _make_npc(name, *, position=Position.STANDING, default_pos=None, room=None, 
     if default_pos is None:
         default_pos = position
     return _make_char(
-        name, is_npc=True, position=position,
-        default_pos=int(default_pos), room=room, **kwargs,
+        name,
+        is_npc=True,
+        position=position,
+        default_pos=int(default_pos),
+        room=room,
+        **kwargs,
     )
 
 
@@ -111,6 +116,7 @@ def _apply_poison(char, *, level=20, duration=5):
 # Reset global state between tests
 # ---------------------------------------------------------------------------
 
+
 def setup_function(_):
     character_registry.clear()
     events.clear()
@@ -130,12 +136,18 @@ def setup_function(_):
 # Regen / tick
 # ---------------------------------------------------------------------------
 
+
 def test_regen_tick_increases_resources():
     _, room = _make_room(10, "Inn")
     ch = _make_char(
         "Bob",
-        hit=5, max_hit=10, mana=3, max_mana=10,
-        move=4, max_move=10, ch_class=3,
+        hit=5,
+        max_hit=10,
+        mana=3,
+        max_mana=10,
+        move=4,
+        max_move=10,
+        ch_class=3,
         pcdata=PCData(condition=[48, 48, 48, 48]),
         perm_stat=[13, 13, 13, 13, 13],
         room=room,
@@ -156,6 +168,7 @@ def test_regen_tick_increases_resources():
 # ---------------------------------------------------------------------------
 # Weather
 # ---------------------------------------------------------------------------
+
 
 def test_weather_pressure_and_sky_transitions(monkeypatch):
     dice_rolls = iter([4, 2, 12] * 5)
@@ -218,6 +231,7 @@ def test_weather_broadcasts_outdoor_characters(monkeypatch):
 # Timed events
 # ---------------------------------------------------------------------------
 
+
 def test_timed_event_fires_after_delay():
     triggered: list[int] = []
     schedule_event(2, lambda: triggered.append(1))
@@ -230,6 +244,7 @@ def test_timed_event_fires_after_delay():
 # ---------------------------------------------------------------------------
 # Pulse ordering
 # ---------------------------------------------------------------------------
+
 
 def test_point_pulse_emits_tick_wiznet_before_updates(monkeypatch):
     gl._pulse_counter = 0
@@ -291,12 +306,11 @@ def test_violence_update_waits_for_pulse_violence(monkeypatch):
 # Mobile AI — aggression
 # ---------------------------------------------------------------------------
 
+
 def test_aggressive_mobile_attacks_player(monkeypatch):
     _, room = _make_room(42, "Arena")
-    hero = _make_char("Hero", level=5, hit=20, max_hit=20, mana=10, max_mana=10,
-                      move=10, max_move=10, room=room)
-    _make_npc("Brute", level=5, hit=20, max_hit=20,
-              act=int(ActFlag.AGGRESSIVE), room=room)
+    hero = _make_char("Hero", level=5, hit=20, max_hit=20, mana=10, max_mana=10, move=10, max_move=10, room=room)
+    _make_npc("Brute", level=5, hit=20, max_hit=20, act=int(ActFlag.AGGRESSIVE), room=room)
 
     monkeypatch.setattr(rng_mm, "number_bits", lambda _: 1)
 
@@ -310,6 +324,7 @@ def test_aggressive_mobile_attacks_player(monkeypatch):
 # ---------------------------------------------------------------------------
 # Mobile AI — mobile_update
 # ---------------------------------------------------------------------------
+
 
 def test_mobile_update_runs_random_trigger(monkeypatch):
     _, room = _make_room(200, "Shrine")
@@ -332,19 +347,24 @@ def test_mobile_update_mobprog_default_position_gate(monkeypatch):
 
     resting_guard = _make_npc(
         "Resting Guard",
-        position=Position.RESTING, default_pos=Position.STANDING,
-        act=int(ActFlag.SCAVENGER), mprog_delay=1, room=room,
+        position=Position.RESTING,
+        default_pos=Position.STANDING,
+        act=int(ActFlag.SCAVENGER),
+        mprog_delay=1,
+        room=room,
     )
     sleeping_oracle = _make_npc(
         "Sleeping Oracle",
         position=Position.SLEEPING,
-        act=int(ActFlag.SCAVENGER), room=room,
+        act=int(ActFlag.SCAVENGER),
+        room=room,
     )
 
     relic = Object(
         instance_id=None,
         prototype=ObjIndex(vnum=0, item_type=int(ItemType.TRASH), short_descr="silver relic"),
-        wear_flags=int(WearFlag.TAKE), cost=50,
+        wear_flags=int(WearFlag.TAKE),
+        cost=50,
     )
     room.add_object(relic)
 
@@ -364,19 +384,24 @@ def test_mobile_update_mobprog_default_position_gate(monkeypatch):
 def test_mobile_update_scavenges_room_loot(monkeypatch):
     _, room = _make_room(201, "Dump")
     scavenger = _make_npc(
-        "Picker", act=int(ActFlag.SCAVENGER),
-        carry_number=0, carry_weight=0, room=room,
+        "Picker",
+        act=int(ActFlag.SCAVENGER),
+        carry_number=0,
+        carry_weight=0,
+        room=room,
     )
 
     cheap = Object(
         instance_id=None,
         prototype=ObjIndex(vnum=0, item_type=int(ItemType.TRASH), short_descr="tin can"),
-        wear_flags=int(WearFlag.TAKE), cost=5,
+        wear_flags=int(WearFlag.TAKE),
+        cost=5,
     )
     pricey = Object(
         instance_id=None,
         prototype=ObjIndex(vnum=0, item_type=int(ItemType.TRASH), short_descr="bright gem"),
-        wear_flags=int(WearFlag.TAKE), cost=25,
+        wear_flags=int(WearFlag.TAKE),
+        cost=25,
     )
     room.add_object(cheap)
     room.add_object(pricey)
@@ -404,13 +429,13 @@ def test_mobile_update_scavenges_room_loot(monkeypatch):
 def test_scavenger_pickup_dispatches_trig_act(monkeypatch):
     """Scavenger pickup broadcast must dispatch TRIG_ACT to NPC observers."""
     _, room = _make_room(202, "Dump")
-    _make_npc("Picker", act=int(ActFlag.SCAVENGER),
-              carry_number=0, carry_weight=0, room=room)
+    _make_npc("Picker", act=int(ActFlag.SCAVENGER), carry_number=0, carry_weight=0, room=room)
 
     gem = Object(
         instance_id=None,
         prototype=ObjIndex(vnum=0, item_type=int(ItemType.TRASH), short_descr="bright gem"),
-        wear_flags=int(WearFlag.TAKE), cost=25,
+        wear_flags=int(WearFlag.TAKE),
+        cost=25,
     )
     room.add_object(gem)
 
@@ -459,15 +484,21 @@ def test_mobile_update_refreshes_shopkeeper_wealth(monkeypatch):
 # char_update — conditions, idle, autosave
 # ---------------------------------------------------------------------------
 
+
 def test_char_update_applies_conditions(monkeypatch):
     monkeypatch.setattr(rng_mm, "number_percent", lambda: 75)
 
     _, room = _make_room(42, "Rest")
     hero = _make_char(
         "Hero",
-        level=5, ch_class=3,
-        hit=5, max_hit=10, mana=3, max_mana=10,
-        move=4, max_move=10,
+        level=5,
+        ch_class=3,
+        hit=5,
+        max_hit=10,
+        mana=3,
+        max_mana=10,
+        move=4,
+        max_move=10,
         size=int(Size.MEDIUM),
         pcdata=PCData(condition=[1, 2, 1, 1]),
         perm_stat=[13, 13, 13, 13, 13],
@@ -498,11 +529,17 @@ def test_char_update_idles_linkdead():
     room_registry[limbo.vnum] = limbo
 
     idle = _make_char(
-        "Sleeper", level=10,
-        hit=20, max_hit=20, mana=15, max_mana=15,
-        move=10, max_move=10,
+        "Sleeper",
+        level=10,
+        hit=20,
+        max_hit=20,
+        mana=15,
+        max_mana=15,
+        move=10,
+        max_move=10,
         pcdata=PCData(condition=[48, 48, 48, 48]),
-        timer=11, room=room,
+        timer=11,
+        room=room,
     )
     idle.desc = None
 
@@ -527,14 +564,16 @@ def test_char_update_autosaves_on_rotation(monkeypatch):
     _, room = _make_room(501, "Inn")
 
     hero = _make_char(
-        "Saver", level=10,
+        "Saver",
+        level=10,
         pcdata=PCData(condition=[48, 48, 48, 48]),
         room=room,
     )
     hero.desc = SimpleNamespace(descriptor_id=30)
 
     bystander = _make_char(
-        "Skipper", level=10,
+        "Skipper",
+        level=10,
         pcdata=PCData(condition=[48, 48, 48, 48]),
         room=room,
     )
@@ -555,7 +594,8 @@ def test_char_update_auto_quits_linkdead(monkeypatch):
     room_registry[limbo.vnum] = limbo
 
     ghost = _make_char(
-        "Ghost", level=10,
+        "Ghost",
+        level=10,
         pcdata=PCData(condition=[48, 48, 48, 48]),
     )
     ghost.timer = 31
@@ -576,6 +616,7 @@ def test_char_update_auto_quits_linkdead(monkeypatch):
 # ---------------------------------------------------------------------------
 # char_update — light decay
 # ---------------------------------------------------------------------------
+
 
 def _make_torch(owner, *, name="bronze torch"):
     """Create a lit torch worn by *owner*."""
@@ -611,9 +652,14 @@ def test_char_update_decays_light_before_lethal_poison_tick():
     _, room = _make_room(301, "Cavern", light=2)
 
     hero = _make_char(
-        "Poisoned", level=5,
-        hit=1, max_hit=1, mana=1, max_mana=1,
-        move=1, max_move=1,
+        "Poisoned",
+        level=5,
+        hit=1,
+        max_hit=1,
+        mana=1,
+        max_mana=1,
+        move=1,
+        max_move=1,
         pcdata=PCData(condition=[48, 48, 48, 48]),
         room=room,
     )
@@ -637,6 +683,7 @@ def test_char_update_decays_light_before_lethal_poison_tick():
 # char_update — out-of-zone mob extraction
 # ---------------------------------------------------------------------------
 
+
 def test_char_update_extracts_out_of_zone_mob(monkeypatch):
     area_home = Area(name="Town")
     area_foreign = Area(name="Dungeon")
@@ -646,8 +693,10 @@ def test_char_update_extracts_out_of_zone_mob(monkeypatch):
     room_registry[away_room.vnum] = away_room
 
     wanderer = _make_npc(
-        "Rover", short_descr="Rover",
-        default_pos=Position.STANDING, room=away_room,
+        "Rover",
+        short_descr="Rover",
+        default_pos=Position.STANDING,
+        room=away_room,
     )
     wanderer.zone = area_home
 
@@ -674,8 +723,10 @@ def test_wanders_home_dispatches_trig_act(monkeypatch):
     room_registry[away_room.vnum] = away_room
 
     wanderer = _make_npc(
-        "Drifter", short_descr="Drifter",
-        default_pos=Position.STANDING, room=away_room,
+        "Drifter",
+        short_descr="Drifter",
+        default_pos=Position.STANDING,
+        room=away_room,
     )
     wanderer.zone = area_home
 
@@ -694,12 +745,15 @@ def test_wanders_home_dispatches_trig_act(monkeypatch):
 # char_update — poison tick
 # ---------------------------------------------------------------------------
 
+
 def test_poison_shiver_dispatches_trig_act(monkeypatch):
     """Poison tick broadcast must dispatch TRIG_ACT to NPC observers."""
     _, room = _make_room(407, "Swamp")
 
     victim = _make_char(
-        "Vic", hit=50, max_hit=50,
+        "Vic",
+        hit=50,
+        max_hit=50,
         pcdata=PCData(condition=[48, 48, 48, 48]),
         room=room,
     )
@@ -709,14 +763,13 @@ def test_poison_shiver_dispatches_trig_act(monkeypatch):
 
     char_update()
 
-    assert any("shivers" in msg for msg, _ in fired), (
-        "poison broadcast must dispatch mp_act_trigger"
-    )
+    assert any("shivers" in msg for msg, _ in fired), "poison broadcast must dispatch mp_act_trigger"
 
 
 # ---------------------------------------------------------------------------
 # obj_update — corpse decay
 # ---------------------------------------------------------------------------
+
 
 def test_obj_update_decays_corpse():
     _, room = _make_room(200, "Battlefield")
@@ -752,18 +805,15 @@ def test_obj_update_decay_dispatches_trig_act(monkeypatch):
 
     obj_update()
 
-    assert any("Kobold corpse decays into dust" in msg for msg, _ in fired), (
-        "object decay must dispatch mp_act_trigger"
-    )
+    assert any("Kobold corpse decays into dust" in msg for msg, _ in fired), "object decay must dispatch mp_act_trigger"
     # The act() loop passes room.people[0] (the first rch) as the actor.
-    assert any(actor is room.people[0] for _, actor in fired), (
-        "object decay TRIG_ACT actor must be a room observer"
-    )
+    assert any(actor is room.people[0] for _, actor in fired), "object decay TRIG_ACT actor must be a room observer"
 
 
 # ---------------------------------------------------------------------------
 # obj_update — object affect wear-off
 # ---------------------------------------------------------------------------
+
 
 def test_object_affect_wear_off_dispatches_trig_act(monkeypatch):
     """Object affect wear-off broadcast must dispatch TRIG_ACT."""
@@ -787,9 +837,7 @@ def test_object_affect_wear_off_dispatches_trig_act(monkeypatch):
         "object affect wear-off must dispatch mp_act_trigger"
     )
     # The act() loop passes room.people[0] (the first rch) as the actor.
-    assert any(actor is room.people[0] for _, actor in fired), (
-        "wear-off TRIG_ACT actor must be a room observer"
-    )
+    assert any(actor is room.people[0] for _, actor in fired), "wear-off TRIG_ACT actor must be a room observer"
 
 
 def test_carried_object_affect_wear_off_is_to_char_only(monkeypatch):
@@ -817,6 +865,7 @@ def test_carried_object_affect_wear_off_is_to_char_only(monkeypatch):
 # ---------------------------------------------------------------------------
 # obj_update — floating container spill
 # ---------------------------------------------------------------------------
+
 
 def test_obj_update_spills_floating_container():
     _, room = _make_room(300, "Treasure")

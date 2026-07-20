@@ -202,6 +202,7 @@ class TestWaitDaze:
 
     def test_haste_halves_wait(self):
         from mud.math.c_compat import c_div
+
         ch = _ch()
         ch.affected_by = AffectFlag.HASTE
         assert c_div(12, 2) == 6
@@ -220,6 +221,7 @@ class TestWaitDaze:
 class TestAreaReset:
     def _area(self, age=0, nplayer=0):
         from mud.models.area import Area
+
         a = Area(vnum=100, name="Test Area")
         a.age = age
         a.nplayer = nplayer
@@ -244,6 +246,7 @@ class TestAreaReset:
 
     def test_reset_resets_age(self):
         from mud.utils import rng_mm
+
         a = self._area(age=20)
         rng_mm.seed_mm(42)
         a.age = rng_mm.number_range(0, 3)

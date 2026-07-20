@@ -119,7 +119,7 @@ def test_magic016_armor_cross_target_npc_uses_pers_shortdescr_capitalized():
 
 def test_armor_already_affected_uses_rom_message():
     """The already-affected branch is ROM's "You are already armored." for a
-    self-cast (src/magic.c:758-763), not the legacy "They are already protected.\" """
+    self-cast (src/magic.c:758-763), not the legacy "They are already protected.\""""
     room = Room(vnum=99103, name="Arena")
     caster = _mage("Tester", room)
 

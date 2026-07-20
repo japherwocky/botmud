@@ -37,6 +37,7 @@ from mud.world.movement import can_carry_n, can_carry_w
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _total_wealth(char: Character) -> int:
     return int(char.gold) * 100 + int(char.silver)
 
@@ -52,11 +53,7 @@ def _create_shop_character(name: str, room_vnum: int) -> Character:
 def _find_keeper(char, keeper_vnum=3002):
     """Locate the shopkeeper in char's room, spawning one if missing."""
     keeper = next(
-        (
-            p
-            for p in char.room.people
-            if getattr(p, "prototype", None) and p.prototype.vnum in shop_registry
-        ),
+        (p for p in char.room.people if getattr(p, "prototype", None) and p.prototype.vnum in shop_registry),
         None,
     )
     if keeper is None:
@@ -71,19 +68,14 @@ def _clean_keeper_inventory(keeper, exclude="lantern"):
     keeper.inventory = [
         obj
         for obj in getattr(keeper, "inventory", [])
-        if exclude
-        not in (getattr(obj.prototype, "short_descr", "") or "").lower()
+        if exclude not in (getattr(obj.prototype, "short_descr", "") or "").lower()
     ]
 
 
 def _ensure_lantern(keeper):
     """Guarantee a hooded brass lantern is in keeper stock; return it."""
     match = next(
-        (
-            obj
-            for obj in keeper.inventory
-            if (obj.short_descr or "").lower().startswith("a hooded brass lantern")
-        ),
+        (obj for obj in keeper.inventory if (obj.short_descr or "").lower().startswith("a hooded brass lantern")),
         None,
     )
     if match is None:
@@ -104,9 +96,11 @@ def shop_hour(hour=10):
     finally:
         time_info.hour = prev
 
+
 # ---------------------------------------------------------------------------
 # Pet-shop helper (self-contained -- uses its own isolated registries)
 # ---------------------------------------------------------------------------
+
 
 def _setup_pet_shop(proto_level=5):
     room_registry.clear()
@@ -119,9 +113,7 @@ def _setup_pet_shop(proto_level=5):
     room_registry[storefront.vnum] = storefront
     room_registry[kennel.vnum] = kennel
 
-    proto = MobIndex(
-        vnum=9602, short_descr="a cuddly companion", player_name="companion pet"
-    )
+    proto = MobIndex(vnum=9602, short_descr="a cuddly companion", player_name="companion pet")
     proto.description = "A bright-eyed pet watches you expectantly.\n"
     proto.level = proto_level
     proto.act_flags = int(ActFlag.PET)
@@ -137,9 +129,11 @@ def _setup_pet_shop(proto_level=5):
 
     return buyer, storefront, kennel, proto
 
+
 # ---------------------------------------------------------------------------
 # Buy tests
 # ---------------------------------------------------------------------------
+
 
 def test_buy_from_grocer():
     char = _create_shop_character("Buyer", 3010)
@@ -149,21 +143,14 @@ def test_buy_from_grocer():
         _ensure_lantern(keeper)
         listing = process_command(char, "list")
         assert "[Lv Price Qty] Item" in listing
-        lantern_line = next(
-            line
-            for line in listing.splitlines()
-            if "hooded brass lantern" in line
-        )
+        lantern_line = next(line for line in listing.splitlines() if "hooded brass lantern" in line)
         assert "--" in lantern_line
         assert "112" in lantern_line
         buy_output = process_command(char, "buy lantern")
         assert "buy a hooded brass lantern" in buy_output.lower()
         assert char.gold == 98
         assert char.silver == 88
-        assert any(
-            (obj.short_descr or "").lower().startswith("a hooded brass lantern")
-            for obj in char.inventory
-        )
+        assert any((obj.short_descr or "").lower().startswith("a hooded brass lantern") for obj in char.inventory)
 
 
 def test_buy_uses_gold_and_silver():
@@ -197,28 +184,12 @@ def test_buy_rejects_items_above_level():
         keeper.inventory.append(weapon)
         before_gold = char.gold
         response = process_command(char, "buy greatsword")
-        keeper_name = (
-            getattr(keeper, "short_descr", None)
-            or getattr(keeper, "name", None)
-            or "The shopkeeper"
-        )
-        weapon_name = (
-            getattr(weapon, "short_descr", None)
-            or getattr(weapon, "name", None)
-            or "it"
-        )
-        assert response == capitalize_act_line(
-            f"{keeper_name} tells you 'You can't use {weapon_name} yet'."
-        )
+        keeper_name = getattr(keeper, "short_descr", None) or getattr(keeper, "name", None) or "The shopkeeper"
+        weapon_name = getattr(weapon, "short_descr", None) or getattr(weapon, "name", None) or "it"
+        assert response == capitalize_act_line(f"{keeper_name} tells you 'You can't use {weapon_name} yet'.")
         assert char.gold == before_gold
-        assert not any(
-            "greatsword" in (obj.short_descr or "").lower()
-            for obj in char.inventory
-        )
-        assert any(
-            "greatsword" in (obj.short_descr or "").lower()
-            for obj in keeper.inventory
-        )
+        assert not any("greatsword" in (obj.short_descr or "").lower() for obj in char.inventory)
+        assert any("greatsword" in (obj.short_descr or "").lower() for obj in keeper.inventory)
 
 
 def test_buy_respects_carry_limits():
@@ -238,9 +209,7 @@ def test_buy_respects_carry_limits():
             return sum(
                 1
                 for obj in keeper.inventory
-                if (obj.short_descr or obj.name or "")
-                .lower()
-                .startswith("a hooded brass lantern")
+                if (obj.short_descr or obj.name or "").lower().startswith("a hooded brass lantern")
             )
 
         baseline_count = lantern_count()
@@ -255,10 +224,7 @@ def test_buy_respects_carry_limits():
         assert char.gold == before_gold
         assert char.silver == before_silver
         assert not any(
-            (obj.short_descr or obj.name or "")
-            .lower()
-            .startswith("a hooded brass lantern")
-            for obj in char.inventory
+            (obj.short_descr or obj.name or "").lower().startswith("a hooded brass lantern") for obj in char.inventory
         )
         assert lantern_count() == baseline_count
 
@@ -270,10 +236,7 @@ def test_buy_respects_carry_limits():
         assert char.gold == before_gold
         assert char.silver == before_silver
         assert not any(
-            (obj.short_descr or obj.name or "")
-            .lower()
-            .startswith("a hooded brass lantern")
-            for obj in char.inventory
+            (obj.short_descr or obj.name or "").lower().startswith("a hooded brass lantern") for obj in char.inventory
         )
         assert lantern_count() == baseline_count
 
@@ -293,10 +256,7 @@ def test_buy_denied_when_coins_exceed_weight_cap():
         assert char.gold == 1000
         assert char.silver == 0
         assert not any(
-            (obj.short_descr or obj.name or "")
-            .lower()
-            .startswith("a hooded brass lantern")
-            for obj in char.inventory
+            (obj.short_descr or obj.name or "").lower().startswith("a hooded brass lantern") for obj in char.inventory
         )
 
 
@@ -309,13 +269,8 @@ def test_buy_preserves_infinite_stock():
         assert ration is not None
         ration.prototype.short_descr = "a stack of ration packs"
         ration.prototype.cost = 25
-        ration.prototype.extra_flags = (
-            int(getattr(ration.prototype, "extra_flags", 0) or 0)
-            | int(ITEM_INVENTORY)
-        )
-        ration.extra_flags = (
-            int(getattr(ration, "extra_flags", 0) or 0) | int(ITEM_INVENTORY)
-        )
+        ration.prototype.extra_flags = int(getattr(ration.prototype, "extra_flags", 0) or 0) | int(ITEM_INVENTORY)
+        ration.extra_flags = int(getattr(ration, "extra_flags", 0) or 0) | int(ITEM_INVENTORY)
         ration.timer = 12
         keeper.inventory.append(ration)
 
@@ -334,9 +289,7 @@ def test_buy_preserves_infinite_stock():
         purchased = next(
             obj
             for obj in char.inventory
-            if (obj.short_descr or obj.name or "")
-            .lower()
-            .startswith("a stack of ration packs")
+            if (obj.short_descr or obj.name or "").lower().startswith("a stack of ration packs")
         )
         assert purchased is not ration
         assert purchased.prototype is ration.prototype
@@ -356,12 +309,8 @@ def test_buy_handles_multiple_inventory_copies():
             p = obj.prototype
             p.short_descr = "a stack of ration packs"
             p.cost = 25
-            p.extra_flags = (
-                int(getattr(p, "extra_flags", 0) or 0) | int(ITEM_INVENTORY)
-            )
-            obj.extra_flags = (
-                int(getattr(obj, "extra_flags", 0) or 0) | int(ITEM_INVENTORY)
-            )
+            p.extra_flags = int(getattr(p, "extra_flags", 0) or 0) | int(ITEM_INVENTORY)
+            obj.extra_flags = int(getattr(obj, "extra_flags", 0) or 0) | int(ITEM_INVENTORY)
             obj.timer = 12
             return obj
 
@@ -381,9 +330,7 @@ def test_buy_handles_multiple_inventory_copies():
             bought = [
                 obj
                 for obj in char.inventory
-                if (obj.short_descr or obj.name or "")
-                .lower()
-                .startswith("a stack of ration packs")
+                if (obj.short_descr or obj.name or "").lower().startswith("a stack of ration packs")
             ][-1]
             assert bought.prototype is ration_a.prototype
             assert bought.timer == 0
@@ -397,9 +344,7 @@ def test_buy_handles_multiple_inventory_copies():
         remaining = {
             id(obj)
             for obj in keeper.inventory
-            if (obj.short_descr or obj.name or "")
-            .lower()
-            .startswith("a stack of ration packs")
+            if (obj.short_descr or obj.name or "").lower().startswith("a stack of ration packs")
         }
         assert baseline_ids <= remaining
 
@@ -414,9 +359,7 @@ def test_buy_inventory_fallback_uses_original_object():
         template.level = 0
         template.weight = 1
         template.cost = 30
-        template.extra_flags = (
-            int(getattr(template, "extra_flags", 0) or 0) | int(ITEM_INVENTORY)
-        )
+        template.extra_flags = int(getattr(template, "extra_flags", 0) or 0) | int(ITEM_INVENTORY)
         template.timer = 9
         keeper.inventory.append(template)
 
@@ -457,20 +400,9 @@ def test_buy_multiple_items_from_inventory():
         total_price = int(match.group(1))
         assert total_price > 0
         assert _total_wealth(char) == before_wealth - total_price
-        ration_count = sum(
-            1
-            for obj in char.inventory
-            if (obj.short_descr or "").lower() == "a ration pack"
-        )
+        ration_count = sum(1 for obj in char.inventory if (obj.short_descr or "").lower() == "a ration pack")
         assert ration_count == 3
-        assert (
-            sum(
-                1
-                for obj in keeper.inventory
-                if (obj.short_descr or "").lower() == "a ration pack"
-            )
-            == 0
-        )
+        assert sum(1 for obj in keeper.inventory if (obj.short_descr or "").lower() == "a ration pack") == 0
 
 
 def test_buy_specific_stock_slot():
@@ -502,9 +434,11 @@ def test_buy_specific_stock_slot():
         assert all(existing is not second for existing in keeper.inventory)
         assert any(existing is third for existing in keeper.inventory)
 
+
 # ---------------------------------------------------------------------------
 # Sell tests
 # ---------------------------------------------------------------------------
+
 
 def test_sell_to_grocer():
     char = _create_shop_character("Seller", 3010)
@@ -526,10 +460,7 @@ def test_sell_to_grocer():
         assert _total_wealth(char) == price
         assert char.gold == price // 100
         assert char.silver == price % 100
-        assert any(
-            (obj.short_descr or "").lower().startswith("a hooded brass lantern")
-            for obj in keeper.inventory
-        )
+        assert any((obj.short_descr or "").lower().startswith("a hooded brass lantern") for obj in keeper.inventory)
 
 
 def test_sell_awards_gold_and_silver():
@@ -567,9 +498,7 @@ def test_sell_reports_gold_and_silver():
     char.add_object(lantern)
     with shop_hour():
         response = process_command(char, "sell lantern")
-        match = re.search(
-            r"for (\d+) silver(?: and (\d+) gold piece(s?))?\.\Z", response
-        )
+        match = re.search(r"for (\d+) silver(?: and (\d+) gold piece(s?))?\.\Z", response)
         assert match is not None
         silver = int(match.group(1))
         gold = int(match.group(2)) if match.group(2) is not None else 0
@@ -610,14 +539,8 @@ def test_sell_respects_drop_and_visibility_gates():
                 invis_obj.value[2] = 0
             char.add_object(invis_obj)
             response = process_command(char, "sell lantern")
-            keeper_name = (
-                getattr(keeper, "short_descr", None)
-                or getattr(keeper, "name", None)
-                or "The shopkeeper"
-            )
-            assert response == capitalize_act_line(
-                f"{keeper_name} doesn't see what you are offering."
-            )
+            keeper_name = getattr(keeper, "short_descr", None) or getattr(keeper, "name", None) or "The shopkeeper"
+            assert response == capitalize_act_line(f"{keeper_name} doesn't see what you are offering.")
             assert _total_wealth(char) == 0
     finally:
         if nodrop_obj and nodrop_obj in char.inventory:
@@ -633,17 +556,8 @@ def test_sell_sets_reply_after_missing_item():
     keeper = _find_keeper(char)
     with shop_hour():
         response = process_command(char, "sell lantern")
-        keeper_name = (
-            getattr(keeper, "short_descr", None)
-            or getattr(keeper, "name", None)
-            or "The shopkeeper"
-        )
-        assert (
-            capitalize_act_line(
-                f"{keeper_name} tells you 'You don't have that item'."
-            )
-            == response
-        )
+        keeper_name = getattr(keeper, "short_descr", None) or getattr(keeper, "name", None) or "The shopkeeper"
+        assert capitalize_act_line(f"{keeper_name} tells you 'You don't have that item'.") == response
         assert char.reply is keeper
 
 
@@ -719,9 +633,7 @@ def test_sell_haggle_applies_discount():
 
     base_sell = _get_cost(keeper, lantern, buy=False)
     buy_price = _get_cost(keeper, lantern, buy=True)
-    proto_cost = int(
-        getattr(lantern.prototype, "cost", getattr(lantern, "cost", 0)) or 0
-    )
+    proto_cost = int(getattr(lantern.prototype, "cost", getattr(lantern, "cost", 0)) or 0)
 
     original_roll = rng_mm.number_percent
     try:
@@ -738,9 +650,7 @@ def test_sell_haggle_applies_discount():
 
     expected_bonus = (proto_cost // 2) * 40 // 100
     cap_by_buy = (95 * buy_price) // 100 if buy_price > 0 else base_sell + expected_bonus
-    expected_total = min(
-        base_sell + expected_bonus, cap_by_buy, keeper.gold * 100 + keeper.silver + base_sell
-    )
+    expected_total = min(base_sell + expected_bonus, cap_by_buy, keeper.gold * 100 + keeper.silver + base_sell)
     assert total_price == expected_total
     assert "You haggle with the shopkeeper." in getattr(char, "messages", [])
 
@@ -771,9 +681,7 @@ def test_sell_numbered_selector():
 
         response = process_command(char, "sell 2.lantern")
         assert "you sell" in response.lower()
-        match = re.search(
-            r"for (\d+) silver(?: and (\d+) gold piece(s?))?\.\Z", response
-        )
+        match = re.search(r"for (\d+) silver(?: and (\d+) gold piece(s?))?\.\Z", response)
         assert match is not None
         silver = int(match.group(1))
         gold = int(match.group(2)) if match.group(2) is not None else 0
@@ -786,9 +694,11 @@ def test_sell_numbered_selector():
         assert all(obj is not first for obj in char.inventory)
         assert any(obj is first for obj in keeper.inventory)
 
+
 # ---------------------------------------------------------------------------
 # GetCost unit tests
 # ---------------------------------------------------------------------------
+
 
 def test_get_cost_sell_extract_skips_dupe_discount():
     char = _create_shop_character("Extractor", 3010)
@@ -913,9 +823,11 @@ def test_get_cost_dupe_discount_compounds_per_copy():
     assert two == c_div(one * 3, 4)
     assert two < one
 
+
 # ---------------------------------------------------------------------------
 # Value tests
 # ---------------------------------------------------------------------------
+
 
 def test_value_respects_drop_and_visibility_gates():
     char = _create_shop_character("Appraiser", 3010)
@@ -1003,9 +915,11 @@ def test_value_uses_keeper_voice_with_item_name():
         assert "silver" in response
         assert "gold coins" in response
 
+
 # ---------------------------------------------------------------------------
 # List tests
 # ---------------------------------------------------------------------------
+
 
 def test_list_price_matches_buy_price():
     char = _create_shop_character("Buyer", 3010)
@@ -1014,9 +928,7 @@ def test_list_price_matches_buy_price():
     with shop_hour():
         _ensure_lantern(keeper)
         out = process_command(char, "list")
-        lantern_line = next(
-            line for line in out.splitlines() if "hooded brass lantern" in line
-        )
+        lantern_line = next(line for line in out.splitlines() if "hooded brass lantern" in line)
         match = re.search(r"\[\s*\d+\s+(\d+)\s+", lantern_line)
         assert match
         price = int(match.group(1))
@@ -1138,9 +1050,11 @@ def test_list_skips_keeper_worn_items():
         assert "normal lantern" in listing
         assert "worn lantern" not in listing
 
+
 # ---------------------------------------------------------------------------
 # Shop behavior tests
 # ---------------------------------------------------------------------------
+
 
 def test_shop_respects_open_hours():
     char = _create_shop_character("Captain patron", 3001)
@@ -1288,9 +1202,11 @@ def test_buy_cant_afford_uses_keeper_voice():
         assert capitalize_act_line(f"{name} tells you '") in response
         assert "You can't afford" in response
 
+
 # ---------------------------------------------------------------------------
 # Haggle tests
 # ---------------------------------------------------------------------------
+
 
 def test_buy_haggle_reduces_cost_on_success():
     char = _create_shop_character("Haggler", 3010)
@@ -1543,9 +1459,11 @@ def test_wand_staff_price_scales_with_charges_and_inventory_discount():
         # base=15, non-inv dupe -> 11, inv copy -> 5, charge 5/10 -> 2
         assert process_command(ch, "sell wand").endswith("2 silver and 0 gold pieces.")
 
+
 # ---------------------------------------------------------------------------
 # Pet-shop tests
 # ---------------------------------------------------------------------------
+
 
 def test_pet_shop_purchase_creates_charmed_pet():
     rng_mm.seed_mm(1)
@@ -1636,12 +1554,8 @@ def test_sell_inventory_item_dedups_via_obj_to_keeper():
         assert template is not None
         template.prototype.item_type = int(ItemType.LIGHT)
         template.prototype.cost = 100
-        template.prototype.extra_flags = (
-            int(getattr(template.prototype, "extra_flags", 0) or 0) | int(ITEM_INVENTORY)
-        )
-        template.extra_flags = (
-            int(getattr(template, "extra_flags", 0) or 0) | int(ITEM_INVENTORY)
-        )
+        template.prototype.extra_flags = int(getattr(template.prototype, "extra_flags", 0) or 0) | int(ITEM_INVENTORY)
+        template.extra_flags = int(getattr(template, "extra_flags", 0) or 0) | int(ITEM_INVENTORY)
         keeper.inventory.append(template)
 
         before = len(keeper.inventory)
@@ -1674,10 +1588,7 @@ def test_buy_multi_stock_requires_consecutive_run():
         result = process_command(char, "buy 2*lantern")
         assert "don't have that many in stock" in result.lower()
         assert l1 in keeper.inventory and l2 in keeper.inventory
-        assert not any(
-            (o.short_descr or "").lower().startswith("a hooded brass lantern")
-            for o in char.inventory
-        )
+        assert not any((o.short_descr or "").lower().startswith("a hooded brass lantern") for o in char.inventory)
 
 
 def test_obj_to_keeper_standardizes_cost_even_when_existing_is_zero():

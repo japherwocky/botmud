@@ -63,7 +63,8 @@ _PLAYER_FLAG_TOGGLES = [
 class TestPlayerFlagToggles:
     @pytest.mark.p0
     @pytest.mark.parametrize(
-        "cmd, flag, on_kw, off_kw", _PLAYER_FLAG_TOGGLES,
+        "cmd, flag, on_kw, off_kw",
+        _PLAYER_FLAG_TOGGLES,
     )
     def test_toggle(self, cmd, flag, on_kw, off_kw):
         ch = _player()
@@ -103,7 +104,8 @@ _COMM_FLAG_TOGGLES = [
 class TestCommFlagToggles:
     @pytest.mark.p0
     @pytest.mark.parametrize(
-        "cmd, flag, on_kw, off_kw", _COMM_FLAG_TOGGLES,
+        "cmd, flag, on_kw, off_kw",
+        _COMM_FLAG_TOGGLES,
     )
     def test_toggle(self, cmd, flag, on_kw, off_kw):
         ch = _player()
@@ -153,8 +155,12 @@ class TestAutoList:
 # ---------------------------------------------------------------------------
 
 _ALL_FLAGS = (
-    PlayerFlag.AUTOASSIST | PlayerFlag.AUTOEXIT | PlayerFlag.AUTOGOLD
-    | PlayerFlag.AUTOLOOT | PlayerFlag.AUTOSAC | PlayerFlag.AUTOSPLIT
+    PlayerFlag.AUTOASSIST
+    | PlayerFlag.AUTOEXIT
+    | PlayerFlag.AUTOGOLD
+    | PlayerFlag.AUTOLOOT
+    | PlayerFlag.AUTOSAC
+    | PlayerFlag.AUTOSPLIT
 )
 
 
@@ -171,8 +177,13 @@ class TestAutoAll:
     def test_off(self):
         ch = _player()
         enable_autos(
-            ch, autoassist=True, autoexit=True, autogold=True,
-            autoloot=True, autosac=True, autosplit=True,
+            ch,
+            autoassist=True,
+            autoexit=True,
+            autogold=True,
+            autoloot=True,
+            autosac=True,
+            autosplit=True,
         )
         output = do_autoall(ch, "off")
         assert not (ch.act & _ALL_FLAGS)
