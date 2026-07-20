@@ -123,7 +123,8 @@ def pytest_ignore_collect(collection_path: object, config: pytest.Config) -> boo
     """
     if config.getoption("--include-parity"):
         return None  # user opted in: collect everything
-    if "tests/integration" in str(collection_path):
+    # os.sep for Windows compat: str(path) uses backslashes on Windows.
+    if f"tests{os.sep}integration" in str(collection_path):
         return True
     return None
 
