@@ -51,13 +51,8 @@ jobs:
   # resolve to bleeding-edge pytest 9 / xdist 3.8, which crash xdist workers
   # ("node down: Not properly terminated") and abort the run with an
   # INTERNALERROR. See CHANGELOG 2.14.267.
-  #
-  # Cost: this run is ~32 CI-min. It is therefore gated to pull_request +
-  # manual dispatch only — direct pushes to master run just the cheap jobs
-  # above. The dev validates the full suite locally via .venv. See 2.14.268.
   test:
     name: Full suite (Python 3.12, pinned)
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     needs: lint
@@ -72,40 +67,7 @@ jobs:
           pip install -r requirements.txt
           pip install -e .
       - name: Test with pytest
-        # Inherits addopts (--timeout=120) from pyproject.toml. The xdist
-        # addopt is -n0, so this run is serial and stable on every runner.
-        #
-        # The .are -> .json conversion scripts (area/help.are, area/*.are, etc.)
-        # are exercised by tests/test_help_conversion.py,
-        # tests/test_are_conversion.py, tests/test_shop_conversion.py, and
-        # tests/test_social_conversion.py — no separate CI drift check
-        # needed. The .are files are kept as frozen ROM 2.4 reference data;
-        # data/*.json is the runtime source and has entries the .are doesn't
-        # (added by the previous author during ROM-parity work).
         run: pytest --tb=short
-
-  # Optional: runs the ROM 2.4 parity harness in tests/integration/ on push
-  # to main. ~3000 tests, ~4 min. Off the default PR path because the
-  # project no longer treats parity as a goal. See make test-parity to run
-  # locally.
-  parity-tests:
-    name: ROM Parity Tests
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: lint
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-      - name: Install pinned dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -e .
-      - name: Run parity tests
-        run: pytest tests/integration/ --include-parity -q --tb=line --timeout=60
 
   # Linux-only — opens real sockets. The `runs-on: ubuntu-latest` is always
   # Linux so no separate os gate is needed (and `runner.os` is not a valid

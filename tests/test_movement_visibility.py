@@ -1,10 +1,10 @@
 from mud.models.character import Character
 from mud.models.constants import (
-    ItemType,
     LEVEL_HERO,
     LEVEL_IMMORTAL,
     AffectFlag,
     Direction,
+    ItemType,
     Position,
     RoomFlag,
     Sector,

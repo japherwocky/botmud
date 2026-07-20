@@ -38,7 +38,6 @@ from mud.time import time_info
 from mud.utils import rng_mm
 from mud.wiznet import WiznetFlag
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------

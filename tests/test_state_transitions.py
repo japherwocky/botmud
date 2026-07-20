@@ -7,14 +7,14 @@ Calls real game functions rather than reimplementing logic in the test.
 
 from __future__ import annotations
 
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-from mud.commands.position import do_sleep, do_stand, do_wake
+import pytest
+
 from mud.combat.engine import set_fighting, update_pos
+from mud.commands.position import do_sleep, do_stand, do_wake
 from mud.models.character import Character
 from mud.models.constants import AffectFlag, Position
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -124,38 +124,38 @@ def _at(pos: Position) -> Character:
 class TestPositionCommands:
     def test_wake_from_sleep(self):
         ch = _at(Position.SLEEPING)
-        output = do_wake(ch, "")
+        do_wake(ch, "")
         assert ch.position == Position.STANDING
 
     def test_wake_from_rest(self):
         ch = _at(Position.RESTING)
-        output = do_wake(ch, "")
+        do_wake(ch, "")
         assert ch.position == Position.STANDING
 
     def test_wake_from_sit(self):
         ch = _at(Position.SITTING)
-        output = do_wake(ch, "")
+        do_wake(ch, "")
         assert ch.position == Position.STANDING
 
     def test_stand_from_sleep(self):
         ch = _at(Position.SLEEPING)
-        output = do_stand(ch, "")
+        do_stand(ch, "")
         assert ch.position == Position.STANDING
 
     def test_sleep_from_standing(self):
         ch = _at(Position.STANDING)
-        output = do_sleep(ch, "")
+        do_sleep(ch, "")
         assert ch.position == Position.SLEEPING
 
     def test_sleep_from_resting(self):
         ch = _at(Position.RESTING)
-        output = do_sleep(ch, "")
+        do_sleep(ch, "")
         assert ch.position == Position.SLEEPING
 
     def test_cannot_sleep_while_fighting(self):
         ch = _at(Position.FIGHTING)
         ch.fighting = MagicMock()
-        output = do_sleep(ch, "")
+        do_sleep(ch, "")
         assert ch.position == Position.FIGHTING
 
 
@@ -243,7 +243,6 @@ class TestAreaReset:
         assert a.age >= 15
 
     def test_reset_resets_age(self):
-        from mud.models.area import Area
         from mud.utils import rng_mm
         a = self._area(age=20)
         rng_mm.seed_mm(42)

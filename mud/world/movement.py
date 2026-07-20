@@ -27,7 +27,7 @@ from mud.registry import room_registry
 from mud.utils import rng_mm
 from mud.utils.act import act_format
 from mud.world.look import look
-from mud.world.vision import can_see_room, check_blind, room_is_dark
+from mud.world.vision import can_see_room, room_is_dark
 
 dir_map: dict[str, Direction] = {
     "north": Direction.NORTH,

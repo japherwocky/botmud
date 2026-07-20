@@ -26,7 +26,6 @@ from mud.skills import skill_registry
 from mud.spawning.templates import MobInstance
 from mud.utils import rng_mm
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
@@ -137,7 +136,7 @@ class TestBackstab:
 
     def test_requires_weapon(self, movable_char_factory, movable_mob_factory):
         char = _ready_thief(movable_char_factory, skill="backstab")
-        mob = _target(movable_mob_factory)
+        _target(movable_mob_factory)
         assert "need to wield" in do_backstab(char, "mob").lower()
 
     def test_cannot_backstab_wounded_victim(self, movable_char_factory, movable_mob_factory, object_factory):
@@ -236,7 +235,7 @@ class TestBash:
     def test_failure_knocks_attacker_to_resting(self, movable_char_factory, movable_mob_factory):
         char = _ready_warrior(movable_char_factory, skill="bash", skill_level=1)
         char.position = Position.STANDING
-        mob = _target(movable_mob_factory)
+        _target(movable_mob_factory)
         # Mock the handler to prevent it from overriding the position change.
         with (
             patch("mud.commands.combat.rng_mm.number_percent", return_value=99),
@@ -259,7 +258,7 @@ class TestBash:
     def test_cannot_bash_while_recovering(self, movable_char_factory, movable_mob_factory):
         char = _ready_warrior(movable_char_factory, skill="bash")
         char.wait = 1
-        mob = _target(movable_mob_factory)
+        _target(movable_mob_factory)
         assert "still recovering" in do_bash(char, "mob").lower()
 
     def test_success_deals_damage(self, movable_char_factory):

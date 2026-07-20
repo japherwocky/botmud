@@ -31,7 +31,6 @@ from mud.skills import load_skills, skill_registry
 from mud.utils import rng_mm
 from mud.world import create_test_character, initialize_world
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

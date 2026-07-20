@@ -105,7 +105,7 @@ def shop_hour(hour=10):
         time_info.hour = prev
 
 # ---------------------------------------------------------------------------
-# Pet-shop helper (self-contained – uses its own isolated registries)
+# Pet-shop helper (self-contained -- uses its own isolated registries)
 # ---------------------------------------------------------------------------
 
 def _setup_pet_shop(proto_level=5):
@@ -1246,7 +1246,8 @@ def test_shop_respects_keeper_wealth():
     char.add_object(canoe)
 
     with shop_hour():
-        keeper.gold = 1; keeper.silver = 0
+        keeper.gold = 1
+        keeper.silver = 0
         name = getattr(keeper, "short_descr", None) or getattr(keeper, "name", None) or "The shopkeeper"
         canoe_name = getattr(canoe, "short_descr", None) or getattr(canoe, "name", None) or "it"
         denied = process_command(char, "sell canoe")
@@ -1257,7 +1258,8 @@ def test_shop_respects_keeper_wealth():
         assert canoe in char.inventory
         assert canoe not in keeper.inventory
 
-        keeper.gold = 2; keeper.silver = 0
+        keeper.gold = 2
+        keeper.silver = 0
         accepted = process_command(char, "sell canoe")
         silver_match = re.search(r"(\d+) silver", accepted)
         assert silver_match is not None
