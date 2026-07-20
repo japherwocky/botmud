@@ -256,14 +256,19 @@ def _reset_object_registry():
     """INV-012: object_registry is global mutable state populated by
     spawn_object. Without this fixture, tests that call spawn_object would
     leak instances across the whole suite.
+
+    NOTE: The old snapshot/restore pattern accumulated objects across tests
+    because initialize_world (from _isolate_world) adds objects BEFORE this
+    fixture runs, so the snapshot captured both old and new worlds' objects.
+    The objects live in object_registry permanently, preventing GC and causing
+    OOM after ~900 tests. Simple clear at both ends suffices — initialize_world
+    repopulates the registry fresh each test.
     """
     from mud.models.obj import object_registry
 
-    snapshot = list(object_registry)
     object_registry.clear()
     yield
     object_registry.clear()
-    object_registry.extend(snapshot)
 
 
 @pytest.fixture
