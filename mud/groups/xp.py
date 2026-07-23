@@ -271,7 +271,7 @@ def xp_compute(gch: Character, victim: Character, total_levels: int) -> int:
     xp = rng_mm.number_range(low, high)
 
     divisor = max(1, total_levels - 1)
-    xp = c_div(xp * gch_level, divisor)
+    xp = c_div(xp * gch_level, divisor) * 3
     return max(0, xp)
 
 
