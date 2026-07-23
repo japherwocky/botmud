@@ -23,11 +23,19 @@ CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "*").spli
 # Keep these values here so engine code can reference parity timings.
 PULSE_PER_SECOND: int = 4
 
+# Extra speed-up applied only to the point/regen tick (hp/mana/move gain),
+# independent of TIME_SCALE — which also accelerates combat rounds, mob AI,
+# and area resets. Default 2 halves the regen tick to ~30s so lowbies (mages
+# especially) aren't stuck waiting a full 60s between hit/mana ticks.
+REGEN_TICK_SCALE: int = 2
+
 
 def get_pulse_tick() -> int:
     """Return pulses per game tick hour (ROM PULSE_TICK).
 
-    Matches ROM's PULSE_TICK = 60 * PULSE_PER_SECOND.
+    Matches ROM's PULSE_TICK = 60 * PULSE_PER_SECOND, further divided by
+    REGEN_TICK_SCALE so the regen tick alone can run faster without
+    changing combat/mob/area cadence.
     """
 
     scale = max(1, int(os.getenv("TIME_SCALE", os.getenv("MUD_TIME_SCALE", "1")) or 1))
@@ -38,9 +46,18 @@ def get_pulse_tick() -> int:
         scale = max(scale, int(getattr(_cfg, "TIME_SCALE", 1)))
     except Exception:
         pass
+
+    regen_scale = max(1, int(os.getenv("REGEN_TICK_SCALE", "1") or 1))
+    try:
+        from mud import config as _cfg  # local import to avoid cycles
+
+        regen_scale = max(regen_scale, int(getattr(_cfg, "REGEN_TICK_SCALE", 1)))
+    except Exception:
+        pass
+
     base = 60 * PULSE_PER_SECOND
     # Ensure at least 1 pulse per tick when scaled up
-    return max(1, base // scale)
+    return max(1, base // scale // regen_scale)
 
 
 def get_pulse_violence() -> int:
