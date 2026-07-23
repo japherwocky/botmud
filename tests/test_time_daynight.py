@@ -1,6 +1,5 @@
 from mud import config as mud_config
 from mud import game_loop
-from mud.config import get_pulse_tick
 from mud.models.character import Character, character_registry
 from mud.models.constants import Position, RoomFlag
 from mud.models.room import Room
@@ -30,9 +29,9 @@ def test_time_tick_advances_hour_and_triggers_sunrise():
     room.add_character(ch)
     character_registry.append(ch)
     time_info.hour = 4
-    # Advance exactly one ROM hour (PULSE_TICK pulses)
-    for _ in range(get_pulse_tick()):
-        game_loop.game_tick()
+    # setup_function zeroes _point_counter, so the point pulse (and the hour
+    # advance it drives) fires on this very first game_tick() call.
+    game_loop.game_tick()
     assert time_info.hour == 5
     assert time_info.sunlight == Sunlight.LIGHT
     assert "The day has begun." in ch.messages
@@ -52,8 +51,9 @@ def test_sunrise_broadcast_targets_awake_outdoor_characters():
 
     character_registry.extend([awake_outdoor, indoor_char, sleeping_outdoor])
     time_info.hour = 4
-    for _ in range(get_pulse_tick()):
-        game_loop.game_tick()
+    # setup_function zeroes _point_counter, so the point pulse fires on this
+    # very first game_tick() call.
+    game_loop.game_tick()
     assert "The day has begun." in awake_outdoor.messages
     assert "The day has begun." not in indoor_char.messages
     assert "The day has begun." not in sleeping_outdoor.messages

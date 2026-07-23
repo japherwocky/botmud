@@ -1627,6 +1627,24 @@ _area_counter = get_pulse_area()
 _music_counter = get_pulse_music()
 _mobile_counter = 0  # Will be initialized on first tick
 _violence_counter = 0  # Will be initialized on first tick
+# Total point pulses (hp/mana/move regen ticks) fired since process start.
+# Tests poll this instead of assuming a fixed pulse count per tick, since
+# _roll_pulse_tick() below makes the interval variable (see HELP TICK).
+_point_pulse_total = 0
+
+
+def _roll_pulse_tick() -> int:
+    """Randomize the next point-pulse interval (ROM src/update.c:1188).
+
+    ROM ships this jitter commented out (`pulse_point = PULSE_TICK` flat),
+    but HELP TICK documents the intended anti-metronome behavior: ticks
+    "average 30 seconds... but the actual amount varies randomly from 15
+    seconds to 45 seconds." We enable the commented formula
+    (number_range(PULSE_TICK/2, 3*PULSE_TICK/2)) so hp/mana/move regen
+    can't be timed precisely against a fixed clock.
+    """
+    base = get_pulse_tick()
+    return rng_mm.number_range(base // 2, (3 * base) // 2)
 
 # Off in production (zero overhead in the live loop). The test suite enables it
 # via an autouse fixture in tests/conftest.py so every game_tick asserts the
@@ -1742,6 +1760,7 @@ def game_tick() -> None:
     closest logical position without breaking ROM ordering.
     """
     global _pulse_counter, _point_counter, _area_counter, _music_counter, _mobile_counter, _violence_counter
+    global _point_pulse_total
     _pulse_counter += 1
 
     # Initialize counters on first tick
@@ -1791,7 +1810,8 @@ def game_tick() -> None:
     if _point_counter <= 0:
         # ROM src/update.c:1186 — immortal tick/debug notice before point updates.
         wiznet("TICK!", None, None, WiznetFlag.WIZ_TICKS, 0, 0)
-        _point_counter = get_pulse_tick()
+        _point_pulse_total += 1
+        _point_counter = _roll_pulse_tick()
         time_tick()
         weather_tick()
         char_update()

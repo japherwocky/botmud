@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import mud.game_loop as gl
 import mud.mobprog as mobprog
 from mud.ai import mobile_update
-from mud.config import get_pulse_tick, get_pulse_violence
+from mud.config import get_pulse_violence
 from mud.game_loop import (
     SkyState,
     char_update,
@@ -152,16 +152,21 @@ def test_regen_tick_increases_resources():
         perm_stat=[13, 13, 13, 13, 13],
         room=room,
     )
-    pulses = get_pulse_tick()
+    start = gl._point_pulse_total
 
     game_tick()
+    assert gl._point_pulse_total == start + 1
     assert ch.hit == 8 and ch.mana == 4 and ch.move == 10
 
-    for _ in range(max(0, pulses - 1)):
+    # The next point pulse is jittered (_roll_pulse_tick — HELP TICK's 15-45s
+    # spread), so poll for it instead of assuming a fixed pulse count.
+    guard = 0
+    while gl._point_pulse_total < start + 2:
+        assert ch.hit == 8 and ch.mana == 4 and ch.move == 10
         game_tick()
-    assert ch.hit == 8 and ch.mana == 4 and ch.move == 10
+        guard += 1
+        assert guard < 1000
 
-    game_tick()
     assert ch.hit == 10 and ch.mana == 5 and ch.move == 10
 
 

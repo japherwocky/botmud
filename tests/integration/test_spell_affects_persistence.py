@@ -56,11 +56,18 @@ def run_point_pulses(count: int = 1) -> None:
     """Run enough game_tick() calls to trigger count point pulses.
 
     ROM affects only tick on PULSE_TICK intervals (default 240 pulses = 1 minute).
-    This helper ensures tests wait for actual ROM timing.
+    game_loop._roll_pulse_tick() jitters that interval (HELP TICK's 15-45s
+    spread), so poll the actual point-pulse counter instead of assuming a
+    fixed number of game_tick() calls per pulse.
     """
-    ticks_per_pulse = get_pulse_tick()
-    for _ in range(count * ticks_per_pulse):
+    import mud.game_loop as gl
+
+    target = gl._point_pulse_total + count
+    guard = 0
+    while gl._point_pulse_total < target:
         game_tick()
+        guard += 1
+        assert guard < count * get_pulse_tick() * 4, "point pulse did not fire as expected"
 
 
 class TestSpellAffectPersistence:
